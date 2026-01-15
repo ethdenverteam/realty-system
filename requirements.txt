@@ -1,0 +1,35 @@
+# Web Framework
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+gunicorn==21.2.0
+flask-cors==4.0.0
+
+# Database
+SQLAlchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic==1.12.1
+
+# Authentication
+PyJWT==2.8.0
+cryptography==41.0.7
+
+# Telegram
+python-telegram-bot==20.7
+Telethon==1.32.0
+
+# Celery
+celery==5.3.4
+redis==5.0.1
+
+# Utilities
+python-dotenv==1.0.0
+aiofiles==23.2.1
+Pillow==10.1.0
+python-dateutil==2.8.2
+
+# Monitoring
+prometheus-client==0.19.0
+
+# Timezone
+pytz==2023.3
+
