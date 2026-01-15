@@ -71,6 +71,7 @@ def create_app(config_class=Config):
     from app.routes.admin import admin_bp
     from app.routes.dashboard import dashboard_bp
     from app.routes.logs import logs_bp
+    from app.routes.logs_viewer import logs_viewer_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(objects_bp, url_prefix='/api/objects')
@@ -80,6 +81,7 @@ def create_app(config_class=Config):
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
     app.register_blueprint(logs_bp, url_prefix='/api/logs')
+    app.register_blueprint(logs_viewer_bp, url_prefix='/api/logs-viewer')
     
     # Web pages
     @app.route('/')

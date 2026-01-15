@@ -42,6 +42,12 @@ def login():
     if not user:
         return jsonify({'error': 'User not found'}), 404
     
+    # Auto-assign admin role if user is ADMIN_ID
+    from app.config import Config
+    if user.telegram_id == Config.ADMIN_ID and user.web_role != 'admin':
+        user.web_role = 'admin'
+        logger.info(f"Auto-assigned admin role to user {user.user_id} (telegram_id: {user.telegram_id})")
+    
     # Mark code as used
     bot_code.is_used = True
     db.session.commit()

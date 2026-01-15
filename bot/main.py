@@ -45,8 +45,9 @@ def setup_bot_logging():
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    # Console handler
-    console_handler = logging.StreamHandler()
+    # Console handler - use sys.stdout for docker-compose logs
+    import sys
+    console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(simple_formatter)
     
@@ -97,6 +98,7 @@ def main():
     application.add_handler(CommandHandler("getcode", getcode_command))
     application.add_handler(CallbackQueryHandler(show_main_menu, pattern="^main_menu$"))
     application.add_handler(CallbackQueryHandler(add_object_start, pattern="^add_object$"))
+    application.add_handler(CallbackQueryHandler(getcode_command, pattern="^getcode$"))
     
     # Add more handlers from botOLD.py as needed
     # TODO: Port all handlers from botOLD.py
