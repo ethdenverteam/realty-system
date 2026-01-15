@@ -34,28 +34,28 @@ user_data = {}
 
 def get_rooms_config():
     """Get rooms configuration from SystemSetting or default"""
-    db = get_db()
+    db_session = get_db()
     try:
-        setting = db.query(SystemSetting).filter_by(key='rooms_config').first()
+        setting = db_session.query(SystemSetting).filter_by(key='rooms_config').first()
         if setting and setting.value_json:
             return setting.value_json
         # Default rooms
         return ["Студия", "1к", "2к", "3к", "4+к", "Дом", "евро1к", "евро2к", "евро3к"]
     finally:
-        db.close()
+        db_session.close()
 
 
 def get_districts_config():
     """Get districts configuration from SystemSetting or default"""
-    db = get_db()
+    db_session = get_db()
     try:
-        setting = db.query(SystemSetting).filter_by(key='districts_config').first()
+        setting = db_session.query(SystemSetting).filter_by(key='districts_config').first()
         if setting and setting.value_json:
             return setting.value_json
         # Default districts (empty dict)
         return {}
     finally:
-        db.close()
+        db_session.close()
 
 
 async def add_object_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
