@@ -265,8 +265,6 @@
                     body: formData
                 });
                 
-                const data = await response.json();
-                
                 const result = await response.json();
                 
                 if (response.ok && (result.success || result.object_id)) {
