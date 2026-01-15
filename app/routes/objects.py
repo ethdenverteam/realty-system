@@ -219,7 +219,11 @@ def create_object(current_user):
             }
         )
         
-        return jsonify(obj.to_dict()), 201
+        return jsonify({
+            'success': True,
+            'object_id': object_id,
+            'object': obj.to_dict()
+        }), 201
     except Exception as e:
         db.session.rollback()
         log_error(e, 'object_create_failed', current_user.user_id, {'object_id': object_id})

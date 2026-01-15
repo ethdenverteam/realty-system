@@ -267,14 +267,17 @@
                 
                 const data = await response.json();
                 
-                if (response.ok) {
-                    document.getElementById('success').textContent = `Объект создан! ID: ${data.object_id}`;
+                const result = await response.json();
+                
+                if (response.ok && (result.success || result.object_id)) {
+                    const objectId = result.object_id || (result.object && result.object.object_id);
+                    document.getElementById('success').textContent = `✅ Объект создан! ID: ${objectId}`;
                     document.getElementById('success').style.display = 'block';
                     setTimeout(() => {
-                        window.location.href = '/api/dashboard/';
+                        window.location.href = '/api/objects/list';
                     }, 2000);
                 } else {
-                    document.getElementById('error').textContent = data.error || 'Ошибка при создании объекта';
+                    document.getElementById('error').textContent = result.error || 'Ошибка при создании объекта';
                     document.getElementById('error').style.display = 'block';
                 }
             } catch (error) {
