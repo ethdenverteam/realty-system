@@ -399,6 +399,7 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
             return ConversationHandler.END
         
         # Get photos
+        photos_json = []
         if update.message.photo:
             photos = update.message.photo
             # Get largest photo
@@ -417,16 +418,18 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
                 db_session.commit()
     finally:
         db_session.close()
-            
-            remaining = 10 - len(photos_json)
-            if remaining > 0:
-                await update.message.reply_text(
-                    f"✅ Фото добавлено. Осталось мест: {remaining}. Отправьте еще фото или нажмите 'Готово':"
-                )
-                return OBJECT_WAITING_MEDIA
-            else:
-                await update.message.reply_text("✅ Все фото добавлены (максимум 10).")
-                return await finish_object_creation(update, context)
+    
+    # Handle photo response (outside of db session)
+    if update.message.photo:
+        remaining = 10 - len(photos_json)
+        if remaining > 0:
+            await update.message.reply_text(
+                f"✅ Фото добавлено. Осталось мест: {remaining}. Отправьте еще фото или нажмите 'Готово':"
+            )
+            return OBJECT_WAITING_MEDIA
+        else:
+            await update.message.reply_text("✅ Все фото добавлены (максимум 10).")
+            return await finish_object_creation(update, context)
     
     await update.message.reply_text("❌ Отправьте фото или нажмите 'Пропустить'.")
     return OBJECT_WAITING_MEDIA
