@@ -32,7 +32,7 @@ def stream_logs(current_user):
         
         log_file = log_files.get(log_type)
         if not log_file or not os.path.exists(log_file):
-            yield f"data: {jsonify({'error': 'Log file not found'}).get_data(as_text=True)}\n\n"
+            yield f"data: {json.dumps({'error': 'Log file not found'})}\n\n"
             return
         
         # Read last N lines
@@ -45,18 +45,18 @@ def stream_logs(current_user):
                 # Send initial lines
                 for line in last_lines:
                     if line.strip():
-                        yield f"data: {jsonify({'line': line.rstrip()}).get_data(as_text=True)}\n\n"
+                        yield f"data: {json.dumps({'line': line.rstrip()})}\n\n"
                 
                 # Stream new lines
                 f.seek(0, os.SEEK_END)
                 while True:
                     line = f.readline()
                     if line:
-                        yield f"data: {jsonify({'line': line.rstrip()}).get_data(as_text=True)}\n\n"
+                        yield f"data: {json.dumps({'line': line.rstrip()})}\n\n"
                     else:
                         time.sleep(0.5)  # Wait for new content
         except Exception as e:
-            yield f"data: {jsonify({'error': str(e)}).get_data(as_text=True)}\n\n"
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
     
     return Response(
         stream_with_context(generate()),
