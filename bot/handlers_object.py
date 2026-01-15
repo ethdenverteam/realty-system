@@ -476,15 +476,19 @@ async def finish_object_creation(update: Update, context: ContextTypes.DEFAULT_T
     # Show summary
     text = f"✅ <b>Объект создан!</b>\n\n"
     text += f"<b>ID:</b> {obj.object_id}\n"
-    text += f"<b>Тип:</b> {obj.rooms_type}\n"
-    text += f"<b>Цена:</b> {obj.price} тыс. руб.\n"
+    if obj.rooms_type:
+        text += f"<b>Тип:</b> {obj.rooms_type}\n"
+    if obj.price > 0:
+        text += f"<b>Цена:</b> {obj.price} тыс. руб.\n"
     if obj.area:
         text += f"<b>Площадь:</b> {obj.area} м²\n"
     if obj.floor:
         text += f"<b>Этаж:</b> {obj.floor}\n"
-    if obj.districts_json:
+    if obj.districts_json and len(obj.districts_json) > 0:
         text += f"<b>Районы:</b> {', '.join(obj.districts_json)}\n"
-    text += f"\nСтатус: {obj.status}"
+    if obj.comment:
+        text += f"<b>Описание:</b> {obj.comment[:50]}{'...' if len(obj.comment) > 50 else ''}\n"
+    text += f"\n<b>Статус:</b> {obj.status}"
     
     keyboard = [
         [InlineKeyboardButton("📋 Мои объекты", callback_data="my_objects")],
