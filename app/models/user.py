@@ -3,7 +3,7 @@ User model
 """
 from app.database import db
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, JSON
+from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Text, JSON
 from sqlalchemy.orm import relationship
 
 
@@ -12,7 +12,7 @@ class User(db.Model):
     __tablename__ = 'users'
     
     user_id = Column(Integer, primary_key=True, autoincrement=True)
-    telegram_id = Column(Integer, unique=True, nullable=False, index=True)
+    telegram_id = Column(BigInteger, unique=True, nullable=False, index=True)
     username = Column(String(255), nullable=True)
     phone = Column(String(20), nullable=True)
     bot_role = Column(String(50), default='start', nullable=False)  # start/broke/beginner/free/freepremium/premium
