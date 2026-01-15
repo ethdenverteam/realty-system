@@ -20,6 +20,13 @@ def create_object_page(current_user):
     return render_template('create_object.html')
 
 
+@objects_bp.route('/list', methods=['GET'])
+@jwt_required
+def list_objects_page(current_user):
+    """Show objects list page"""
+    return render_template('objects_list.html')
+
+
 @objects_bp.route('/', methods=['GET'])
 @jwt_required
 def list_objects(current_user):
