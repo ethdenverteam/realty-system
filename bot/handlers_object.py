@@ -12,6 +12,7 @@ from bot.utils import (
 from bot.database import get_db
 from bot.models import Object, SystemSetting, ActionLog
 from bot.config import ROLE_START, ROLE_BROKE, ROLE_BEGINNER
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +73,12 @@ async def add_object_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 obj = get_object(old_object_id)
                 if obj:
-                    db = get_db()
+                    db_session = get_db()
                     try:
-                        db.delete(obj)
-                        db.commit()
+                        db_session.delete(obj)
+                        db_session.commit()
                     finally:
-                        db.close()
+                        db_session.close()
             except Exception as e:
                 logger.error(f"Error deleting old object: {e}")
         user_data.pop(user.id, None)
@@ -97,15 +98,15 @@ async def add_object_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_obj:
             if user_obj.bot_role in [ROLE_START, ROLE_BROKE]:
                 user_obj.bot_role = ROLE_BEGINNER
-                db = get_db()
+                db_session = get_db()
                 try:
-                    db.commit()
+                    db_session.commit()
                 finally:
-                    db.close()
+                    db_session.close()
         
         # Log action
         try:
-            db = get_db()
+            db_session = get_db()
             try:
                 if user_obj:
                     action_log = ActionLog(
@@ -114,10 +115,10 @@ async def add_object_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         details_json={'object_id': object_id},
                         created_at=datetime.utcnow()
                     )
-                    db.add(action_log)
-                    db.commit()
+                    db_session.add(action_log)
+                    db_session.commit()
             finally:
-                db.close()
+                db_session.close()
         except Exception as e:
             logger.error(f"Failed to log action: {e}")
         
@@ -164,11 +165,11 @@ async def object_rooms_selected(update: Update, context: ContextTypes.DEFAULT_TY
     obj = get_object(object_id)
     if obj:
         obj.rooms_type = rooms_type
-        db = get_db()
+        db_session = get_db()
         try:
-            db.commit()
+            db_session.commit()
         finally:
-            db.close()
+            db_session.close()
     
     # Step 2: Select districts
     districts_config = get_districts_config()
@@ -220,11 +221,11 @@ async def object_district_selected(update: Update, context: ContextTypes.DEFAULT
     obj = get_object(object_id)
     if obj:
         obj.districts_json = user_data[user.id]["districts"]
-        db = get_db()
+        db_session = get_db()
         try:
-            db.commit()
+            db_session.commit()
         finally:
-            db.close()
+            db_session.close()
     
     # Go to price
     keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
@@ -253,11 +254,11 @@ async def object_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         obj = get_object(object_id)
         if obj:
             obj.price = price
-            db = get_db()
+            db_session = get_db()
             try:
-                db.commit()
+                db_session.commit()
             finally:
-                db.close()
+                db_session.close()
         
         # Go to area
         keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
@@ -290,11 +291,11 @@ async def object_area_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         obj = get_object(object_id)
         if obj:
             obj.area = area
-            db = get_db()
+            db_session = get_db()
             try:
-                db.commit()
+                db_session.commit()
             finally:
-                db.close()
+                db_session.close()
         
         # Check if rooms_type is "Дом" - skip floor
         if obj and obj.rooms_type == "Дом":
@@ -334,11 +335,11 @@ async def object_floor_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     obj = get_object(object_id)
     if obj:
         obj.floor = floor
-        db = get_db()
+        db_session = get_db()
         try:
-            db.commit()
+            db_session.commit()
         finally:
-            db.close()
+            db_session.close()
     
     # Go to comment
     keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
@@ -364,11 +365,11 @@ async def object_comment_input(update: Update, context: ContextTypes.DEFAULT_TYP
     obj = get_object(object_id)
     if obj:
         obj.comment = comment
-        db = get_db()
+        db_session = get_db()
         try:
-            db.commit()
+            db_session.commit()
         finally:
-            db.close()
+            db_session.close()
     
     # Go to media
     keyboard = [[InlineKeyboardButton("Пропустить", callback_data="skip_media")],
@@ -411,11 +412,11 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
                 'file_unique_id': photo.file_unique_id
             })
             obj.photos_json = photos_json
-            db = get_db()
+            db_session = get_db()
             try:
-                db.commit()
+                db_session.commit()
             finally:
-                db.close()
+                db_session.close()
             
             remaining = 10 - len(photos_json)
             if remaining > 0:
@@ -460,11 +461,11 @@ async def finish_object_creation(update: Update, context: ContextTypes.DEFAULT_T
     
     # Mark as draft
     obj.status = 'черновик'
-    db = get_db()
+    db_session = get_db()
     try:
-        db.commit()
+        db_session.commit()
     finally:
-        db.close()
+        db_session.close()
     
     # Clear user data
     user_data.pop(user.id, None)
@@ -505,12 +506,12 @@ async def cancel_object_creation(update: Update, context: ContextTypes.DEFAULT_T
             try:
                 obj = get_object(object_id)
                 if obj:
-                    db = get_db()
+                    db_session = get_db()
                     try:
-                        db.delete(obj)
-                        db.commit()
+                        db_session.delete(obj)
+                        db_session.commit()
                     finally:
-                        db.close()
+                        db_session.close()
             except Exception as e:
                 logger.error(f"Error deleting object: {e}")
         user_data.pop(user.id, None)

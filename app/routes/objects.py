@@ -125,7 +125,8 @@ def create_object(current_user):
                 from datetime import datetime
                 timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')
                 filename = f"{timestamp}_{filename}"
-                filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+                from app.config import Config
+                filepath = os.path.join(Config.UPLOAD_FOLDER, filename)
                 os.makedirs(os.path.dirname(filepath), exist_ok=True)
                 file.save(filepath)
                 photos_json.append(f"uploads/{filename}")
