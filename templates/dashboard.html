@@ -162,6 +162,7 @@
             <h2>Быстрые действия</h2>
             <a href="/api/objects" class="btn" target="_blank">Просмотр объектов (API)</a>
             <a href="/api/dashboard" class="btn" target="_blank" style="margin-left: 10px;">Статистика (API)</a>
+            <a href="/api/logs-viewer/view" class="btn" id="logsLink" style="margin-left: 10px; display: none;">Просмотр логов</a>
         </div>
     </div>
 
@@ -177,6 +178,11 @@
         
         // Display user info
         document.getElementById('userName').textContent = user.username || `ID: ${user.telegram_id}`;
+        
+        // Show logs link for admins
+        if (user.web_role === 'admin') {
+            document.getElementById('logsLink').style.display = 'inline-block';
+        }
         
         // Load dashboard data
         async function loadDashboard() {
