@@ -13,10 +13,14 @@ from sqlalchemy import func
 dashboard_bp = Blueprint('dashboard', __name__)
 
 
+@dashboard_bp.route('/', methods=['GET'])
 @dashboard_bp.route('/stats', methods=['GET'])
 @jwt_required
 def get_stats(current_user):
     """Get dashboard statistics"""
+    from app.models.telegram_account import TelegramAccount
+    from app.models.publication_history import PublicationHistory
+    
     # User's objects count
     objects_count = Object.query.filter_by(user_id=current_user.user_id).count()
     
@@ -33,9 +37,22 @@ def get_stats(current_user):
         func.date(PublicationQueue.created_at) == today
     ).count()
     
+    # Total publications
+    total_publications = PublicationHistory.query.filter_by(
+        user_id=current_user.user_id
+    ).count()
+    
+    # Accounts count
+    accounts_count = TelegramAccount.query.filter_by(
+        owner_id=current_user.user_id,
+        is_active=True
+    ).count()
+    
     return jsonify({
         'objects_count': objects_count,
         'objects_by_status': dict(objects_by_status),
-        'today_publications': today_publications
+        'today_publications': today_publications,
+        'total_publications': total_publications,
+        'accounts_count': accounts_count
     })
 

@@ -1,7 +1,7 @@
 """
 Authentication routes
 """
-from flask import Blueprint, request, jsonify, make_response
+from flask import Blueprint, request, jsonify, make_response, render_template
 from app.database import db
 from app.models.user import User
 from app.models.bot_web_code import BotWebCode
@@ -83,4 +83,10 @@ def get_current_user():
         return jsonify({'user': current_user.to_dict()})
     
     return _get_user()
+
+
+@auth_bp.route('/login', methods=['GET'])
+def login_page():
+    """Login page"""
+    return render_template('login.html')
 

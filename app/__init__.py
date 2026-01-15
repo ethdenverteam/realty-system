@@ -33,6 +33,19 @@ def create_app(config_class=Config):
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
     
+    # Web pages
+    @app.route('/')
+    def index():
+        """Redirect to login"""
+        from flask import redirect
+        return redirect('/api/auth/login')
+    
+    @app.route('/dashboard')
+    def dashboard_page():
+        """Dashboard page"""
+        from flask import render_template
+        return render_template('dashboard.html')
+    
     # Initialize database
     with app.app_context():
         init_db()
