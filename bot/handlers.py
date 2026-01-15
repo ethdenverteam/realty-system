@@ -1,10 +1,16 @@
 """
 Bot handlers - основные обработчики команд
 """
+import logging
+from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from bot.utils import get_user, update_user_activity, generate_web_code
 from bot.config import ADMIN_ID
+from bot.database import get_db
+from bot.models import ActionLog
+
+logger = logging.getLogger(__name__)
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -54,12 +60,35 @@ async def getcode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         code = generate_web_code(user_id)
         text = f"Ваш код для входа в веб-интерфейс:\n\n<b>{code}</b>\n\nКод действителен 10 минут."
         
+        # Log action
+        try:
+            db = get_db()
+            try:
+                user = get_user(user_id)
+                if user:
+                    action_log = ActionLog(
+                        user_id=user.user_id,
+                        action='bot_getcode_requested',
+                        details_json={'telegram_id': int(user_id), 'code': code},
+                        created_at=datetime.utcnow()
+                    )
+                    db.add(action_log)
+                    db.commit()
+            except Exception as e:
+                logger.error(f"Failed to log getcode action: {e}")
+                db.rollback()
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Failed to get DB session for logging: {e}")
+        
         if update.message:
             await update.message.reply_text(text, parse_mode='HTML')
         elif update.callback_query:
             await update.callback_query.answer()
             await update.callback_query.edit_message_text(text, parse_mode='HTML')
     except Exception as e:
+        logger.error(f"Error in getcode_command: {e}", exc_info=True)
         error_text = f"Ошибка при генерации кода: {str(e)}"
         if update.message:
             await update.message.reply_text(error_text)

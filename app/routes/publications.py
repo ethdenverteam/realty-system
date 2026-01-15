@@ -6,8 +6,11 @@ from app.database import db
 from app.models.publication_queue import PublicationQueue
 from app.models.object import Object
 from app.utils.decorators import jwt_required
+from app.utils.logger import log_action, log_error
+import logging
 
 publications_bp = Blueprint('publications', __name__)
+logger = logging.getLogger(__name__)
 
 
 @publications_bp.route('/queue', methods=['POST'])
@@ -43,12 +46,30 @@ def create_publication(current_user):
         db.session.add(queue)
         queue_ids.append(queue.queue_id)
     
-    db.session.commit()
-    
-    # TODO: Add to Celery queue
-    
-    return jsonify({
-        'success': True,
-        'queue_ids': queue_ids
-    }), 201
+    try:
+        db.session.commit()
+        
+        # Log publication creation
+        log_action(
+            action='publication_queued',
+            user_id=current_user.user_id,
+            details={
+                'object_id': object_id,
+                'chat_count': len(chat_ids),
+                'account_id': account_id,
+                'mode': mode,
+                'queue_ids': queue_ids
+            }
+        )
+        
+        # TODO: Add to Celery queue
+        
+        return jsonify({
+            'success': True,
+            'queue_ids': queue_ids
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        log_error(e, 'publication_queue_failed', current_user.user_id, {'object_id': object_id})
+        return jsonify({'error': str(e)}), 500
 

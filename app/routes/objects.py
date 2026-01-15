@@ -5,9 +5,12 @@ from flask import Blueprint, request, jsonify
 from app.database import db
 from app.models.object import Object
 from app.utils.decorators import jwt_required, role_required
+from app.utils.logger import log_action, log_error
 from sqlalchemy import or_, and_
+import logging
 
 objects_bp = Blueprint('objects', __name__)
+logger = logging.getLogger(__name__)
 
 
 @objects_bp.route('/', methods=['GET'])
@@ -125,10 +128,28 @@ def create_object(current_user):
         source='web'
     )
     
-    db.session.add(obj)
-    db.session.commit()
-    
-    return jsonify(obj.to_dict()), 201
+    try:
+        db.session.add(obj)
+        db.session.commit()
+        
+        # Log creation
+        log_action(
+            action='object_created',
+            user_id=current_user.user_id,
+            details={
+                'object_id': object_id,
+                'rooms_type': obj.rooms_type,
+                'price': obj.price,
+                'status': obj.status,
+                'source': 'web'
+            }
+        )
+        
+        return jsonify(obj.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        log_error(e, 'object_create_failed', current_user.user_id, {'object_id': object_id})
+        return jsonify({'error': str(e)}), 500
 
 
 @objects_bp.route('/<object_id>', methods=['PUT'])
@@ -170,9 +191,28 @@ def update_object(object_id, current_user):
     if 'status' in data:
         obj.status = data['status']
     
-    db.session.commit()
-    
-    return jsonify(obj.to_dict())
+    try:
+        # Store old status for logging
+        old_status = obj.status
+        db.session.commit()
+        
+        # Log update
+        log_action(
+            action='object_updated',
+            user_id=current_user.user_id,
+            details={
+                'object_id': object_id,
+                'updated_fields': list(data.keys()),
+                'old_status': old_status if 'status' in data else None,
+                'new_status': obj.status if 'status' in data else None
+            }
+        )
+        
+        return jsonify(obj.to_dict())
+    except Exception as e:
+        db.session.rollback()
+        log_error(e, 'object_update_failed', current_user.user_id, {'object_id': object_id})
+        return jsonify({'error': str(e)}), 500
 
 
 @objects_bp.route('/<object_id>', methods=['DELETE'])
@@ -184,8 +224,28 @@ def delete_object(object_id, current_user):
     if not obj:
         return jsonify({'error': 'Object not found'}), 404
     
-    db.session.delete(obj)
-    db.session.commit()
-    
-    return jsonify({'success': True})
+    try:
+        # Store object info for logging
+        object_info = {
+            'object_id': object_id,
+            'rooms_type': obj.rooms_type,
+            'price': obj.price,
+            'status': obj.status
+        }
+        
+        db.session.delete(obj)
+        db.session.commit()
+        
+        # Log deletion
+        log_action(
+            action='object_deleted',
+            user_id=current_user.user_id,
+            details=object_info
+        )
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        log_error(e, 'object_delete_failed', current_user.user_id, {'object_id': object_id})
+        return jsonify({'error': str(e)}), 500
 

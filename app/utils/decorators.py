@@ -32,11 +32,14 @@ def jwt_required(f):
         if not payload:
             return jsonify({'error': 'Invalid or expired token'}), 401
         
-        # Add user to kwargs
+        # Add user to kwargs and request context
         user = User.query.get(payload.get('user_id'))
         if not user:
             return jsonify({'error': 'User not found'}), 404
         
+        from flask import g
+        g.current_user = user
+        g.current_user_id = user.user_id
         kwargs['current_user'] = user
         return f(*args, **kwargs)
     

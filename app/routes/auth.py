@@ -1,16 +1,19 @@
 """
 Authentication routes
 """
-from flask import Blueprint, request, jsonify, make_response, render_template
+from flask import Blueprint, request, jsonify, make_response, render_template, g
 from app.database import db
 from app.models.user import User
 from app.models.bot_web_code import BotWebCode
 from app.utils.jwt import generate_token
+from app.utils.logger import log_action, log_error
 from datetime import datetime, timedelta
 import random
 import string
+import logging
 
 auth_bp = Blueprint('auth', __name__)
+logger = logging.getLogger(__name__)
 
 
 @auth_bp.route('/login', methods=['POST'])
@@ -43,6 +46,19 @@ def login():
     bot_code.is_used = True
     db.session.commit()
     
+    # Log successful login
+    log_action(
+        action='user_login',
+        user_id=user.user_id,
+        details={
+            'method': 'bot_code',
+            'username': user.username,
+            'telegram_id': user.telegram_id
+        },
+        ip_address=request.remote_addr,
+        user_agent=request.user_agent.string if request.user_agent else None
+    )
+    
     # Generate JWT token
     token = generate_token(user)
     
@@ -68,9 +84,22 @@ def login():
 @auth_bp.route('/logout', methods=['POST'])
 def logout():
     """Logout user"""
-    response = make_response(jsonify({'success': True}))
-    response.set_cookie('jwt_token', '', expires=0)
-    return response
+    from app.utils.decorators import jwt_required
+    
+    @jwt_required
+    def _logout(current_user):
+        # Log logout
+        log_action(
+            action='user_logout',
+            user_id=current_user.user_id,
+            details={'username': current_user.username}
+        )
+        
+        response = make_response(jsonify({'success': True}))
+        response.set_cookie('jwt_token', '', expires=0)
+        return response
+    
+    return _logout()
 
 
 @auth_bp.route('/me', methods=['GET'])

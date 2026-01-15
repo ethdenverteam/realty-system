@@ -5,9 +5,12 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 import random
 import string
+import logging
 from bot.database import get_db
-from bot.models import User, Object, Chat, BotWebCode, SystemSetting
+from bot.models import User, Object, Chat, BotWebCode, SystemSetting, ActionLog
 from sqlalchemy import func
+
+logger = logging.getLogger(__name__)
 
 
 def get_moscow_time() -> datetime:
@@ -78,8 +81,10 @@ def update_user_activity(user_id: str, username: str = None):
     db = get_db()
     try:
         user = db.query(User).filter_by(telegram_id=int(user_id)).first()
+        is_new_user = False
         
         if not user:
+            is_new_user = True
             user = User(
                 telegram_id=int(user_id),
                 username=username or "",
@@ -94,6 +99,21 @@ def update_user_activity(user_id: str, username: str = None):
                 user.username = username
         
         db.commit()
+        
+        # Log user activity
+        if is_new_user:
+            try:
+                action_log = ActionLog(
+                    user_id=user.user_id,
+                    action='bot_user_registered',
+                    details_json={'telegram_id': int(user_id), 'username': username},
+                    created_at=datetime.utcnow()
+                )
+                db.add(action_log)
+                db.commit()
+            except Exception as e:
+                logger.error(f"Failed to log user registration: {e}")
+                db.rollback()
     finally:
         db.close()
 
