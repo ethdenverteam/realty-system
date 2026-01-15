@@ -21,6 +21,48 @@ def list_users(current_user):
     return jsonify([user.to_dict() for user in users])
 
 
+@admin_bp.route('/stats', methods=['GET'])
+@jwt_required
+@role_required('admin')
+def get_admin_stats(current_user):
+    """Get admin statistics"""
+    from app.models.telegram_account import TelegramAccount
+    from app.models.publication_history import PublicationHistory
+    from app.models.publication_queue import PublicationQueue
+    from datetime import datetime, timedelta
+    
+    # Total users
+    users_count = User.query.count()
+    
+    # Total objects
+    objects_count = Object.query.count()
+    
+    # Publications today
+    today = datetime.utcnow().date()
+    publications_today = PublicationQueue.query.filter(
+        func.date(PublicationQueue.created_at) == today
+    ).count()
+    
+    # Active accounts
+    accounts_count = TelegramAccount.query.filter_by(is_active=True).count()
+    
+    return jsonify({
+        'users_count': users_count,
+        'objects_count': objects_count,
+        'publications_today': publications_today,
+        'accounts_count': accounts_count
+    })
+
+
+@admin_bp.route('/dashboard', methods=['GET'])
+@jwt_required
+@role_required('admin')
+def admin_dashboard_page(current_user):
+    """Admin dashboard page"""
+    from flask import render_template
+    return render_template('dashboard_admin.html')
+
+
 @admin_bp.route('/users/<int:user_id>/role', methods=['PUT'])
 @jwt_required
 @role_required('admin')

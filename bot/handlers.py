@@ -27,10 +27,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показать главное меню"""
     keyboard = [
-        [InlineKeyboardButton("Добавить объект", callback_data="add_object")],
-        [InlineKeyboardButton("Мои объекты", callback_data="my_objects")],
-        [InlineKeyboardButton("Настройки", callback_data="settings")],
-        [InlineKeyboardButton("Получить код для веба", callback_data="getcode")],
+        [InlineKeyboardButton("➕ Добавить объект", callback_data="add_object")],
+        [InlineKeyboardButton("📋 Мои объекты", callback_data="my_objects")],
+        [InlineKeyboardButton("⚙️ Настройки", callback_data="settings")],
+        [InlineKeyboardButton("🔑 Получить код для веба", callback_data="getcode")],
     ]
     
     if update.effective_user.id == ADMIN_ID:

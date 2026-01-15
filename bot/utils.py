@@ -264,15 +264,15 @@ def update_object(object_id: str, updates: Dict):
 
 def get_user_objects(user_id: str) -> List[Object]:
     """Получить все объекты пользователя"""
-    db = get_db()
+    db_session = get_db()
     try:
         user = get_user(user_id)
         if not user:
             return []
         
-        return db.query(Object).filter_by(user_id=user.user_id).all()
+        return db_session.query(Object).filter_by(user_id=user.user_id).all()
     finally:
-        db.close()
+        db_session.close()
 
 
 def get_chats() -> List[Chat]:

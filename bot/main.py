@@ -15,6 +15,7 @@ from bot.handlers import (
     getcode_command
 )
 from bot.handlers_object import create_object_conversation_handler
+from bot.handlers_objects_view import my_objects_command, my_objects_callback
 from bot.config import BOT_TOKEN, ADMIN_ID
 
 # Setup logging
@@ -46,11 +47,13 @@ def setup_bot_logging():
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    # Console handler - use sys.stdout for docker-compose logs
+    # Console handler - use sys.stdout for docker-compose logs (unbuffered)
     import sys
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(logging.DEBUG)  # Changed to DEBUG for more info
     console_handler.setFormatter(simple_formatter)
+    # Force flush for real-time logs
+    console_handler.stream.reconfigure(line_buffering=True)
     
     # File handler - all logs
     all_logs_file = os.path.join(log_dir, 'bot.log')
@@ -97,8 +100,10 @@ def main():
     # Register handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("getcode", getcode_command))
+    application.add_handler(CommandHandler("myobjects", my_objects_command))
     application.add_handler(CallbackQueryHandler(show_main_menu, pattern="^main_menu$"))
     application.add_handler(CallbackQueryHandler(getcode_command, pattern="^getcode$"))
+    application.add_handler(CallbackQueryHandler(my_objects_callback, pattern="^my_objects$"))
     
     # Add object creation conversation handler
     application.add_handler(create_object_conversation_handler())

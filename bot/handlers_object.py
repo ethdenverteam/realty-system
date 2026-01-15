@@ -162,14 +162,14 @@ async def object_rooms_selected(update: Update, context: ContextTypes.DEFAULT_TY
     object_id = user_data[user.id]["object_id"]
     
     # Update object
-    obj = get_object(object_id)
-    if obj:
-        obj.rooms_type = rooms_type
-        db_session = get_db()
-        try:
+    db_session = get_db()
+    try:
+        obj = db_session.query(Object).filter_by(object_id=object_id).first()
+        if obj:
+            obj.rooms_type = rooms_type
             db_session.commit()
-        finally:
-            db_session.close()
+    finally:
+        db_session.close()
     
     # Step 2: Select districts
     districts_config = get_districts_config()
@@ -218,14 +218,14 @@ async def object_district_selected(update: Update, context: ContextTypes.DEFAULT
     
     # Update object
     object_id = user_data[user.id]["object_id"]
-    obj = get_object(object_id)
-    if obj:
-        obj.districts_json = user_data[user.id]["districts"]
-        db_session = get_db()
-        try:
+    db_session = get_db()
+    try:
+        obj = db_session.query(Object).filter_by(object_id=object_id).first()
+        if obj:
+            obj.districts_json = user_data[user.id]["districts"]
             db_session.commit()
-        finally:
-            db_session.close()
+    finally:
+        db_session.close()
     
     # Go to price
     keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
@@ -251,14 +251,14 @@ async def object_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         # Update object
         object_id = user_data[user.id]["object_id"]
-        obj = get_object(object_id)
-        if obj:
-            obj.price = price
-            db_session = get_db()
-            try:
+        db_session = get_db()
+        try:
+            obj = db_session.query(Object).filter_by(object_id=object_id).first()
+            if obj:
+                obj.price = price
                 db_session.commit()
-            finally:
-                db_session.close()
+        finally:
+            db_session.close()
         
         # Go to area
         keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
@@ -288,14 +288,14 @@ async def object_area_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Update object
         object_id = user_data[user.id]["object_id"]
-        obj = get_object(object_id)
-        if obj:
-            obj.area = area
-            db_session = get_db()
-            try:
+        db_session = get_db()
+        try:
+            obj = db_session.query(Object).filter_by(object_id=object_id).first()
+            if obj:
+                obj.area = area
                 db_session.commit()
-            finally:
-                db_session.close()
+        finally:
+            db_session.close()
         
         # Check if rooms_type is "Дом" - skip floor
         if obj and obj.rooms_type == "Дом":
@@ -332,14 +332,14 @@ async def object_floor_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # Update object
     object_id = user_data[user.id]["object_id"]
-    obj = get_object(object_id)
-    if obj:
-        obj.floor = floor
-        db_session = get_db()
-        try:
+    db_session = get_db()
+    try:
+        obj = db_session.query(Object).filter_by(object_id=object_id).first()
+        if obj:
+            obj.floor = floor
             db_session.commit()
-        finally:
-            db_session.close()
+    finally:
+        db_session.close()
     
     # Go to comment
     keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
@@ -362,14 +362,14 @@ async def object_comment_input(update: Update, context: ContextTypes.DEFAULT_TYP
     
     # Update object
     object_id = user_data[user.id]["object_id"]
-    obj = get_object(object_id)
-    if obj:
-        obj.comment = comment
-        db_session = get_db()
-        try:
+    db_session = get_db()
+    try:
+        obj = db_session.query(Object).filter_by(object_id=object_id).first()
+        if obj:
+            obj.comment = comment
             db_session.commit()
-        finally:
-            db_session.close()
+    finally:
+        db_session.close()
     
     # Go to media
     keyboard = [[InlineKeyboardButton("Пропустить", callback_data="skip_media")],
@@ -390,33 +390,33 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
         return ConversationHandler.END
     
     object_id = user_data[user.id]["object_id"]
-    obj = get_object(object_id)
-    
-    if not obj:
-        await update.message.reply_text("Ошибка: объект не найден.")
-        return ConversationHandler.END
-    
-    # Get photos
-    if update.message.photo:
-        photos = update.message.photo
-        # Get largest photo
-        photo = photos[-1]
-        file = await context.bot.get_file(photo.file_id)
+    db_session = get_db()
+    try:
+        obj = db_session.query(Object).filter_by(object_id=object_id).first()
         
-        # Save photo info (in production, download and save to uploads/)
-        # For now, just store file_id
-        photos_json = obj.photos_json or []
-        if len(photos_json) < 10:
-            photos_json.append({
-                'file_id': photo.file_id,
-                'file_unique_id': photo.file_unique_id
-            })
-            obj.photos_json = photos_json
-            db_session = get_db()
-            try:
+        if not obj:
+            await update.message.reply_text("Ошибка: объект не найден.")
+            return ConversationHandler.END
+        
+        # Get photos
+        if update.message.photo:
+            photos = update.message.photo
+            # Get largest photo
+            photo = photos[-1]
+            file = await context.bot.get_file(photo.file_id)
+            
+            # Save photo info (in production, download and save to uploads/)
+            # For now, just store file_id
+            photos_json = obj.photos_json or []
+            if len(photos_json) < 10:
+                photos_json.append({
+                    'file_id': photo.file_id,
+                    'file_unique_id': photo.file_unique_id
+                })
+                obj.photos_json = photos_json
                 db_session.commit()
-            finally:
-                db_session.close()
+    finally:
+        db_session.close()
             
             remaining = 10 - len(photos_json)
             if remaining > 0:
@@ -450,22 +450,25 @@ async def finish_object_creation(update: Update, context: ContextTypes.DEFAULT_T
         return ConversationHandler.END
     
     object_id = user_data[user.id]["object_id"]
-    obj = get_object(object_id)
-    
-    if not obj:
-        if update.callback_query:
-            await update.callback_query.edit_message_text("Ошибка: объект не найден.")
-        else:
-            await update.message.reply_text("Ошибка: объект не найден.")
-        return ConversationHandler.END
-    
-    # Mark as draft
-    obj.status = 'черновик'
     db_session = get_db()
     try:
+        obj = db_session.query(Object).filter_by(object_id=object_id).first()
+        
+        if not obj:
+            if update.callback_query:
+                await update.callback_query.edit_message_text("Ошибка: объект не найден.")
+            else:
+                await update.message.reply_text("Ошибка: объект не найден.")
+            return ConversationHandler.END
+        
+        # Mark as draft
+        obj.status = 'черновик'
         db_session.commit()
     finally:
         db_session.close()
+    
+    # Get object again for display (after commit)
+    obj = get_object(object_id)
     
     # Clear user data
     user_data.pop(user.id, None)

@@ -218,8 +218,10 @@ def log_request():
         return
     
     try:
-        # Skip logging for static files and health checks
-        if request.path.startswith('/static/') or request.path == '/health':
+        # Skip logging for static files, health checks, and metrics
+        if (request.path.startswith('/static/') or 
+            request.path == '/health' or 
+            request.path == '/metrics'):
             return
         
         # Get user ID if authenticated
@@ -251,8 +253,10 @@ def log_response(response):
         return response
     
     try:
-        # Skip logging for static files
-        if request.path.startswith('/static/') or request.path == '/health':
+        # Skip logging for static files, health checks, and metrics
+        if (request.path.startswith('/static/') or 
+            request.path == '/health' or 
+            request.path == '/metrics'):
             return response
         
         # Get user ID if authenticated

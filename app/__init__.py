@@ -38,7 +38,13 @@ def create_app(config_class=Config):
     @app.errorhandler(Exception)
     def handle_exception(e):
         from app.utils.logger import log_error
+        from werkzeug.exceptions import NotFound
         import traceback
+        
+        # Don't log 404 errors for /metrics (Prometheus)
+        if isinstance(e, NotFound) and request.path == '/metrics':
+            from flask import jsonify
+            return jsonify({'error': 'Not found'}), 404
         
         logger = logging.getLogger('app.errors')
         logger.error(f"Unhandled exception: {e}", exc_info=True)
