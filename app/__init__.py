@@ -9,7 +9,9 @@ from app.config import Config
 
 def create_app(config_class=Config):
     """Create and configure Flask application"""
-    app = Flask(__name__)
+    import os
+    template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates')
+    app = Flask(__name__, template_folder=template_dir)
     app.config.from_object(config_class)
     
     # Initialize extensions
