@@ -11,17 +11,15 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'change_telegram_id_bigint'
-down_revision = 'eef5d1222136'
+down_revision = 'eef5d1222136'  # Initial migration revision
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
     # Change telegram_id from Integer to BigInteger
-    op.alter_column('users', 'telegram_id',
-                    existing_type=sa.Integer(),
-                    type_=sa.BigInteger(),
-                    existing_nullable=False)
+    # Using raw SQL to avoid revision dependency issues
+    op.execute('ALTER TABLE users ALTER COLUMN telegram_id TYPE BIGINT')
 
 
 def downgrade() -> None:
