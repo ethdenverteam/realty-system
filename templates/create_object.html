@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Создать объект - Realty System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .form-section {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-section h3 {
+            margin-bottom: 20px;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .photo-preview {
+            display: inline-block;
+            margin: 10px;
+            position: relative;
+        }
+        .photo-preview img {
+            width: 150px;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .photo-preview .remove-btn {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: red;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand">Создание объекта</span>
+            <a href="/api/dashboard/" class="btn btn-outline-light btn-sm">Назад в дашборд</a>
+        </div>
+    </nav>
+    
+    <div class="container mt-4">
+        <div id="error" class="alert alert-danger" style="display: none;"></div>
+        <div id="success" class="alert alert-success" style="display: none;"></div>
+        
+        <form id="objectForm">
+            <!-- Основная информация -->
+            <div class="form-section">
+                <h3>Основная информация</h3>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="rooms_type" class="form-label">Тип комнат *</label>
+                        <select class="form-select" id="rooms_type" required>
+                            <option value="">Выберите тип</option>
+                            <option value="Студия">Студия</option>
+                            <option value="1к">1к</option>
+                            <option value="2к">2к</option>
+                            <option value="3к">3к</option>
+                            <option value="4+к">4+к</option>
+                            <option value="Дом">Дом</option>
+                            <option value="евро1к">евро1к</option>
+                            <option value="евро2к">евро2к</option>
+                            <option value="евро3к">евро3к</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="price" class="form-label">Цена (тыс. руб.) *</label>
+                        <input type="number" class="form-control" id="price" step="0.01" min="0" required>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="area" class="form-label">Площадь (м²) *</label>
+                        <input type="number" class="form-control" id="area" step="0.01" min="0" required>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="floor" class="form-label">Этаж</label>
+                        <input type="text" class="form-control" id="floor" placeholder="например: 5/9">
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="districts" class="form-label">Районы</label>
+                    <input type="text" class="form-control" id="districts" placeholder="Введите районы через запятую">
+                    <small class="form-text text-muted">Например: ККБ, Музыкальный</small>
+                </div>
+            </div>
+            
+            <!-- Описание -->
+            <div class="form-section">
+                <h3>Описание</h3>
+                <div class="mb-3">
+                    <label for="comment" class="form-label">Комментарий</label>
+                    <textarea class="form-control" id="comment" rows="4" placeholder="Опишите квартиру и условия покупки"></textarea>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="address" class="form-label">Адрес</label>
+                    <input type="text" class="form-control" id="address" placeholder="Улица и номер дома">
+                </div>
+                
+                <div class="mb-3">
+                    <label for="renovation" class="form-label">Состояние ремонта</label>
+                    <select class="form-select" id="renovation">
+                        <option value="">Не указано</option>
+                        <option value="Черновая">Черновая</option>
+                        <option value="ПЧО">ПЧО</option>
+                        <option value="Ремонт требует освежения">Ремонт требует освежения</option>
+                        <option value="Хороший ремонт">Хороший ремонт</option>
+                        <option value="Инстаграмный">Инстаграмный</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Фото -->
+            <div class="form-section">
+                <h3>Фотографии (до 10)</h3>
+                <div class="mb-3">
+                    <input type="file" class="form-control" id="photos" accept="image/*" multiple>
+                    <small class="form-text text-muted">Можно выбрать несколько файлов (до 10)</small>
+                </div>
+                <div id="photoPreview"></div>
+            </div>
+            
+            <!-- Контакты -->
+            <div class="form-section">
+                <h3>Контакты</h3>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="contact_name" class="form-label">Имя контакта</label>
+                        <input type="text" class="form-control" id="contact_name">
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="phone_number" class="form-label">Телефон</label>
+                        <input type="tel" class="form-control" id="phone_number" placeholder="+79991234567">
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="show_username">
+                        <label class="form-check-label" for="show_username">
+                            Показывать username Telegram
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary btn-lg">Создать объект</button>
+                <a href="/api/dashboard/" class="btn btn-secondary">Отмена</a>
+            </div>
+        </form>
+    </div>
+    
+    <script>
+        const token = localStorage.getItem('jwt_token');
+        if (!token) {
+            window.location.href = '/';
+        }
+        
+        const photos = [];
+        const photoPreview = document.getElementById('photoPreview');
+        
+        // Handle photo selection
+        document.getElementById('photos').addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            if (photos.length + files.length > 10) {
+                alert('Максимум 10 фото!');
+                return;
+            }
+            
+            files.forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    photos.push(file);
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const div = document.createElement('div');
+                        div.className = 'photo-preview';
+                        div.innerHTML = `
+                            <img src="${e.target.result}" alt="Preview">
+                            <button type="button" class="remove-btn" onclick="removePhoto(${photos.length - 1})">×</button>
+                        `;
+                        photoPreview.appendChild(div);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        });
+        
+        function removePhoto(index) {
+            photos.splice(index, 1);
+            updatePhotoPreview();
+        }
+        
+        function updatePhotoPreview() {
+            photoPreview.innerHTML = '';
+            photos.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const div = document.createElement('div');
+                    div.className = 'photo-preview';
+                    div.innerHTML = `
+                        <img src="${e.target.result}" alt="Preview">
+                        <button type="button" class="remove-btn" onclick="removePhoto(${index})">×</button>
+                    `;
+                    photoPreview.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        // Handle form submission
+        document.getElementById('objectForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('rooms_type', document.getElementById('rooms_type').value);
+            formData.append('price', document.getElementById('price').value);
+            formData.append('area', document.getElementById('area').value);
+            formData.append('floor', document.getElementById('floor').value);
+            formData.append('comment', document.getElementById('comment').value);
+            formData.append('address', document.getElementById('address').value);
+            formData.append('renovation', document.getElementById('renovation').value);
+            formData.append('contact_name', document.getElementById('contact_name').value);
+            formData.append('phone_number', document.getElementById('phone_number').value);
+            formData.append('show_username', document.getElementById('show_username').checked);
+            
+            // Districts
+            const districts = document.getElementById('districts').value
+                .split(',')
+                .map(d => d.trim())
+                .filter(d => d);
+            formData.append('districts_json', JSON.stringify(districts));
+            
+            // Photos
+            photos.forEach((photo, index) => {
+                formData.append(`photo_${index}`, photo);
+            });
+            
+            try {
+                const response = await fetch('/api/objects/', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('success').textContent = `Объект создан! ID: ${data.object_id}`;
+                    document.getElementById('success').style.display = 'block';
+                    setTimeout(() => {
+                        window.location.href = '/api/dashboard/';
+                    }, 2000);
+                } else {
+                    document.getElementById('error').textContent = data.error || 'Ошибка при создании объекта';
+                    document.getElementById('error').style.display = 'block';
+                }
+            } catch (error) {
+                document.getElementById('error').textContent = 'Ошибка: ' + error.message;
+                document.getElementById('error').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
+

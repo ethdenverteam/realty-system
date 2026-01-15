@@ -1,7 +1,7 @@
 """
 Objects routes
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app, render_template
 from app.database import db
 from app.models.object import Object
 from app.utils.decorators import jwt_required, role_required
@@ -11,6 +11,13 @@ import logging
 
 objects_bp = Blueprint('objects', __name__)
 logger = logging.getLogger(__name__)
+
+
+@objects_bp.route('/create', methods=['GET'])
+@jwt_required
+def create_object_page(current_user):
+    """Show object creation page"""
+    return render_template('create_object.html')
 
 
 @objects_bp.route('/', methods=['GET'])
@@ -82,15 +89,74 @@ def get_object(object_id, current_user):
 @jwt_required
 def create_object(current_user):
     """Create new object"""
-    data = request.get_json()
+    from werkzeug.utils import secure_filename
+    import os
+    import json
     
-    # Generate object_id (simplified, should use proper logic from bot)
-    # TODO: Implement proper ID generation like in bot
-    from datetime import datetime
-    import random
-    import string
+    # Check if form data (file upload) or JSON
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        # Handle form data with file uploads
+        rooms_type = request.form.get('rooms_type', '')
+        price = float(request.form.get('price', 0))
+        area = float(request.form.get('area', 0)) if request.form.get('area') else None
+        floor = request.form.get('floor', '')
+        comment = request.form.get('comment', '')
+        address = request.form.get('address', '')
+        renovation = request.form.get('renovation', '')
+        contact_name = request.form.get('contact_name', '')
+        phone_number = request.form.get('phone_number', '')
+        show_username = request.form.get('show_username') == 'true'
+        
+        # Parse districts
+        districts_json_str = request.form.get('districts_json', '[]')
+        try:
+            districts_json = json.loads(districts_json_str) if districts_json_str else []
+        except:
+            districts_json = []
+        
+        # Handle photo uploads
+        photos_json = []
+        photo_index = 0
+        while f'photo_{photo_index}' in request.files:
+            file = request.files[f'photo_{photo_index}']
+            if file and file.filename:
+                filename = secure_filename(file.filename)
+                # Create unique filename
+                from datetime import datetime
+                timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')
+                filename = f"{timestamp}_{filename}"
+                filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                file.save(filepath)
+                photos_json.append(f"uploads/{filename}")
+            photo_index += 1
+    else:
+        # Handle JSON data
+        data = request.get_json()
+        rooms_type = data.get('rooms_type', '')
+        price = float(data.get('price', 0))
+        area = data.get('area')
+        floor = data.get('floor', '')
+        comment = data.get('comment', '')
+        address = data.get('address', '')
+        renovation = data.get('renovation', '')
+        contact_name = data.get('contact_name', '')
+        phone_number = data.get('phone_number', '')
+        show_username = data.get('show_username', False)
+        districts_json = data.get('districts_json', [])
+        photos_json = data.get('photos_json', [])
     
-    prefix = current_user.settings_json.get('id_prefix', 'WEB')
+    # Generate object_id (proper logic from bot)
+    prefix = current_user.settings_json.get('id_prefix', 'WEB') if current_user.settings_json else 'WEB'
+    if not prefix:
+        # Generate prefix if not exists
+        from bot.utils import generate_next_id_prefix
+        prefix = generate_next_id_prefix()
+        if not current_user.settings_json:
+            current_user.settings_json = {}
+        current_user.settings_json['id_prefix'] = prefix
+        db.session.commit()
+    
     # Get next number for user
     last_obj = Object.query.filter(
         Object.object_id.like(f'{prefix}%')
@@ -110,20 +176,20 @@ def create_object(current_user):
     obj = Object(
         object_id=object_id,
         user_id=current_user.user_id,
-        rooms_type=data.get('rooms_type', ''),
-        price=float(data.get('price', 0)),
-        districts_json=data.get('districts_json', []),
-        region=data.get('region'),
-        city=data.get('city'),
-        photos_json=data.get('photos_json', []),
-        area=data.get('area'),
-        floor=data.get('floor'),
-        address=data.get('address'),
-        renovation=data.get('renovation'),
-        comment=data.get('comment'),
-        contact_name=data.get('contact_name'),
-        show_username=data.get('show_username', False),
-        phone_number=data.get('phone_number'),
+        rooms_type=rooms_type,
+        price=price,
+        districts_json=districts_json,
+        region=None,  # TODO: Extract from districts
+        city=None,  # TODO: Extract from districts
+        photos_json=photos_json,
+        area=area,
+        floor=floor,
+        address=address,
+        renovation=renovation,
+        comment=comment,
+        contact_name=contact_name,
+        show_username=show_username,
+        phone_number=phone_number,
         status='черновик',
         source='web'
     )

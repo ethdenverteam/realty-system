@@ -11,9 +11,10 @@ from telegram.ext import (
 )
 
 from bot.handlers import (
-    start_command, show_main_menu, add_object_start,
+    start_command, show_main_menu,
     getcode_command
 )
+from bot.handlers_object import create_object_conversation_handler
 from bot.config import BOT_TOKEN, ADMIN_ID
 
 # Setup logging
@@ -97,8 +98,10 @@ def main():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("getcode", getcode_command))
     application.add_handler(CallbackQueryHandler(show_main_menu, pattern="^main_menu$"))
-    application.add_handler(CallbackQueryHandler(add_object_start, pattern="^add_object$"))
     application.add_handler(CallbackQueryHandler(getcode_command, pattern="^getcode$"))
+    
+    # Add object creation conversation handler
+    application.add_handler(create_object_conversation_handler())
     
     # Add more handlers from botOLD.py as needed
     # TODO: Port all handlers from botOLD.py

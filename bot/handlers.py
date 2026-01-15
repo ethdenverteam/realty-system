@@ -45,11 +45,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(text, reply_markup=reply_markup)
 
 
-async def add_object_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Начать создание объекта"""
-    # TODO: Implement object creation flow from botOLD.py
-    await update.callback_query.answer("Функция в разработке")
-    await update.callback_query.edit_message_text("Создание объекта будет реализовано позже")
+# Object creation moved to bot/handlers_object.py
 
 
 async def getcode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

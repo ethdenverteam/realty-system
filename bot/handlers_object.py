@@ -1,0 +1,545 @@
+"""
+Object creation handlers for bot
+"""
+import logging
+from datetime import datetime
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CallbackQueryHandler, filters
+from bot.utils import (
+    get_user, update_user_activity, create_object, get_object, update_object,
+    get_user_id_prefix, set_user_id_prefix, generate_next_id_prefix
+)
+from bot.database import get_db
+from bot.models import Object, SystemSetting, ActionLog
+from bot.config import ROLE_START, ROLE_BROKE, ROLE_BEGINNER
+
+logger = logging.getLogger(__name__)
+
+# Conversation states
+OBJECT_WAITING_ROOMS = 1
+OBJECT_WAITING_DISTRICT = 2
+OBJECT_WAITING_PRICE = 3
+OBJECT_WAITING_AREA = 4
+OBJECT_WAITING_FLOOR = 5
+OBJECT_WAITING_COMMENT = 6
+OBJECT_WAITING_MEDIA = 7
+OBJECT_WAITING_RENOVATION = 8
+OBJECT_WAITING_ADDRESS = 9
+OBJECT_WAITING_CONTACTS = 10
+
+# User data storage (in-memory, should be moved to Redis in production)
+user_data = {}
+
+
+def get_rooms_config():
+    """Get rooms configuration from SystemSetting or default"""
+    db = get_db()
+    try:
+        setting = db.query(SystemSetting).filter_by(key='rooms_config').first()
+        if setting and setting.value_json:
+            return setting.value_json
+        # Default rooms
+        return ["Студия", "1к", "2к", "3к", "4+к", "Дом", "евро1к", "евро2к", "евро3к"]
+    finally:
+        db.close()
+
+
+def get_districts_config():
+    """Get districts configuration from SystemSetting or default"""
+    db = get_db()
+    try:
+        setting = db.query(SystemSetting).filter_by(key='districts_config').first()
+        if setting and setting.value_json:
+            return setting.value_json
+        # Default districts (empty dict)
+        return {}
+    finally:
+        db.close()
+
+
+async def add_object_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Start object creation process"""
+    query = update.callback_query
+    await query.answer()
+    
+    user = update.effective_user
+    user_id_str = str(user.id)
+    
+    # Clear old user data if exists
+    if user.id in user_data:
+        old_object_id = user_data[user.id].get("object_id")
+        if old_object_id:
+            try:
+                obj = get_object(old_object_id)
+                if obj:
+                    db = get_db()
+                    try:
+                        db.delete(obj)
+                        db.commit()
+                    finally:
+                        db.close()
+            except Exception as e:
+                logger.error(f"Error deleting old object: {e}")
+        user_data.pop(user.id, None)
+    
+    # Create new object
+    try:
+        object_id = create_object(user_id_str)
+        
+        # Initialize user data
+        user_data[user.id] = {
+            "object_id": object_id,
+            "districts": []
+        }
+        
+        # Update user role if needed
+        user_obj = get_user(user_id_str)
+        if user_obj:
+            if user_obj.bot_role in [ROLE_START, ROLE_BROKE]:
+                user_obj.bot_role = ROLE_BEGINNER
+                db = get_db()
+                try:
+                    db.commit()
+                finally:
+                    db.close()
+        
+        # Log action
+        try:
+            db = get_db()
+            try:
+                if user_obj:
+                    action_log = ActionLog(
+                        user_id=user_obj.user_id,
+                        action='bot_object_creation_started',
+                        details_json={'object_id': object_id},
+                        created_at=datetime.utcnow()
+                    )
+                    db.add(action_log)
+                    db.commit()
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Failed to log action: {e}")
+        
+        # Step 1: Select rooms type
+        rooms = get_rooms_config()
+        keyboard = []
+        row = []
+        for i, room in enumerate(rooms):
+            row.append(InlineKeyboardButton(room, callback_data=f"rooms_{room}"))
+            if len(row) == 3 or i == len(rooms) - 1:
+                keyboard.append(row)
+                row = []
+        keyboard.append([InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            "🏠 <b>Создание объекта</b>\n\nВыберите тип комнат:",
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+        
+        return OBJECT_WAITING_ROOMS
+        
+    except Exception as e:
+        logger.error(f"Error in add_object_start: {e}", exc_info=True)
+        await query.edit_message_text(f"Ошибка при создании объекта: {str(e)}")
+        return ConversationHandler.END
+
+
+async def object_rooms_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle rooms type selection"""
+    query = update.callback_query
+    await query.answer()
+    
+    user = update.effective_user
+    if user.id not in user_data:
+        await query.edit_message_text("Ошибка: сессия истекла. Начните заново.")
+        return ConversationHandler.END
+    
+    rooms_type = query.data.replace("rooms_", "")
+    object_id = user_data[user.id]["object_id"]
+    
+    # Update object
+    obj = get_object(object_id)
+    if obj:
+        obj.rooms_type = rooms_type
+        db = get_db()
+        try:
+            db.commit()
+        finally:
+            db.close()
+    
+    # Step 2: Select districts
+    districts_config = get_districts_config()
+    districts = list(districts_config.keys()) if districts_config else []
+    
+    if not districts:
+        # Skip districts, go to price
+        keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            "💰 Введите цену в тысячах рублей:",
+            reply_markup=reply_markup
+        )
+        return OBJECT_WAITING_PRICE
+    
+    # Show districts selection
+    keyboard = [[InlineKeyboardButton(district, callback_data=f"district_{district}")] 
+                for district in districts]
+    keyboard.append([InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "📍 Выберите район:",
+        reply_markup=reply_markup
+    )
+    return OBJECT_WAITING_DISTRICT
+
+
+async def object_district_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle district selection"""
+    query = update.callback_query
+    await query.answer()
+    
+    user = update.effective_user
+    if user.id not in user_data:
+        await query.edit_message_text("Ошибка: сессия истекла. Начните заново.")
+        return ConversationHandler.END
+    
+    district = query.data.replace("district_", "")
+    
+    # Add district
+    if "districts" not in user_data[user.id]:
+        user_data[user.id]["districts"] = []
+    if district not in user_data[user.id]["districts"]:
+        user_data[user.id]["districts"].append(district)
+    
+    # Update object
+    object_id = user_data[user.id]["object_id"]
+    obj = get_object(object_id)
+    if obj:
+        obj.districts_json = user_data[user.id]["districts"]
+        db = get_db()
+        try:
+            db.commit()
+        finally:
+            db.close()
+    
+    # Go to price
+    keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(
+        "💰 Введите цену в тысячах рублей:",
+        reply_markup=reply_markup
+    )
+    return OBJECT_WAITING_PRICE
+
+
+async def object_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle price input"""
+    user = update.effective_user
+    if user.id not in user_data:
+        await update.message.reply_text("Ошибка: сессия истекла. Начните заново.")
+        return ConversationHandler.END
+    
+    try:
+        price = float(update.message.text.replace(",", "."))
+        if price <= 0:
+            raise ValueError
+        
+        # Update object
+        object_id = user_data[user.id]["object_id"]
+        obj = get_object(object_id)
+        if obj:
+            obj.price = price
+            db = get_db()
+            try:
+                db.commit()
+            finally:
+                db.close()
+        
+        # Go to area
+        keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            "📐 Введите площадь в м²:",
+            reply_markup=reply_markup
+        )
+        return OBJECT_WAITING_AREA
+        
+    except ValueError:
+        await update.message.reply_text("❌ Неверный формат цены. Введите число больше нуля:")
+        return OBJECT_WAITING_PRICE
+
+
+async def object_area_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle area input"""
+    user = update.effective_user
+    if user.id not in user_data:
+        await update.message.reply_text("Ошибка: сессия истекла. Начните заново.")
+        return ConversationHandler.END
+    
+    try:
+        area = float(update.message.text.replace(",", "."))
+        if area <= 0:
+            raise ValueError
+        
+        # Update object
+        object_id = user_data[user.id]["object_id"]
+        obj = get_object(object_id)
+        if obj:
+            obj.area = area
+            db = get_db()
+            try:
+                db.commit()
+            finally:
+                db.close()
+        
+        # Check if rooms_type is "Дом" - skip floor
+        if obj and obj.rooms_type == "Дом":
+            keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                "📝 Введите описание (комментарий):",
+                reply_markup=reply_markup
+            )
+            return OBJECT_WAITING_COMMENT
+        
+        # Go to floor
+        keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            "🏢 Введите этаж (например: 5/9):",
+            reply_markup=reply_markup
+        )
+        return OBJECT_WAITING_FLOOR
+        
+    except ValueError:
+        await update.message.reply_text("❌ Неверный формат площади. Введите число больше нуля:")
+        return OBJECT_WAITING_AREA
+
+
+async def object_floor_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle floor input"""
+    user = update.effective_user
+    if user.id not in user_data:
+        await update.message.reply_text("Ошибка: сессия истекла. Начните заново.")
+        return ConversationHandler.END
+    
+    floor = update.message.text.strip()
+    
+    # Update object
+    object_id = user_data[user.id]["object_id"]
+    obj = get_object(object_id)
+    if obj:
+        obj.floor = floor
+        db = get_db()
+        try:
+            db.commit()
+        finally:
+            db.close()
+    
+    # Go to comment
+    keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "📝 Введите описание (комментарий):",
+        reply_markup=reply_markup
+    )
+    return OBJECT_WAITING_COMMENT
+
+
+async def object_comment_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle comment input"""
+    user = update.effective_user
+    if user.id not in user_data:
+        await update.message.reply_text("Ошибка: сессия истекла. Начните заново.")
+        return ConversationHandler.END
+    
+    comment = update.message.text.strip()
+    
+    # Update object
+    object_id = user_data[user.id]["object_id"]
+    obj = get_object(object_id)
+    if obj:
+        obj.comment = comment
+        db = get_db()
+        try:
+            db.commit()
+        finally:
+            db.close()
+    
+    # Go to media
+    keyboard = [[InlineKeyboardButton("Пропустить", callback_data="skip_media")],
+                [InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "📷 Отправьте фото объекта (до 10 фото). Нажмите 'Пропустить' если фото нет:",
+        reply_markup=reply_markup
+    )
+    return OBJECT_WAITING_MEDIA
+
+
+async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle media (photo) input"""
+    user = update.effective_user
+    if user.id not in user_data:
+        await update.message.reply_text("Ошибка: сессия истекла. Начните заново.")
+        return ConversationHandler.END
+    
+    object_id = user_data[user.id]["object_id"]
+    obj = get_object(object_id)
+    
+    if not obj:
+        await update.message.reply_text("Ошибка: объект не найден.")
+        return ConversationHandler.END
+    
+    # Get photos
+    if update.message.photo:
+        photos = update.message.photo
+        # Get largest photo
+        photo = photos[-1]
+        file = await context.bot.get_file(photo.file_id)
+        
+        # Save photo info (in production, download and save to uploads/)
+        # For now, just store file_id
+        photos_json = obj.photos_json or []
+        if len(photos_json) < 10:
+            photos_json.append({
+                'file_id': photo.file_id,
+                'file_unique_id': photo.file_unique_id
+            })
+            obj.photos_json = photos_json
+            db = get_db()
+            try:
+                db.commit()
+            finally:
+                db.close()
+            
+            remaining = 10 - len(photos_json)
+            if remaining > 0:
+                await update.message.reply_text(
+                    f"✅ Фото добавлено. Осталось мест: {remaining}. Отправьте еще фото или нажмите 'Готово':"
+                )
+                return OBJECT_WAITING_MEDIA
+            else:
+                await update.message.reply_text("✅ Все фото добавлены (максимум 10).")
+                return await finish_object_creation(update, context)
+    
+    await update.message.reply_text("❌ Отправьте фото или нажмите 'Пропустить'.")
+    return OBJECT_WAITING_MEDIA
+
+
+async def skip_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Skip media step"""
+    query = update.callback_query
+    await query.answer()
+    return await finish_object_creation(update, context)
+
+
+async def finish_object_creation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Finish object creation and show summary"""
+    user = update.effective_user
+    if user.id not in user_data:
+        if update.callback_query:
+            await update.callback_query.edit_message_text("Ошибка: сессия истекла.")
+        else:
+            await update.message.reply_text("Ошибка: сессия истекла.")
+        return ConversationHandler.END
+    
+    object_id = user_data[user.id]["object_id"]
+    obj = get_object(object_id)
+    
+    if not obj:
+        if update.callback_query:
+            await update.callback_query.edit_message_text("Ошибка: объект не найден.")
+        else:
+            await update.message.reply_text("Ошибка: объект не найден.")
+        return ConversationHandler.END
+    
+    # Mark as draft
+    obj.status = 'черновик'
+    db = get_db()
+    try:
+        db.commit()
+    finally:
+        db.close()
+    
+    # Clear user data
+    user_data.pop(user.id, None)
+    
+    # Show summary
+    text = f"✅ <b>Объект создан!</b>\n\n"
+    text += f"<b>ID:</b> {obj.object_id}\n"
+    text += f"<b>Тип:</b> {obj.rooms_type}\n"
+    text += f"<b>Цена:</b> {obj.price} тыс. руб.\n"
+    if obj.area:
+        text += f"<b>Площадь:</b> {obj.area} м²\n"
+    if obj.floor:
+        text += f"<b>Этаж:</b> {obj.floor}\n"
+    if obj.districts_json:
+        text += f"<b>Районы:</b> {', '.join(obj.districts_json)}\n"
+    text += f"\nСтатус: {obj.status}"
+    
+    keyboard = [
+        [InlineKeyboardButton("📋 Мои объекты", callback_data="my_objects")],
+        [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    if update.callback_query:
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='HTML')
+    else:
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='HTML')
+    
+    return ConversationHandler.END
+
+
+async def cancel_object_creation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancel object creation"""
+    user = update.effective_user
+    if user.id in user_data:
+        object_id = user_data[user.id].get("object_id")
+        if object_id:
+            try:
+                obj = get_object(object_id)
+                if obj:
+                    db = get_db()
+                    try:
+                        db.delete(obj)
+                        db.commit()
+                    finally:
+                        db.close()
+            except Exception as e:
+                logger.error(f"Error deleting object: {e}")
+        user_data.pop(user.id, None)
+    
+    await update.message.reply_text("❌ Создание объекта отменено.")
+    return ConversationHandler.END
+
+
+# Create conversation handler
+def create_object_conversation_handler():
+    """Create conversation handler for object creation"""
+    return ConversationHandler(
+        entry_points=[CallbackQueryHandler(add_object_start, pattern="^add_object$")],
+        states={
+            OBJECT_WAITING_ROOMS: [CallbackQueryHandler(object_rooms_selected, pattern="^rooms_")],
+            OBJECT_WAITING_DISTRICT: [CallbackQueryHandler(object_district_selected, pattern="^district_")],
+            OBJECT_WAITING_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, object_price_input)],
+            OBJECT_WAITING_AREA: [MessageHandler(filters.TEXT & ~filters.COMMAND, object_area_input)],
+            OBJECT_WAITING_FLOOR: [MessageHandler(filters.TEXT & ~filters.COMMAND, object_floor_input)],
+            OBJECT_WAITING_COMMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, object_comment_input)],
+            OBJECT_WAITING_MEDIA: [
+                MessageHandler(filters.PHOTO, object_media_received),
+                CallbackQueryHandler(skip_media, pattern="^skip_media$")
+            ],
+        },
+        fallbacks=[
+            CallbackQueryHandler(cancel_object_creation, pattern="^back_to_menu$"),
+            MessageHandler(filters.COMMAND, cancel_object_creation)
+        ],
+        name="add_object_handler"
+    )
+
