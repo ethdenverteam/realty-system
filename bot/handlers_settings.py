@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 # Conversation states for settings
 SETTINGS_MENU = 30
 SETTINGS_WAITING_PHONE = 31
+SETTINGS_WAITING_NAME = 32
 
 
 async def settings_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

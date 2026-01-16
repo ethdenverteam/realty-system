@@ -72,6 +72,7 @@ export default function AdminBotChats() {
     try {
       setFetching(true)
       setError('')
+      setChatFilter('all') // Reset to 'all' when fetching
       const response = await api.post('/admin/dashboard/bot-chats/fetch', { stop_bot: true }, {
         headers: {
           'Content-Type': 'application/json'
@@ -286,32 +287,48 @@ export default function AdminBotChats() {
               <div className="modal-content">
                 <div className="chat-filter-tabs">
                   <button 
+                    className={`tab ${chatFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setChatFilter('all')}
+                  >
+                    Все ({(fetchedChats.all || []).length || (fetchedChats.groups || []).length + (fetchedChats.users || []).length})
+                  </button>
+                  <button 
                     className={`tab ${chatFilter === 'groups' ? 'active' : ''}`}
                     onClick={() => setChatFilter('groups')}
                   >
-                    Группы ({fetchedChats.groups.length})
+                    Группы ({(fetchedChats.groups || []).length})
                   </button>
                   <button 
                     className={`tab ${chatFilter === 'users' ? 'active' : ''}`}
                     onClick={() => setChatFilter('users')}
                   >
-                    Пользователи ({fetchedChats.users.length})
+                    Пользователи ({(fetchedChats.users || []).length})
                   </button>
                 </div>
                 <div className="chat-list">
-                  {(chatFilter === 'groups' ? fetchedChats.groups : fetchedChats.users).map(chat => (
-                    <div 
-                      key={chat.id} 
-                      className="chat-item"
-                      onClick={() => handleSelectChat(chat)}
-                    >
-                      <div className="chat-item-title">{chat.title}</div>
-                      <div className="chat-item-meta">
-                        <span className="chat-item-type">{getChatTypeLabel(chat.type)}</span>
-                        <span className="chat-item-id">ID: {chat.id}</span>
+                  {(() => {
+                    let chatsToShow = []
+                    if (chatFilter === 'all') {
+                      chatsToShow = fetchedChats.all || [...(fetchedChats.groups || []), ...(fetchedChats.users || [])]
+                    } else if (chatFilter === 'groups') {
+                      chatsToShow = fetchedChats.groups || []
+                    } else {
+                      chatsToShow = fetchedChats.users || []
+                    }
+                    return chatsToShow.map(chat => (
+                      <div 
+                        key={chat.id} 
+                        className="chat-item"
+                        onClick={() => handleSelectChat(chat)}
+                      >
+                        <div className="chat-item-title">{chat.title}</div>
+                        <div className="chat-item-meta">
+                          <span className="chat-item-type">{getChatTypeLabel(chat.type)}</span>
+                          <span className="chat-item-id">ID: {chat.id}</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  })()}
                 </div>
               </div>
             </div>
