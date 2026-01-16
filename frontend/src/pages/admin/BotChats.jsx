@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import api from '../../utils/api'
 import './BotChats.css'
@@ -7,19 +6,28 @@ import './BotChats.css'
 export default function AdminBotChats() {
   const [chats, setChats] = useState([])
   const [config, setConfig] = useState(null)
+  const [districts, setDistricts] = useState({})
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showDistrictsModal, setShowDistrictsModal] = useState(false)
+  const [showFetchModal, setShowFetchModal] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [fetching, setFetching] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [fetchedChats, setFetchedChats] = useState({ groups: [], users: [] })
+  const [chatFilter, setChatFilter] = useState('all') // all, groups, users
 
   const [formData, setFormData] = useState({
-    chat_link: '',
+    chat_id: '',
+    chat_title: '',
     filter_type: '',
     rooms_types: [],
     districts: [],
     price_min: '',
     price_max: ''
   })
+
+  const [newDistrict, setNewDistrict] = useState('')
 
   useEffect(() => {
     loadData()
@@ -28,17 +36,43 @@ export default function AdminBotChats() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [chatsRes, configRes] = await Promise.all([
+      const [chatsRes, configRes, districtsRes] = await Promise.all([
         api.get('/admin/dashboard/bot-chats/list'),
-        api.get('/admin/dashboard/bot-chats/config')
+        api.get('/admin/dashboard/bot-chats/config'),
+        api.get('/admin/dashboard/bot-chats/districts')
       ])
       setChats(chatsRes.data)
       setConfig(configRes.data)
+      setDistricts(districtsRes.data.districts || {})
     } catch (err) {
       setError('Ошибка загрузки данных')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleFetchChats = async () => {
+    try {
+      setFetching(true)
+      setError('')
+      const response = await api.post('/admin/dashboard/bot-chats/fetch')
+      setFetchedChats(response.data)
+      setShowFetchModal(true)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Ошибка при получении чатов')
+    } finally {
+      setFetching(false)
+    }
+  }
+
+  const handleSelectChat = (chat) => {
+    setFormData({
+      ...formData,
+      chat_id: chat.id,
+      chat_title: chat.title
+    })
+    setShowFetchModal(false)
+    setShowAddModal(true)
   }
 
   const handleAddChat = async (e) => {
@@ -57,14 +91,20 @@ export default function AdminBotChats() {
     }
 
     try {
+      // If chat_id is selected from list, use it directly, otherwise use as link
+      const chatLink = formData.chat_id.includes('@') || formData.chat_id.includes('t.me') || formData.chat_id.includes('http')
+        ? formData.chat_id
+        : formData.chat_id // Use as direct ID or username
+      
       await api.post('/admin/dashboard/bot-chats', {
-        chat_link: formData.chat_link,
+        chat_link: chatLink,
         filters
       })
       setSuccess('Чат успешно добавлен')
       setShowAddModal(false)
       setFormData({
-        chat_link: '',
+        chat_id: '',
+        chat_title: '',
         filter_type: '',
         rooms_types: [],
         districts: [],
@@ -74,6 +114,34 @@ export default function AdminBotChats() {
       loadData()
     } catch (err) {
       setError(err.response?.data?.error || 'Ошибка при добавлении чата')
+    }
+  }
+
+  const handleAddDistrict = async (e) => {
+    e.preventDefault()
+    if (!newDistrict.trim()) return
+
+    try {
+      await api.post('/admin/dashboard/bot-chats/districts', {
+        name: newDistrict.trim()
+      })
+      setSuccess('Район успешно добавлен')
+      setNewDistrict('')
+      loadData()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Ошибка при добавлении района')
+    }
+  }
+
+  const handleDeleteDistrict = async (districtName) => {
+    if (!confirm(`Удалить район "${districtName}"?`)) return
+
+    try {
+      await api.delete(`/admin/dashboard/bot-chats/districts/${encodeURIComponent(districtName)}`)
+      setSuccess('Район успешно удален')
+      loadData()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Ошибка при удалении района')
     }
   }
 
@@ -99,31 +167,96 @@ export default function AdminBotChats() {
       parts.push(`Районы: ${filters.districts.join(', ')}`)
     }
     if (filters.price_min || filters.price_max) {
-      parts.push(`Цена: ${filters.price_min || 0} - ${filters.price_max || '∞'}`)
+      parts.push(`Цена: ${filters.price_min || 0} - ${filters.price_max || '∞'} тыс. руб.`)
     }
     return parts.length ? parts.join(' | ') : (chat.category || 'Нет фильтров')
   }
 
+  const filteredChats = chatFilter === 'all' 
+    ? chats 
+    : chatFilter === 'groups' 
+    ? chats.filter(c => ['group', 'supergroup', 'channel'].includes(c.type))
+    : chats.filter(c => c.type === 'private')
+
   return (
     <Layout 
-      title="Чаты бота" 
+      title="Управление чатами и районами бота" 
       isAdmin
       headerActions={
-        <button 
-          className="header-icon-btn" 
-          onClick={() => setShowAddModal(true)}
-          aria-label="Добавить чат"
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-        </button>
+        <>
+          <button 
+            className="btn btn-secondary"
+            onClick={handleFetchChats}
+            disabled={fetching}
+          >
+            {fetching ? 'Загрузка...' : 'Получить чаты'}
+          </button>
+          <button 
+            className="btn btn-secondary"
+            onClick={() => setShowDistrictsModal(true)}
+          >
+            Управление районами
+          </button>
+          <button 
+            className="header-icon-btn" 
+            onClick={() => setShowAddModal(true)}
+            aria-label="Добавить чат"
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </>
       }
     >
       <div className="bot-chats-page">
         {error && <div className="alert alert-error">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
 
+        {/* Fetch Chats Modal */}
+        {showFetchModal && (
+          <div className="modal-overlay" onClick={() => setShowFetchModal(false)}>
+            <div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>Выберите чат для добавления</h2>
+                <button className="modal-close" onClick={() => setShowFetchModal(false)}>×</button>
+              </div>
+              <div className="modal-content">
+                <div className="chat-filter-tabs">
+                  <button 
+                    className={`tab ${chatFilter === 'groups' ? 'active' : ''}`}
+                    onClick={() => setChatFilter('groups')}
+                  >
+                    Группы ({fetchedChats.groups.length})
+                  </button>
+                  <button 
+                    className={`tab ${chatFilter === 'users' ? 'active' : ''}`}
+                    onClick={() => setChatFilter('users')}
+                  >
+                    Пользователи ({fetchedChats.users.length})
+                  </button>
+                </div>
+                <div className="chat-list">
+                  {(chatFilter === 'groups' ? fetchedChats.groups : fetchedChats.users).map(chat => (
+                    <div 
+                      key={chat.id} 
+                      className="chat-item"
+                      onClick={() => handleSelectChat(chat)}
+                    >
+                      <div className="chat-item-title">{chat.title}</div>
+                      <div className="chat-item-meta">
+                        <span className="chat-item-type">{chat.type}</span>
+                        <span className="chat-item-id">ID: {chat.id}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Chat Modal */}
         {showAddModal && (
           <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
             <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -132,20 +265,42 @@ export default function AdminBotChats() {
                 <button className="modal-close" onClick={() => setShowAddModal(false)}>×</button>
               </div>
               <form onSubmit={handleAddChat} className="modal-form">
-                <div className="form-group">
-                  <label className="form-label">Ссылка на чат</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={formData.chat_link}
-                    onChange={(e) => setFormData({...formData, chat_link: e.target.value})}
-                    placeholder="https://t.me/chatname или @chatname"
-                    required
-                  />
-                </div>
+                {formData.chat_title && (
+                  <div className="form-group">
+                    <label className="form-label">Выбранный чат</label>
+                    <div className="selected-chat">
+                      <strong>{formData.chat_title}</strong>
+                      <small>ID: {formData.chat_id}</small>
+                    </div>
+                  </div>
+                )}
+
+                {!formData.chat_id && (
+                  <div className="form-group">
+                    <label className="form-label">Ссылка на чат или ID</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={formData.chat_id}
+                      onChange={(e) => setFormData({...formData, chat_id: e.target.value})}
+                      placeholder="https://t.me/chatname, @chatname или ID чата"
+                      required
+                    />
+                    <button 
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setShowAddModal(false)
+                        handleFetchChats()
+                      }}
+                    >
+                      Получить чаты
+                    </button>
+                  </div>
+                )}
 
                 <div className="form-group">
-                  <label className="form-label">Тип фильтра</label>
+                  <label className="form-label">Тип категории связи</label>
                   <select
                     className="form-input"
                     value={formData.filter_type}
@@ -183,7 +338,7 @@ export default function AdminBotChats() {
                   </div>
                 )}
 
-                {formData.filter_type === 'district' && config && (
+                {formData.filter_type === 'district' && (
                   <div className="form-group">
                     <label className="form-label">Районы</label>
                     <select
@@ -194,8 +349,9 @@ export default function AdminBotChats() {
                         const selected = Array.from(e.target.selectedOptions, opt => opt.value)
                         setFormData({...formData, districts: selected})
                       }}
+                      required
                     >
-                      {Object.keys(config.districts || {}).map(d => (
+                      {Object.keys(districts).map(d => (
                         <option key={d} value={d}>{d}</option>
                       ))}
                     </select>
@@ -214,6 +370,7 @@ export default function AdminBotChats() {
                         onChange={(e) => setFormData({...formData, price_min: e.target.value})}
                         min="0"
                         step="100"
+                        required
                       />
                     </div>
                     <div className="form-group">
@@ -225,6 +382,7 @@ export default function AdminBotChats() {
                         onChange={(e) => setFormData({...formData, price_max: e.target.value})}
                         min="0"
                         step="100"
+                        required
                       />
                     </div>
                   </>
@@ -239,11 +397,74 @@ export default function AdminBotChats() {
           </div>
         )}
 
+        {/* Districts Management Modal */}
+        {showDistrictsModal && (
+          <div className="modal-overlay" onClick={() => setShowDistrictsModal(false)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>Управление районами</h2>
+                <button className="modal-close" onClick={() => setShowDistrictsModal(false)}>×</button>
+              </div>
+              <div className="modal-content">
+                <form onSubmit={handleAddDistrict} className="form-inline">
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={newDistrict}
+                    onChange={(e) => setNewDistrict(e.target.value)}
+                    placeholder="Название района"
+                  />
+                  <button type="submit" className="btn btn-primary">Добавить</button>
+                </form>
+                <div className="districts-list">
+                  {Object.keys(districts).length === 0 ? (
+                    <div className="empty-state">Нет районов. Добавьте первый район.</div>
+                  ) : (
+                    Object.keys(districts).map(district => (
+                      <div key={district} className="district-item">
+                        <span>{district}</span>
+                        <button 
+                          className="btn btn-sm btn-danger"
+                          onClick={() => handleDeleteDistrict(district)}
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="card">
-          <h2 className="card-title">Список чатов</h2>
+          <div className="card-header">
+            <h2 className="card-title">Список чатов</h2>
+            <div className="chat-filter-tabs">
+              <button 
+                className={`tab ${chatFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setChatFilter('all')}
+              >
+                Все ({chats.length})
+              </button>
+              <button 
+                className={`tab ${chatFilter === 'groups' ? 'active' : ''}`}
+                onClick={() => setChatFilter('groups')}
+              >
+                Группы ({chats.filter(c => ['group', 'supergroup', 'channel'].includes(c.type)).length})
+              </button>
+              <button 
+                className={`tab ${chatFilter === 'users' ? 'active' : ''}`}
+                onClick={() => setChatFilter('users')}
+              >
+                Пользователи ({chats.filter(c => c.type === 'private').length})
+              </button>
+            </div>
+          </div>
           {loading ? (
             <div className="loading">Загрузка...</div>
-          ) : chats.length === 0 ? (
+          ) : filteredChats.length === 0 ? (
             <div className="empty-state">Нет чатов. Добавьте первый чат.</div>
           ) : (
             <div className="table-container">
@@ -258,7 +479,7 @@ export default function AdminBotChats() {
                   </tr>
                 </thead>
                 <tbody>
-                  {chats.map(chat => (
+                  {filteredChats.map(chat => (
                     <tr key={chat.chat_id}>
                       <td>
                         <strong>{chat.title}</strong>
@@ -293,4 +514,3 @@ export default function AdminBotChats() {
     </Layout>
   )
 }
-

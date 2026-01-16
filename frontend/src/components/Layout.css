@@ -14,10 +14,22 @@
   border-bottom: 1px solid var(--color-border);
   padding: var(--spacing-md) var(--spacing-md);
   backdrop-filter: blur(10px);
+}
+
+[data-theme="light"] .app-header {
   background: rgba(255, 255, 255, 0.9);
 }
 
+[data-theme="dark"] .app-header {
+  background: rgba(18, 18, 18, 0.9);
+}
+
 .app-header.admin {
+  border-bottom-color: var(--color-admin);
+}
+
+[data-theme="dark"] .app-header.admin {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
   border-bottom-color: var(--color-admin);
 }
 

@@ -176,9 +176,14 @@ def admin_add_bot_chat(current_user):
         return jsonify({'error': 'chat_link is required'}), 400
     
     try:
-        # Extract username from link
+        # Extract username or chat_id from link
         username = None
-        if chat_link.startswith('https://t.me/') or chat_link.startswith('http://t.me/'):
+        chat_id_direct = None
+        
+        # Check if it's a direct chat ID (numeric)
+        if chat_link.lstrip('-').isdigit():
+            chat_id_direct = chat_link
+        elif chat_link.startswith('https://t.me/') or chat_link.startswith('http://t.me/'):
             username = chat_link.split('/')[-1].replace('@', '')
         elif chat_link.startswith('t.me/'):
             username = chat_link.split('/')[-1].replace('@', '')
@@ -187,17 +192,38 @@ def admin_add_bot_chat(current_user):
         else:
             username = chat_link.replace('@', '')
         
-        if not username:
+        if not username and not chat_id_direct:
             return jsonify({'error': 'Invalid chat link format'}), 400
         
         # Get bot instance to resolve chat
         from bot.config import BOT_TOKEN
         from telegram import Bot
+        import asyncio
         
-        bot = Bot(token=BOT_TOKEN)
-        chat_info = bot.get_chat(chat_id=f"@{username}")
+        async def get_chat_info():
+            bot = Bot(token=BOT_TOKEN)
+            try:
+                if chat_id_direct:
+                    # Direct chat ID
+                    chat_info = await bot.get_chat(chat_id=int(chat_id_direct))
+                else:
+                    # Try with @username first
+                    try:
+                        chat_info = await bot.get_chat(chat_id=f"@{username}")
+                    except Exception:
+                        # If that fails, try with chat_id if it's numeric
+                        if username.isdigit() or (username.startswith('-') and username[1:].isdigit()):
+                            chat_info = await bot.get_chat(chat_id=int(username))
+                        else:
+                            raise
+            except Exception as e:
+                logger.error(f"Error getting chat info: {e}")
+                raise
+            return chat_info
+        
+        chat_info = asyncio.run(get_chat_info())
         telegram_chat_id = str(chat_info.id)
-        title = chat_info.title or username
+        title = chat_info.title or (chat_info.first_name or '') + ' ' + (chat_info.last_name or '') or username or f'Chat {telegram_chat_id}'
         chat_type = chat_info.type
         
         # Check if chat already exists
@@ -332,4 +358,194 @@ def admin_bot_chats_config(current_user):
         'rooms_types': rooms_types,
         'price_ranges': price_ranges
     })
+
+
+@admin_routes_bp.route('/dashboard/bot-chats/fetch', methods=['POST'])
+@jwt_required
+@role_required('admin')
+def admin_fetch_bot_chats(current_user):
+    """Fetch all chats from Telegram bot using getUpdates"""
+    try:
+        from bot.config import BOT_TOKEN
+        import requests
+        
+        chats_dict = {}
+        
+        # Get updates using Telegram API
+        url = f'https://api.telegram.org/bot{BOT_TOKEN}/getUpdates'
+        offset = 0
+        max_iterations = 10  # Limit iterations to avoid infinite loops
+        
+        for _ in range(max_iterations):
+            params = {'offset': offset, 'timeout': 1, 'limit': 100}
+            try:
+                response = requests.get(url, params=params, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+            except Exception as e:
+                logger.error(f"Error fetching updates: {e}")
+                break
+            
+            if not data.get('ok') or not data.get('result'):
+                break
+            
+            updates = data['result']
+            if not updates:
+                break
+            
+            for update in updates:
+                if 'message' in update:
+                    chat = update['message'].get('chat', {})
+                    chat_id = str(chat.get('id'))
+                    chat_type = chat.get('type')
+                    
+                    # Get title based on chat type
+                    if chat_type in ['group', 'supergroup', 'channel']:
+                        title = chat.get('title', '')
+                    else:
+                        first_name = chat.get('first_name', '')
+                        last_name = chat.get('last_name', '')
+                        title = f"{first_name} {last_name}".strip() or chat.get('username', '')
+                    
+                    username = chat.get('username', '')
+                    
+                    if chat_id and chat_id not in chats_dict:
+                        chats_dict[chat_id] = {
+                            'id': chat_id,
+                            'title': title or f'Chat {chat_id}',
+                            'type': chat_type,
+                            'username': username
+                        }
+                
+                offset = max(offset, update.get('update_id', 0) + 1)
+            
+            if len(updates) < 100:  # Last batch
+                break
+        
+        # Convert to list
+        chats = list(chats_dict.values())
+        
+        # Separate groups and users
+        groups = [c for c in chats if c['type'] in ['group', 'supergroup', 'channel']]
+        users = [c for c in chats if c['type'] == 'private']
+        
+        return jsonify({
+            'groups': groups,
+            'users': users,
+            'all': chats
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching chats: {e}", exc_info=True)
+        log_error(e, 'admin_fetch_chats_failed', current_user.user_id, {})
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_routes_bp.route('/dashboard/bot-chats/districts', methods=['GET'])
+@jwt_required
+@role_required('admin')
+def admin_get_districts(current_user):
+    """Get all districts"""
+    from app.models.system_setting import SystemSetting
+    
+    districts_setting = SystemSetting.query.filter_by(key='districts_config').first()
+    districts_config = districts_setting.value_json if districts_setting else {}
+    
+    return jsonify({
+        'districts': districts_config
+    })
+
+
+@admin_routes_bp.route('/dashboard/bot-chats/districts', methods=['POST'])
+@jwt_required
+@role_required('admin')
+def admin_add_district(current_user):
+    """Add a new district"""
+    from app.models.system_setting import SystemSetting
+    
+    data = request.get_json()
+    district_name = data.get('name', '').strip()
+    
+    if not district_name:
+        return jsonify({'error': 'District name is required'}), 400
+    
+    try:
+        districts_setting = SystemSetting.query.filter_by(key='districts_config').first()
+        
+        if districts_setting:
+            districts_config = districts_setting.value_json or {}
+        else:
+            districts_config = {}
+            districts_setting = SystemSetting(
+                key='districts_config',
+                value_json={},
+                description='Configuration for districts'
+            )
+            db.session.add(districts_setting)
+        
+        if district_name in districts_config:
+            return jsonify({'error': 'District already exists'}), 400
+        
+        districts_config[district_name] = district_name
+        districts_setting.value_json = districts_config
+        districts_setting.updated_by = current_user.user_id
+        
+        db.session.commit()
+        
+        log_action(
+            action='admin_district_added',
+            user_id=current_user.user_id,
+            details={'district_name': district_name}
+        )
+        
+        return jsonify({
+            'districts': districts_config
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error adding district: {e}", exc_info=True)
+        log_error(e, 'admin_district_add_failed', current_user.user_id, {'district_name': district_name})
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_routes_bp.route('/dashboard/bot-chats/districts/<district_name>', methods=['DELETE'])
+@jwt_required
+@role_required('admin')
+def admin_delete_district(district_name, current_user):
+    """Delete a district"""
+    from app.models.system_setting import SystemSetting
+    
+    try:
+        districts_setting = SystemSetting.query.filter_by(key='districts_config').first()
+        
+        if not districts_setting or not districts_setting.value_json:
+            return jsonify({'error': 'No districts found'}), 404
+        
+        districts_config = districts_setting.value_json
+        
+        if district_name not in districts_config:
+            return jsonify({'error': 'District not found'}), 404
+        
+        del districts_config[district_name]
+        districts_setting.value_json = districts_config
+        districts_setting.updated_by = current_user.user_id
+        
+        db.session.commit()
+        
+        log_action(
+            action='admin_district_deleted',
+            user_id=current_user.user_id,
+            details={'district_name': district_name}
+        )
+        
+        return jsonify({
+            'districts': districts_config
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting district: {e}", exc_info=True)
+        log_error(e, 'admin_district_delete_failed', current_user.user_id, {'district_name': district_name})
+        return jsonify({'error': str(e)}), 500
 
