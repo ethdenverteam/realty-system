@@ -289,16 +289,19 @@ async def object_area_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Update object
         object_id = user_data[user.id]["object_id"]
         db_session = get_db()
+        rooms_type = None
         try:
             obj = db_session.query(Object).filter_by(object_id=object_id).first()
             if obj:
+                # Get rooms_type before closing session
+                rooms_type = obj.rooms_type
                 obj.area = area
                 db_session.commit()
         finally:
             db_session.close()
         
         # Check if rooms_type is "Дом" - skip floor
-        if obj and obj.rooms_type == "Дом":
+        if rooms_type == "Дом":
             keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(

@@ -94,12 +94,11 @@ def setup_bot_logging():
     logging.getLogger('asyncio').setLevel(logging.WARNING)
     logging.getLogger('httpcore').setLevel(logging.WARNING)
     
-    # Ensure bot.handlers logger uses bot logger
+    # Ensure bot.handlers logger uses bot logger (but don't add duplicate handlers)
     handlers_logger = logging.getLogger('bot.handlers')
     handlers_logger.setLevel(logging.DEBUG)
-    if not handlers_logger.handlers:
-        handlers_logger.addHandler(console_handler)
-        handlers_logger.addHandler(file_handler)
+    # Don't add handlers - let it propagate to parent 'bot' logger
+    handlers_logger.propagate = True
     
     return logger
 
