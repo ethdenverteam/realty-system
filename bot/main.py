@@ -118,8 +118,13 @@ def main():
     # TODO: Port all handlers from botOLD.py
     
     # Start bot
-    logger.info("Starting bot...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    logger.info("Bot started successfully, starting polling...")
+    import sys
+    sys.stdout.flush()
+    application.run_polling(
+        allowed_updates=Update.ALL_TYPES,
+        drop_pending_updates=True
+    )
 
 
 if __name__ == '__main__':
