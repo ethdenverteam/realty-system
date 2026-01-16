@@ -163,6 +163,43 @@ async def publish_immediate_handler(update: Update, context: ContextTypes.DEFAUL
         
         return OBJECT_PREVIEW_MENU
     
+    # Check if object was already published within last 24 hours
+    db = get_db()
+    try:
+        from datetime import timedelta
+        yesterday = datetime.utcnow() - timedelta(days=1)
+        recent_publications = db.query(PublicationHistory).filter(
+            PublicationHistory.object_id == object_id,
+            PublicationHistory.published_at >= yesterday,
+            PublicationHistory.deleted == False
+        ).all()
+        
+        if recent_publications:
+            blocked_chats = []
+            for pub in recent_publications:
+                chat = db.query(Chat).filter_by(chat_id=pub.chat_id).first()
+                if chat:
+                    blocked_chats.append(chat.title or f'Чат {chat.chat_id}')
+            
+            if blocked_chats:
+                error_text = "⚠️ <b>Ошибка!</b>\n\n"
+                error_text += "Этот объект уже был опубликован в следующие чаты в течение последних 24 часов:\n\n"
+                for i, name in enumerate(blocked_chats, 1):
+                    error_text += f"{i}. {name}\n"
+                error_text += "\nОдин объект не может быть опубликован в один и тот же чат чаще чем раз в сутки."
+                
+                keyboard = [[InlineKeyboardButton("⬅️ Назад к редактированию", callback_data="back_to_preview")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                try:
+                    await query.message.reply_text(error_text, reply_markup=reply_markup, parse_mode='HTML')
+                except:
+                    await query.edit_message_text(error_text, reply_markup=reply_markup, parse_mode='HTML')
+                
+                return OBJECT_PREVIEW_MENU
+    finally:
+        db.close()
+    
     # Get target chats
     target_chats = await get_target_chats_for_object(obj)
     
@@ -205,7 +242,7 @@ async def publish_immediate_handler(update: Update, context: ContextTypes.DEFAUL
 async def confirm_publish_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик подтверждения публикации"""
     query = update.callback_query
-    await query.answer()
+    await query.answer("Публикация начата...")
     
     object_id = query.data.replace("confirm_publish_", "")
     
@@ -215,6 +252,7 @@ async def confirm_publish_handler(update: Update, context: ContextTypes.DEFAULT_
     user_data[user.id]["object_id"] = object_id
     
     try:
+        # Publish immediately
         await publish_object_immediate(update, context, object_id)
         return ConversationHandler.END
     except Exception as e:

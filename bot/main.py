@@ -284,10 +284,19 @@ def main():
     application.add_handler(edit_conversation)
     
     # Log all updates (for debugging) - only non-command messages to avoid duplication
+    # NOTE: This handler should be added AFTER conversation handlers to avoid intercepting messages
     async def log_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Log all incoming updates (non-commands only)"""
         import sys
         # Skip commands - they're already logged in handlers
+        # Skip if in conversation - check if any conversation handler is active
+        # Conversation handlers store state in context.user_data with conversation name
+        if context.user_data:
+            # Check if any conversation is active
+            for key in context.user_data.keys():
+                if key.startswith('_conversation_'):
+                    return  # Don't log if in conversation
+        
         if update.message:
             if not update.message.text or not update.message.text.startswith('/'):
                 logger.debug(f"Received message from {update.effective_user.id}: {update.message.text or 'media'}")
@@ -296,7 +305,8 @@ def main():
             pass
         sys.stdout.flush()
     
-    # Add update logger (lowest priority, only for non-command text messages)
+    # Add update logger LAST with lowest priority, only for non-command text messages
+    # This ensures conversation handlers process messages first
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, log_update), group=-1)
     
     logger.info("All handlers registered successfully")

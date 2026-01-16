@@ -284,6 +284,28 @@ def admin_bot_chats_list(current_user):
                 # Convert rows to dict
                 result = []
                 for row in rows:
+                    # Try to get filters_json from database using ORM
+                    chat_id = row[0]
+                    try:
+                        chat_orm = Chat.query.filter_by(chat_id=chat_id).first()
+                        filters_json = chat_orm.filters_json if chat_orm and hasattr(chat_orm, 'filters_json') else {}
+                    except:
+                        filters_json = {}
+                    
+                    # If filters_json is empty, try to parse category
+                    if not filters_json and row[4]:  # category
+                        category = row[4]
+                        filters_json = {}
+                        if category.startswith('rooms_'):
+                            filters_json['rooms_types'] = [category.replace('rooms_', '')]
+                        elif category.startswith('district_'):
+                            filters_json['districts'] = [category.replace('district_', '')]
+                        elif category.startswith('price_'):
+                            parts = category.replace('price_', '').split('_')
+                            if len(parts) == 2:
+                                filters_json['price_min'] = float(parts[0])
+                                filters_json['price_max'] = float(parts[1])
+                    
                     chat_dict = {
                         'chat_id': row[0],
                         'telegram_chat_id': row[1],
@@ -297,11 +319,11 @@ def admin_bot_chats_list(current_user):
                         'added_date': row[9].isoformat() if row[9] else None,
                         'last_publication': row[10].isoformat() if row[10] else None,
                         'total_publications': row[11],
-                        'filters_json': {}  # Default empty dict since column doesn't exist
+                        'filters_json': filters_json
                     }
                     result.append(chat_dict)
                 
-                logger.info(f"Returned {len(result)} chats using fallback query (filters_json column missing)")
+                logger.info(f"Returned {len(result)} chats using fallback query with parsed category")
                 return jsonify(result)
             raise
         
