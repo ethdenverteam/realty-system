@@ -2,6 +2,89 @@
 
 Этот инструмент позволяет синхронизировать логи с сервера в локальный проект для анализа AI.
 
+## ⭐ РЕКОМЕНДУЕМЫЙ СПОСОБ: Скачивание через веб-интерфейс
+
+Самый простой способ получить логи:
+
+1. Откройте админ-панель → **Просмотр логов** (`/admin/dashboard/logs`)
+2. Нажмите кнопку **"⬇️ Скачать логи"**
+3. Браузер скачает ZIP архив со всеми логами
+4. Распакуйте архив в папку `logs_server/` в корне проекта:
+
+```bash
+# Распакуйте realty_logs_YYYYMMDD_HHMMSS.zip в:
+realty-system/
+  └── logs_server/
+      ├── app.log
+      ├── errors.log
+      ├── bot.log
+      └── bot_errors.log
+```
+
+**Готово!** Теперь AI может анализировать логи из `logs_server/`.
+
+---
+
+## ⭐⭐⭐ ЛУЧШИЙ СПОСОБ: Автоматическое скачивание через скрипт
+
+Для автоматического скачивания логов напрямую в папку `logs_server/` используйте скрипт:
+
+### Python скрипт (рекомендуется)
+
+```bash
+# Базовое использование (попросит токен)
+python download_logs.py
+
+# С параметрами
+python download_logs.py https://your-domain.com YOUR_API_TOKEN
+
+# Через переменные окружения
+export REALTY_API_URL="https://your-domain.com"
+export REALTY_API_TOKEN="your_token_here"
+python download_logs.py
+```
+
+### PowerShell скрипт (Windows)
+
+```powershell
+# Базовое использование
+.\download_logs.ps1
+
+# С параметрами
+.\download_logs.ps1 -ApiUrl "https://your-domain.com" -ApiToken "YOUR_TOKEN"
+```
+
+### Получение API токена
+
+1. Зайдите в админ-панель (`/admin/dashboard`)
+2. Откройте DevTools (F12) → Console
+3. Выполните: `localStorage.getItem('jwt_token')`
+4. Скопируйте токен
+
+Или создайте файл `.api_token` в корне проекта с токеном (файл в .gitignore).
+
+### Настройка (опционально)
+
+Создайте `.api_token` файл в корне проекта:
+```
+your_jwt_token_here
+```
+
+Или установите переменные окружения:
+```bash
+# Windows PowerShell
+$env:REALTY_API_URL = "https://your-domain.com"
+$env:REALTY_API_TOKEN = "your_token"
+
+# Linux/Mac
+export REALTY_API_URL="https://your-domain.com"
+export REALTY_API_TOKEN="your_token"
+```
+
+---
+
+## Альтернативные способы
+
 ## Зачем это нужно?
 
 - **Прямой доступ AI к логам**: AI (нейросеть) в Cursor может сразу анализировать актуальные логи

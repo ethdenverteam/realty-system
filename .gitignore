@@ -42,6 +42,7 @@ logs_server/
 # Environment
 .env
 .env.local
+.api_token
 
 # IDE
 .vscode/

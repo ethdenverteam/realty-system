@@ -102,6 +102,31 @@ export default function AdminLogs() {
     setLogs([])
   }
 
+  const handleDownloadLogs = async () => {
+    try {
+      setError('')
+      // Get auth token
+      const token = localStorage.getItem('jwt_token')
+      
+      // Create download link
+      const downloadUrl = `/api/logs/download?token=${encodeURIComponent(token || '')}`
+      
+      // Create temporary link and trigger download
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = `realty_logs_${new Date().toISOString().slice(0, 10)}.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      // Show success message (optional - you can add a success state)
+      console.log('Логи скачиваются...')
+    } catch (err) {
+      console.error('Error downloading logs:', err)
+      setError('Ошибка при скачивании логов')
+    }
+  }
+
   return (
     <Layout 
       title="Просмотр логов" 
@@ -150,6 +175,13 @@ export default function AdminLogs() {
                 disabled={isStreaming}
               >
                 🗑 Очистить
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={handleDownloadLogs}
+                title="Скачать все логи в ZIP архив"
+              >
+                ⬇️ Скачать логи
               </button>
             </div>
           </div>

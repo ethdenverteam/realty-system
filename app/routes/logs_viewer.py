@@ -127,3 +127,98 @@ def view_logs_page(current_user):
     from flask import render_template
     return render_template('logs_viewer.html')
 
+
+@logs_viewer_bp.route('/download', methods=['GET'])
+@jwt_required
+@role_required('admin')
+def download_logs(current_user):
+    """Download all logs as ZIP archive"""
+    import zipfile
+    import io
+    from datetime import datetime
+    from flask import send_file
+    
+    try:
+        # Create in-memory ZIP file
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Get all log files
+            log_files = {
+                'app.log': os.path.join(Config.LOG_FOLDER, 'app.log'),
+                'errors.log': os.path.join(Config.LOG_FOLDER, 'errors.log'),
+                'bot.log': os.path.join(Config.LOG_FOLDER, 'bot.log'),
+                'bot_errors.log': os.path.join(Config.LOG_FOLDER, 'bot_errors.log')
+            }
+            
+            files_added = 0
+            for log_filename, log_path in log_files.items():
+                if os.path.exists(log_path):
+                    try:
+                        # Read file and add to ZIP
+                        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()
+                            zip_file.writestr(log_filename, content)
+                        files_added += 1
+                        logger.info(f"Added {log_filename} to download archive")
+                    except Exception as e:
+                        logger.warning(f"Failed to add {log_filename} to archive: {e}")
+        
+        if files_added == 0:
+            return jsonify({'error': 'No log files found'}), 404
+        
+        # Reset buffer position to beginning
+        zip_buffer.seek(0)
+        
+        # Create filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'realty_logs_{timestamp}.zip'
+        
+        logger.info(f"Downloading logs archive: {filename} ({files_added} files)")
+        
+        return send_file(
+            zip_buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        logger.error(f"Error creating logs archive: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@logs_viewer_bp.route('/file/<log_type>', methods=['GET'])
+@jwt_required
+@role_required('admin')
+def download_log_file(log_type, current_user):
+    """Download specific log file"""
+    from flask import send_file
+    
+    log_files = {
+        'app': 'app.log',
+        'errors': 'errors.log',
+        'bot': 'bot.log',
+        'bot_errors': 'bot_errors.log'
+    }
+    
+    if log_type not in log_files:
+        return jsonify({'error': f'Invalid log type. Allowed: {", ".join(log_files.keys())}'}), 400
+    
+    log_filename = log_files[log_type]
+    log_path = os.path.join(Config.LOG_FOLDER, log_filename)
+    
+    if not os.path.exists(log_path):
+        return jsonify({'error': f'Log file {log_filename} not found'}), 404
+    
+    try:
+        logger.info(f"Downloading log file: {log_filename}")
+        return send_file(
+            log_path,
+            mimetype='text/plain',
+            as_attachment=True,
+            download_name=log_filename
+        )
+    except Exception as e:
+        logger.error(f"Error sending log file {log_filename}: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
