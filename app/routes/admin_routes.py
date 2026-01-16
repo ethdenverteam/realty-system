@@ -496,7 +496,11 @@ def admin_bot_chats_config(current_user):
 @jwt_required
 @role_required('admin')
 def admin_fetch_bot_chats(current_user):
-    """Fetch all chats from Telegram bot using getUpdates"""
+    """Fetch all chats from Telegram bot using getUpdates
+    
+    NOTE: This will conflict if the bot is currently running with polling.
+    The bot must be stopped temporarily to use this endpoint.
+    """
     try:
         from bot.config import BOT_TOKEN
         import requests
@@ -504,6 +508,32 @@ def admin_fetch_bot_chats(current_user):
         if not BOT_TOKEN:
             logger.error("BOT_TOKEN is not configured")
             return jsonify({'error': 'BOT_TOKEN is not configured'}), 500
+        
+        # First, try to get updates with offset=-1 to check for conflicts
+        # This will fail immediately if bot is running
+        test_url = f'https://api.telegram.org/bot{BOT_TOKEN}/getUpdates'
+        test_params = {'offset': -1, 'timeout': 1, 'limit': 1}
+        
+        try:
+            test_response = requests.get(test_url, params=test_params, timeout=5)
+            test_data = test_response.json()
+            
+            # Check for conflict in test request
+            if not test_data.get('ok'):
+                error_description = test_data.get('description', 'Unknown error')
+                error_code = test_data.get('error_code', 0)
+                
+                if error_code == 409 or 'Conflict' in error_description or 'getUpdates' in error_description or 'terminated by other' in error_description:
+                    logger.warning(f"Bot conflict detected during test: {error_description}")
+                    return jsonify({
+                        'error': 'Bot conflict: Another bot instance is running',
+                        'details': 'The bot is currently running and using getUpdates. To fetch chats, you need to temporarily stop the bot container, fetch chats, then restart it.',
+                        'conflict': True,
+                        'suggestion': 'Run: docker-compose stop bot (then fetch chats, then: docker-compose start bot)'
+                    }), 409
+        except Exception as test_error:
+            # If test fails, continue anyway - might be network issue
+            logger.debug(f"Test request failed (non-critical): {test_error}")
         
         chats_dict = {}
         
@@ -531,9 +561,9 @@ def admin_fetch_bot_chats(current_user):
                         logger.warning(f"Bot conflict detected: {error_description}")
                         return jsonify({
                             'error': 'Bot conflict: Another bot instance is running',
-                            'details': 'The bot is currently running and using getUpdates. To fetch chats, you need to temporarily stop the bot or use chats that are already in the database.',
+                            'details': 'The bot is currently running and using getUpdates. To fetch chats, you need to temporarily stop the bot container, fetch chats, then restart it.',
                             'conflict': True,
-                            'suggestion': 'Stop the bot container temporarily, fetch chats, then restart the bot'
+                            'suggestion': 'Run: docker-compose stop bot (then fetch chats, then: docker-compose start bot)'
                         }), 409
                     
                     logger.error(f"Telegram API error: {error_description}")
@@ -609,6 +639,22 @@ def admin_fetch_bot_chats(current_user):
         # Convert to list
         chats = list(chats_dict.values())
         logger.info(f"Total chats found: {len(chats)}")
+        
+        # If no chats found and we got empty result, it might be because bot is consuming updates
+        if len(chats) == 0:
+            logger.warning("No chats found - this might indicate bot conflict or no updates available")
+            # Check if there are any chats in database as alternative
+            from app.models.chat import Chat
+            db_chats = Chat.query.filter_by(owner_type='bot', is_active=True).all()
+            if db_chats:
+                logger.info(f"Found {len(db_chats)} chats in database - suggesting to use those instead")
+                return jsonify({
+                    'groups': [],
+                    'users': [],
+                    'all': [],
+                    'warning': 'No chats found from getUpdates. This might be because the bot is currently running and consuming updates. Consider using chats already in the database or temporarily stopping the bot.',
+                    'database_chats_count': len(db_chats)
+                })
         
         # Separate groups and users
         groups = [c for c in chats if c['type'] in ['group', 'supergroup', 'channel']]
@@ -691,6 +737,16 @@ def admin_add_district(current_user):
         
         db.session.commit()
         
+        # Verify the district was saved
+        db.session.refresh(districts_setting)
+        saved_config = districts_setting.value_json or {}
+        logger.info(f"District '{district_name}' added. Total districts: {len(saved_config)}")
+        
+        if district_name not in saved_config:
+            logger.error(f"District '{district_name}' was not saved correctly!")
+            db.session.rollback()
+            return jsonify({'error': 'Failed to save district'}), 500
+        
         # Log action (don't fail if logging fails)
         try:
             log_action(
@@ -702,7 +758,8 @@ def admin_add_district(current_user):
             logger.warning(f"Failed to log district addition: {log_error}")
         
         return jsonify({
-            'districts': districts_config
+            'districts': saved_config,
+            'message': f'District "{district_name}" added successfully'
         }), 201
         
     except Exception as e:
