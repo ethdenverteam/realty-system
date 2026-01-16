@@ -548,8 +548,7 @@ export default function AdminBotChats() {
                   <thead>
                     <tr>
                       <th>Название</th>
-                      <th>Тип</th>
-                      <th>Фильтры</th>
+                      <th>Привязка</th>
                       <th>Статус</th>
                       <th>Действия</th>
                     </tr>
@@ -562,8 +561,7 @@ export default function AdminBotChats() {
                           <br />
                           <small>{chat.telegram_chat_id}</small>
                         </td>
-                        <td>{getFiltersText(chat) !== 'Нет фильтров' ? getFiltersText(chat) : getChatTypeLabel(chat.type)}</td>
-                        <td><small>{getFiltersText(chat)}</small></td>
+                        <td>{getFiltersText(chat)}</td>
                         <td>
                           {chat.is_active ? (
                             <span className="badge badge-success">Активен</span>

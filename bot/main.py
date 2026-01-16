@@ -15,6 +15,7 @@ from bot.handlers import (
     getcode_command
 )
 from bot.handlers_object import create_object_conversation_handler
+from bot.handlers_settings import create_settings_conversation_handler
 from bot.handlers_objects_view import my_objects_command, my_objects_callback, edit_object_from_list
 from bot.handlers_object_edit import (
     edit_price_handler, edit_area_handler, edit_floor_handler, edit_comment_handler,
@@ -177,6 +178,7 @@ def main():
     # Add object creation conversation handler
     logger.info("Registering conversation handlers...")
     application.add_handler(create_object_conversation_handler())
+    application.add_handler(create_settings_conversation_handler())
     
     # Add object editing handlers
     logger.info("Registering object editing handlers...")

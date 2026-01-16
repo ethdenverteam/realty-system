@@ -4,7 +4,7 @@ Celery tasks for background processing
 from workers.celery_app import celery_app
 from bot.database import get_db
 from bot.models import PublicationQueue, Object, Chat, PublicationHistory
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,22 @@ def publish_to_telegram(queue_id: int):
         if not obj or not chat:
             queue.status = 'failed'
             queue.error_message = 'Object or chat not found'
+            db.commit()
+            return False
+        
+        # Check if object was published to this chat within last 24 hours
+        yesterday = datetime.utcnow() - timedelta(days=1)
+        recent_publication = db.query(PublicationHistory).filter(
+            PublicationHistory.object_id == queue.object_id,
+            PublicationHistory.chat_id == queue.chat_id,
+            PublicationHistory.published_at >= yesterday,
+            PublicationHistory.deleted == False
+        ).first()
+        
+        if recent_publication:
+            logger.info(f"Object {queue.object_id} was already published to chat {queue.chat_id} within 24 hours, skipping")
+            queue.status = 'failed'
+            queue.error_message = 'Object was already published to this chat within 24 hours'
             db.commit()
             return False
         

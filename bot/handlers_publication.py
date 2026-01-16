@@ -11,7 +11,8 @@ from bot.utils import (
     format_publication_text, get_moscow_time, format_moscow_datetime
 )
 from bot.database import get_db
-from bot.models import Object, ActionLog, Chat
+from bot.models import Object, ActionLog, Chat, PublicationHistory
+from datetime import timedelta
 from bot.handlers_object import user_data, show_object_preview_with_menu
 from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
 
@@ -253,12 +254,26 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
     # Publish to each chat
     for chat_id in target_chats:
         try:
-            # Get chat info
+            # Check if object was published to this chat within last 24 hours
             db = get_db()
             try:
                 chat = db.query(Chat).filter_by(chat_id=chat_id).first()
                 if not chat:
                     continue
+                
+                # Check publication history for this object and chat
+                yesterday = datetime.utcnow() - timedelta(days=1)
+                recent_publication = db.query(PublicationHistory).filter(
+                    PublicationHistory.object_id == object_id,
+                    PublicationHistory.chat_id == chat_id,
+                    PublicationHistory.published_at >= yesterday,
+                    PublicationHistory.deleted == False
+                ).first()
+                
+                if recent_publication:
+                    logger.info(f"Object {object_id} was already published to chat {chat_id} within 24 hours, skipping")
+                    continue
+                
                 telegram_chat_id = chat.telegram_chat_id
             finally:
                 db.close()
@@ -303,13 +318,24 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
                     parse_mode='HTML'
                 )
             
-            # Update chat statistics
+            # Update chat statistics and create publication history
             db = get_db()
             try:
                 chat = db.query(Chat).filter_by(chat_id=chat_id).first()
                 if chat:
                     chat.total_publications = (chat.total_publications or 0) + 1
                     chat.last_publication = datetime.utcnow()
+                    
+                    # Create publication history entry
+                    history = PublicationHistory(
+                        object_id=object_id,
+                        chat_id=chat_id,
+                        account_id=None,  # Bot publication
+                        published_at=datetime.utcnow(),
+                        message_id=None,  # Will be updated if needed
+                        deleted=False
+                    )
+                    db.add(history)
                     db.commit()
             finally:
                 db.close()

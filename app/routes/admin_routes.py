@@ -1253,6 +1253,23 @@ def admin_publish_object_to_chat(chat_id, current_user):
         if not obj:
             return jsonify({'error': 'Object not found'}), 404
         
+        # Check if object was published to this chat within last 24 hours
+        from app.models.publication_history import PublicationHistory
+        from datetime import timedelta
+        yesterday = datetime.utcnow() - timedelta(days=1)
+        recent_publication = PublicationHistory.query.filter(
+            PublicationHistory.object_id == object_id,
+            PublicationHistory.chat_id == chat_id,
+            PublicationHistory.published_at >= yesterday,
+            PublicationHistory.deleted == False
+        ).first()
+        
+        if recent_publication:
+            return jsonify({
+                'error': 'Object was already published to this chat within 24 hours',
+                'last_publication': recent_publication.published_at.isoformat()
+            }), 400
+        
         if not BOT_TOKEN:
             return jsonify({'error': 'BOT_TOKEN is not configured'}), 500
         
@@ -1291,6 +1308,18 @@ def admin_publish_object_to_chat(chat_id, current_user):
         # Update chat statistics
         chat.total_publications = (chat.total_publications or 0) + 1
         chat.last_publication = datetime.utcnow()
+        
+        # Create publication history entry
+        from app.models.publication_history import PublicationHistory
+        history = PublicationHistory(
+            object_id=object_id,
+            chat_id=chat_id,
+            account_id=None,  # Admin publication
+            published_at=datetime.utcnow(),
+            message_id=str(message_id) if message_id else None,
+            deleted=False
+        )
+        db.session.add(history)
         db.session.commit()
         
         # Update object status if needed
