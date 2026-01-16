@@ -577,7 +577,9 @@ async def show_object_preview_with_menu(update: Update, context: ContextTypes.DE
     finally:
         db_session.close()
     
-    return ConversationHandler.END
+    # Return preview menu state instead of END to allow editing
+    from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
+    return OBJECT_PREVIEW_MENU
 
 
 async def finish_object_creation(update: Update, context: ContextTypes.DEFAULT_TYPE):

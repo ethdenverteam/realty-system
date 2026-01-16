@@ -28,6 +28,9 @@ from bot.handlers_object_edit import (
     OBJECT_WAITING_EDIT_ROOMS, OBJECT_WAITING_EDIT_DISTRICT, OBJECT_WAITING_EDIT_PRICE,
     OBJECT_WAITING_ADD_DISTRICT, OBJECT_PREVIEW_MENU
 )
+from bot.handlers_publication import (
+    publish_immediate_handler, confirm_publish_handler
+)
 from bot.handlers_object import (
     object_area_input, object_floor_input, object_comment_input,
     object_media_received, skip_media,
@@ -170,6 +173,8 @@ def main():
     application.add_handler(CallbackQueryHandler(phone_custom_handler, pattern="^phone_custom_"))
     application.add_handler(CallbackQueryHandler(set_contact_name_handler, pattern="^set_contact_name_"))
     application.add_handler(CallbackQueryHandler(toggle_username_handler, pattern="^toggle_username_"))
+    application.add_handler(CallbackQueryHandler(publish_immediate_handler, pattern="^publish_immediate_"))
+    application.add_handler(CallbackQueryHandler(confirm_publish_handler, pattern="^confirm_publish_"))
     
     # Edit conversation handler for editing states
     edit_conversation = ConvHandler(
@@ -238,6 +243,8 @@ def main():
                 CallbackQueryHandler(phone_custom_handler, pattern="^phone_custom_"),
                 CallbackQueryHandler(set_contact_name_handler, pattern="^set_contact_name_"),
                 CallbackQueryHandler(toggle_username_handler, pattern="^toggle_username_"),
+                CallbackQueryHandler(publish_immediate_handler, pattern="^publish_immediate_"),
+                CallbackQueryHandler(confirm_publish_handler, pattern="^confirm_publish_"),
             ]
         },
         fallbacks=[
