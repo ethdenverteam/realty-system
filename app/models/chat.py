@@ -35,13 +35,12 @@ class Chat(db.Model):
     
     def to_dict(self):
         """Convert to dictionary"""
-        return {
+        result = {
             'chat_id': self.chat_id,
             'telegram_chat_id': self.telegram_chat_id,
             'title': self.title,
             'type': self.type,
             'category': self.category,
-            'filters_json': self.filters_json or {},
             'owner_type': self.owner_type,
             'owner_account_id': self.owner_account_id,
             'is_active': self.is_active,
@@ -50,4 +49,11 @@ class Chat(db.Model):
             'last_publication': self.last_publication.isoformat() if self.last_publication else None,
             'total_publications': self.total_publications,
         }
+        # Safely handle filters_json - it might not exist in the database
+        try:
+            result['filters_json'] = self.filters_json or {}
+        except AttributeError:
+            # Column doesn't exist in database
+            result['filters_json'] = {}
+        return result
 

@@ -132,6 +132,19 @@ def main():
     # Создать папку если не существует
     LOCAL_LOGS_DIR.mkdir(exist_ok=True)
     
+    # Удалить старые файлы перед загрузкой новых
+    print("Удаление старых файлов логов...")
+    for log_type in TEST_LOG_TYPES:
+        filename = TEST_LOG_FILENAMES[log_type]
+        old_file = LOCAL_LOGS_DIR / filename
+        if old_file.exists():
+            try:
+                old_file.unlink()
+                print(f"  [OK] Удален старый файл: {filename}")
+            except Exception as e:
+                print(f"  [WARN] Не удалось удалить {filename}: {e}")
+    print()
+    
     # Скачать все ТЕСТОВЫЕ логи (короткие, свежие)
     print("Скачивание тестовых логов (свежие логи с последнего деплоя)...")
     print()

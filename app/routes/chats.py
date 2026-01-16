@@ -18,14 +18,77 @@ logger = logging.getLogger(__name__)
 @jwt_required
 def list_chats(current_user):
     """Get list of chats"""
-    owner_type = request.args.get('owner_type', None)
-    query = Chat.query.filter_by(is_active=True)
-    
-    if owner_type:
-        query = query.filter_by(owner_type=owner_type)
-    
-    chats = query.all()
-    return jsonify([chat.to_dict() for chat in chats])
+    try:
+        from sqlalchemy.exc import ProgrammingError
+        from sqlalchemy import inspect as sqlalchemy_inspect
+        from sqlalchemy import text
+        
+        owner_type = request.args.get('owner_type', None)
+        
+        # Check if filters_json column exists
+        inspector = sqlalchemy_inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('chats')]
+        has_filters_json = 'filters_json' in columns
+        
+        # If filters_json doesn't exist, use raw SQL
+        if not has_filters_json:
+            sql = text("""
+                SELECT chat_id, telegram_chat_id, title, type, category, 
+                       owner_type, owner_account_id, is_active, members_count,
+                       added_date, last_publication, total_publications
+                FROM chats
+                WHERE is_active = true
+            """)
+            params = {}
+            if owner_type:
+                sql = text("""
+                    SELECT chat_id, telegram_chat_id, title, type, category, 
+                           owner_type, owner_account_id, is_active, members_count,
+                           added_date, last_publication, total_publications
+                    FROM chats
+                    WHERE is_active = true AND owner_type = :owner_type
+                """)
+                params = {'owner_type': owner_type}
+            
+            result_proxy = db.session.execute(sql, params)
+            rows = result_proxy.fetchall()
+            
+            result = []
+            for row in rows:
+                chat_dict = {
+                    'chat_id': row[0],
+                    'telegram_chat_id': row[1],
+                    'title': row[2],
+                    'type': row[3],
+                    'category': row[4],
+                    'owner_type': row[5],
+                    'owner_account_id': row[6],
+                    'is_active': row[7],
+                    'members_count': row[8],
+                    'added_date': row[9].isoformat() if row[9] else None,
+                    'last_publication': row[10].isoformat() if row[10] else None,
+                    'total_publications': row[11],
+                    'filters_json': {}
+                }
+                result.append(chat_dict)
+            return jsonify(result)
+        
+        # Column exists, use normal ORM query
+        query = Chat.query.filter_by(is_active=True)
+        if owner_type:
+            query = query.filter_by(owner_type=owner_type)
+        
+        chats = query.all()
+        return jsonify([chat.to_dict() for chat in chats])
+    except ProgrammingError as e:
+        db.session.rollback()
+        if 'filters_json' in str(e):
+            logger.error(f"Database column 'filters_json' does not exist. Please run migrations: {e}", exc_info=True)
+            return jsonify({
+                'error': 'Database schema is outdated. The filters_json column is missing.',
+                'details': 'Please run database migrations: alembic upgrade head'
+            }), 500
+        raise
 
 
 @chats_bp.route('/bot', methods=['GET'])
@@ -33,8 +96,60 @@ def list_chats(current_user):
 @role_required('admin')
 def list_bot_chats(current_user):
     """Get list of bot chats (admin only)"""
-    chats = Chat.query.filter_by(owner_type='bot', is_active=True).all()
-    return jsonify([chat.to_dict() for chat in chats])
+    try:
+        from sqlalchemy.exc import ProgrammingError
+        from sqlalchemy import inspect as sqlalchemy_inspect
+        from sqlalchemy import text
+        
+        # Check if filters_json column exists
+        inspector = sqlalchemy_inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('chats')]
+        has_filters_json = 'filters_json' in columns
+        
+        # If filters_json doesn't exist, use raw SQL
+        if not has_filters_json:
+            sql = text("""
+                SELECT chat_id, telegram_chat_id, title, type, category, 
+                       owner_type, owner_account_id, is_active, members_count,
+                       added_date, last_publication, total_publications
+                FROM chats
+                WHERE owner_type = 'bot' AND is_active = true
+            """)
+            result_proxy = db.session.execute(sql)
+            rows = result_proxy.fetchall()
+            
+            result = []
+            for row in rows:
+                chat_dict = {
+                    'chat_id': row[0],
+                    'telegram_chat_id': row[1],
+                    'title': row[2],
+                    'type': row[3],
+                    'category': row[4],
+                    'owner_type': row[5],
+                    'owner_account_id': row[6],
+                    'is_active': row[7],
+                    'members_count': row[8],
+                    'added_date': row[9].isoformat() if row[9] else None,
+                    'last_publication': row[10].isoformat() if row[10] else None,
+                    'total_publications': row[11],
+                    'filters_json': {}
+                }
+                result.append(chat_dict)
+            return jsonify(result)
+        
+        # Column exists, use normal ORM query
+        chats = Chat.query.filter_by(owner_type='bot', is_active=True).all()
+        return jsonify([chat.to_dict() for chat in chats])
+    except ProgrammingError as e:
+        db.session.rollback()
+        if 'filters_json' in str(e):
+            logger.error(f"Database column 'filters_json' does not exist. Please run migrations: {e}", exc_info=True)
+            return jsonify({
+                'error': 'Database schema is outdated. The filters_json column is missing.',
+                'details': 'Please run database migrations: alembic upgrade head'
+            }), 500
+        raise
 
 
 @chats_bp.route('/bot', methods=['POST'])

@@ -169,12 +169,50 @@ def admin_bot_chats_list(current_user):
         columns = [col['name'] for col in inspector.get_columns('chats')]
         has_filters_json = 'filters_json' in columns
         
+        # If filters_json column doesn't exist, use raw SQL to avoid SQLAlchemy trying to load it
+        if not has_filters_json:
+            logger.warning("filters_json column missing, using raw SQL query")
+            # Use raw SQL to query without filters_json column
+            sql = text("""
+                SELECT chat_id, telegram_chat_id, title, type, category, 
+                       owner_type, owner_account_id, is_active, members_count,
+                       added_date, last_publication, total_publications
+                FROM chats
+                WHERE owner_type = :owner_type AND is_active = true
+            """)
+            result_proxy = db.session.execute(sql, {'owner_type': 'bot'})
+            rows = result_proxy.fetchall()
+            
+            # Convert rows to dict
+            result = []
+            for row in rows:
+                chat_dict = {
+                    'chat_id': row[0],
+                    'telegram_chat_id': row[1],
+                    'title': row[2],
+                    'type': row[3],
+                    'category': row[4],
+                    'owner_type': row[5],
+                    'owner_account_id': row[6],
+                    'is_active': row[7],
+                    'members_count': row[8],
+                    'added_date': row[9].isoformat() if row[9] else None,
+                    'last_publication': row[10].isoformat() if row[10] else None,
+                    'total_publications': row[11],
+                    'filters_json': {}  # Default empty dict since column doesn't exist
+                }
+                result.append(chat_dict)
+            
+            logger.info(f"Returned {len(result)} chats using raw SQL query (filters_json column missing)")
+            return jsonify(result)
+        
+        # Column exists, use normal ORM query
         try:
             chats = Chat.query.filter_by(owner_type='bot', is_active=True).all()
         except ProgrammingError as query_error:
-            # If query fails due to missing column, try using raw SQL without filters_json
+            # If query still fails, try using raw SQL without filters_json
             if 'filters_json' in str(query_error):
-                logger.warning(f"filters_json column missing, using alternative query: {query_error}")
+                logger.warning(f"filters_json column missing despite check, using alternative query: {query_error}")
                 # IMPORTANT: Rollback failed transaction before executing new query
                 db.session.rollback()
                 # Use raw SQL to query without filters_json column
@@ -489,12 +527,13 @@ def admin_fetch_bot_chats(current_user):
                     error_code = data.get('error_code', 0)
                     
                     # Handle conflict error (409) - bot is already running
-                    if error_code == 409 or 'Conflict' in error_description or 'getUpdates' in error_description:
+                    if error_code == 409 or 'Conflict' in error_description or 'getUpdates' in error_description or 'terminated by other' in error_description:
                         logger.warning(f"Bot conflict detected: {error_description}")
                         return jsonify({
                             'error': 'Bot conflict: Another bot instance is running',
                             'details': 'The bot is currently running and using getUpdates. To fetch chats, you need to temporarily stop the bot or use chats that are already in the database.',
-                            'conflict': True
+                            'conflict': True,
+                            'suggestion': 'Stop the bot container temporarily, fetch chats, then restart the bot'
                         }), 409
                     
                     logger.error(f"Telegram API error: {error_description}")
@@ -504,6 +543,16 @@ def admin_fetch_bot_chats(current_user):
                     }), 500
                 
             except requests.exceptions.RequestException as e:
+                error_str = str(e)
+                # Check if it's a conflict error in the exception message
+                if 'Conflict' in error_str or 'getUpdates' in error_str or '409' in error_str:
+                    logger.warning(f"Bot conflict detected in request exception: {error_str}")
+                    return jsonify({
+                        'error': 'Bot conflict: Another bot instance is running',
+                        'details': 'The bot is currently running and using getUpdates. To fetch chats, you need to temporarily stop the bot or use chats that are already in the database.',
+                        'conflict': True,
+                        'suggestion': 'Stop the bot container temporarily, fetch chats, then restart the bot'
+                    }), 409
                 logger.error(f"Request error fetching updates: {e}", exc_info=True)
                 return jsonify({
                     'error': f'Request error to Telegram API: {str(e)}',
