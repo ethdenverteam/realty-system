@@ -335,6 +335,19 @@ def get_districts_config() -> Dict:
         db.close()
 
 
+def get_rooms_config() -> List[str]:
+    """Get rooms configuration from SystemSetting or default"""
+    db = get_db()
+    try:
+        setting = db.query(SystemSetting).filter_by(key='rooms_config').first()
+        if setting and setting.value_json:
+            return setting.value_json
+        # Default rooms
+        return ["Студия", "1к", "2к", "3к", "4+к", "Дом", "евро1к", "евро2к", "евро3к"]
+    finally:
+        db.close()
+
+
 def get_hashtag_suffix() -> str:
     """Получить суффикс хэштегов"""
     db = get_db()

@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, Call
 from bot.utils import (
     get_user, update_user_activity, create_object, get_object, update_object,
     get_user_id_prefix, set_user_id_prefix, generate_next_id_prefix,
-    format_publication_text
+    format_publication_text, get_rooms_config, get_districts_config
 )
 from bot.database import get_db
 from bot.models import Object, SystemSetting, ActionLog
@@ -33,30 +33,6 @@ OBJECT_WAITING_CONTACTS = 10
 user_data = {}
 
 
-def get_rooms_config():
-    """Get rooms configuration from SystemSetting or default"""
-    db_session = get_db()
-    try:
-        setting = db_session.query(SystemSetting).filter_by(key='rooms_config').first()
-        if setting and setting.value_json:
-            return setting.value_json
-        # Default rooms
-        return ["Студия", "1к", "2к", "3к", "4+к", "Дом", "евро1к", "евро2к", "евро3к"]
-    finally:
-        db_session.close()
-
-
-def get_districts_config():
-    """Get districts configuration from SystemSetting or default"""
-    db_session = get_db()
-    try:
-        setting = db_session.query(SystemSetting).filter_by(key='districts_config').first()
-        if setting and setting.value_json:
-            return setting.value_json
-        # Default districts (empty dict)
-        return {}
-    finally:
-        db_session.close()
 
 
 async def add_object_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
