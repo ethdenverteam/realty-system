@@ -92,6 +92,14 @@ def setup_bot_logging():
     logging.getLogger('telegram').setLevel(logging.WARNING)
     logging.getLogger('httpx').setLevel(logging.WARNING)
     logging.getLogger('asyncio').setLevel(logging.WARNING)
+    logging.getLogger('httpcore').setLevel(logging.WARNING)
+    
+    # Ensure bot.handlers logger uses bot logger
+    handlers_logger = logging.getLogger('bot.handlers')
+    handlers_logger.setLevel(logging.DEBUG)
+    if not handlers_logger.handlers:
+        handlers_logger.addHandler(console_handler)
+        handlers_logger.addHandler(file_handler)
     
     return logger
 
