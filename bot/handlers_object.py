@@ -291,15 +291,23 @@ async def object_area_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         object_id = user_data[user.id]["object_id"]
         db_session = get_db()
         rooms_type = None
+        comment = None
         try:
             obj = db_session.query(Object).filter_by(object_id=object_id).first()
             if obj:
-                # Get rooms_type before closing session
+                # Get rooms_type and comment before closing session
                 rooms_type = obj.rooms_type
+                comment = obj.comment
                 obj.area = area
                 db_session.commit()
         finally:
             db_session.close()
+        
+        # If comment exists, this is editing from menu - return to preview
+        if comment:
+            from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
+            await show_object_preview_with_menu(update, context, object_id)
+            return OBJECT_PREVIEW_MENU
         
         # Check if rooms_type is "Дом" - skip floor
         if rooms_type == "Дом":
@@ -337,13 +345,21 @@ async def object_floor_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Update object
     object_id = user_data[user.id]["object_id"]
     db_session = get_db()
+    comment = None
     try:
         obj = db_session.query(Object).filter_by(object_id=object_id).first()
         if obj:
+            comment = obj.comment
             obj.floor = floor
             db_session.commit()
     finally:
         db_session.close()
+    
+    # If comment exists, this is editing from menu - return to preview
+    if comment:
+        from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
+        await show_object_preview_with_menu(update, context, object_id)
+        return OBJECT_PREVIEW_MENU
     
     # Go to comment
     keyboard = [[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
@@ -367,13 +383,21 @@ async def object_comment_input(update: Update, context: ContextTypes.DEFAULT_TYP
     # Update object
     object_id = user_data[user.id]["object_id"]
     db_session = get_db()
+    photos_count = 0
     try:
         obj = db_session.query(Object).filter_by(object_id=object_id).first()
         if obj:
             obj.comment = comment
+            photos_count = len(obj.photos_json) if obj.photos_json else 0
             db_session.commit()
     finally:
         db_session.close()
+    
+    # If photos exist, this is editing from menu - return to preview
+    if photos_count > 0:
+        from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
+        await show_object_preview_with_menu(update, context, object_id)
+        return OBJECT_PREVIEW_MENU
     
     # Go to media
     keyboard = [[InlineKeyboardButton("Пропустить", callback_data="skip_media")],
@@ -395,6 +419,7 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
     
     object_id = user_data[user.id]["object_id"]
     db_session = get_db()
+    photos_json = []
     try:
         obj = db_session.query(Object).filter_by(object_id=object_id).first()
         
@@ -403,12 +428,10 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
             return ConversationHandler.END
         
         # Get photos
-        photos_json = []
         if update.message.photo:
             photos = update.message.photo
             # Get largest photo
             photo = photos[-1]
-            file = await context.bot.get_file(photo.file_id)
             
             # Save photo info (in production, download and save to uploads/)
             # For now, just store file_id
@@ -428,11 +451,17 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
         remaining = 10 - len(photos_json)
         if remaining > 0:
             await update.message.reply_text(
-                f"✅ Фото добавлено. Осталось мест: {remaining}. Отправьте еще фото или нажмите 'Готово':"
+                f"✅ Фото добавлено. Осталось мест: {remaining}. Отправьте еще фото или нажмите 'Пропустить':"
             )
             return OBJECT_WAITING_MEDIA
         else:
             await update.message.reply_text("✅ Все фото добавлены (максимум 10).")
+            # Check if this is editing (comment exists) or creation
+            obj = get_object(object_id)
+            if obj and obj.comment:
+                from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
+                await show_object_preview_with_menu(update, context, object_id)
+                return OBJECT_PREVIEW_MENU
             return await finish_object_creation(update, context)
     
     await update.message.reply_text("❌ Отправьте фото или нажмите 'Пропустить'.")
@@ -567,6 +596,7 @@ async def show_object_preview_with_menu(update: Update, context: ContextTypes.DE
             user_data[user.id] = {}
         user_data[user.id]["preview_message_id"] = preview_message.message_id
         user_data[user.id]["menu_message_id"] = menu_message.message_id
+        user_data[user.id]["preview_chat_id"] = message.chat_id
         
     finally:
         db_session.close()

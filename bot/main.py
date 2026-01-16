@@ -15,7 +15,26 @@ from bot.handlers import (
     getcode_command
 )
 from bot.handlers_object import create_object_conversation_handler
-from bot.handlers_objects_view import my_objects_command, my_objects_callback
+from bot.handlers_objects_view import my_objects_command, my_objects_callback, edit_object_from_list
+from bot.handlers_object_edit import (
+    edit_price_handler, edit_area_handler, edit_floor_handler, edit_comment_handler,
+    edit_renovation_handler, edit_address_handler, edit_contacts_handler,
+    edit_rooms_handler, edit_district_handler, add_district_handler,
+    add_media_handler, back_to_preview_handler,
+    edit_price_input, edit_rooms_selected, edit_district_selected,
+    add_district_selected, renovation_selected, address_input,
+    contacts_input, phone_from_settings_handler,
+    phone_custom_handler, set_contact_name_handler, toggle_username_handler,
+    OBJECT_WAITING_EDIT_ROOMS, OBJECT_WAITING_EDIT_DISTRICT, OBJECT_WAITING_EDIT_PRICE,
+    OBJECT_WAITING_ADD_DISTRICT, OBJECT_PREVIEW_MENU
+)
+from bot.handlers_object import (
+    object_area_input, object_floor_input, object_comment_input,
+    object_media_received, skip_media,
+    OBJECT_WAITING_AREA, OBJECT_WAITING_FLOOR, OBJECT_WAITING_COMMENT,
+    OBJECT_WAITING_MEDIA, OBJECT_WAITING_RENOVATION, OBJECT_WAITING_ADDRESS,
+    OBJECT_WAITING_CONTACTS
+)
 from bot.config import BOT_TOKEN, ADMIN_ID
 
 # Setup logging
@@ -124,11 +143,110 @@ def main():
     application.add_handler(CommandHandler("myobjects", my_objects_command))
     application.add_handler(CallbackQueryHandler(show_main_menu, pattern="^main_menu$"))
     application.add_handler(CallbackQueryHandler(getcode_command, pattern="^getcode$"))
-    application.add_handler(CallbackQueryHandler(my_objects_callback, pattern="^my_objects$"))
+    application.add_handler(CallbackQueryHandler(my_objects_callback, pattern="^(my_objects|my_objects_page_|edit_object_from_list_)"))
     
     # Add object creation conversation handler
     logger.info("Registering conversation handlers...")
     application.add_handler(create_object_conversation_handler())
+    
+    # Add object editing handlers
+    logger.info("Registering object editing handlers...")
+    from telegram.ext import ConversationHandler as ConvHandler
+    
+    # Edit handlers - callback queries
+    application.add_handler(CallbackQueryHandler(edit_price_handler, pattern="^edit_price_"))
+    application.add_handler(CallbackQueryHandler(edit_area_handler, pattern="^edit_area_"))
+    application.add_handler(CallbackQueryHandler(edit_floor_handler, pattern="^edit_floor_"))
+    application.add_handler(CallbackQueryHandler(edit_comment_handler, pattern="^edit_comment_"))
+    application.add_handler(CallbackQueryHandler(edit_renovation_handler, pattern="^edit_renovation_"))
+    application.add_handler(CallbackQueryHandler(edit_address_handler, pattern="^edit_address_"))
+    application.add_handler(CallbackQueryHandler(edit_contacts_handler, pattern="^edit_contacts_"))
+    application.add_handler(CallbackQueryHandler(edit_rooms_handler, pattern="^edit_rooms_"))
+    application.add_handler(CallbackQueryHandler(edit_district_handler, pattern="^edit_district_"))
+    application.add_handler(CallbackQueryHandler(add_district_handler, pattern="^add_district_"))
+    application.add_handler(CallbackQueryHandler(add_media_handler, pattern="^add_media_"))
+    application.add_handler(CallbackQueryHandler(back_to_preview_handler, pattern="^back_to_preview$"))
+    application.add_handler(CallbackQueryHandler(phone_from_settings_handler, pattern="^phone_from_settings_"))
+    application.add_handler(CallbackQueryHandler(phone_custom_handler, pattern="^phone_custom_"))
+    application.add_handler(CallbackQueryHandler(set_contact_name_handler, pattern="^set_contact_name_"))
+    application.add_handler(CallbackQueryHandler(toggle_username_handler, pattern="^toggle_username_"))
+    
+    # Edit conversation handler for editing states
+    edit_conversation = ConvHandler(
+        entry_points=[
+            CallbackQueryHandler(edit_price_handler, pattern="^edit_price_"),
+            CallbackQueryHandler(edit_area_handler, pattern="^edit_area_"),
+            CallbackQueryHandler(edit_floor_handler, pattern="^edit_floor_"),
+            CallbackQueryHandler(edit_comment_handler, pattern="^edit_comment_"),
+            CallbackQueryHandler(edit_renovation_handler, pattern="^edit_renovation_"),
+            CallbackQueryHandler(edit_address_handler, pattern="^edit_address_"),
+            CallbackQueryHandler(edit_contacts_handler, pattern="^edit_contacts_"),
+            CallbackQueryHandler(edit_rooms_handler, pattern="^edit_rooms_"),
+            CallbackQueryHandler(edit_district_handler, pattern="^edit_district_"),
+            CallbackQueryHandler(add_district_handler, pattern="^add_district_"),
+            CallbackQueryHandler(add_media_handler, pattern="^add_media_"),
+        ],
+        states={
+            OBJECT_WAITING_EDIT_PRICE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, edit_price_input)
+            ],
+            OBJECT_WAITING_AREA: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, object_area_input)
+            ],
+            OBJECT_WAITING_FLOOR: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, object_floor_input)
+            ],
+            OBJECT_WAITING_COMMENT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, object_comment_input)
+            ],
+            OBJECT_WAITING_RENOVATION: [
+                CallbackQueryHandler(renovation_selected, pattern="^renovation_")
+            ],
+            OBJECT_WAITING_ADDRESS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, address_input)
+            ],
+            OBJECT_WAITING_CONTACTS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, contacts_input),
+            ],
+            OBJECT_WAITING_EDIT_ROOMS: [
+                CallbackQueryHandler(edit_rooms_selected, pattern="^rooms_")
+            ],
+            OBJECT_WAITING_EDIT_DISTRICT: [
+                CallbackQueryHandler(edit_district_selected, pattern="^district_")
+            ],
+            OBJECT_WAITING_ADD_DISTRICT: [
+                CallbackQueryHandler(add_district_selected, pattern="^district_")
+            ],
+            OBJECT_WAITING_MEDIA: [
+                MessageHandler(filters.PHOTO, object_media_received),
+                CallbackQueryHandler(skip_media, pattern="^skip_media$")
+            ],
+            OBJECT_PREVIEW_MENU: [
+                CallbackQueryHandler(back_to_preview_handler, pattern="^back_to_preview$"),
+                CallbackQueryHandler(edit_price_handler, pattern="^edit_price_"),
+                CallbackQueryHandler(edit_area_handler, pattern="^edit_area_"),
+                CallbackQueryHandler(edit_floor_handler, pattern="^edit_floor_"),
+                CallbackQueryHandler(edit_comment_handler, pattern="^edit_comment_"),
+                CallbackQueryHandler(edit_renovation_handler, pattern="^edit_renovation_"),
+                CallbackQueryHandler(edit_address_handler, pattern="^edit_address_"),
+                CallbackQueryHandler(edit_contacts_handler, pattern="^edit_contacts_"),
+                CallbackQueryHandler(edit_rooms_handler, pattern="^edit_rooms_"),
+                CallbackQueryHandler(edit_district_handler, pattern="^edit_district_"),
+                CallbackQueryHandler(add_district_handler, pattern="^add_district_"),
+                CallbackQueryHandler(add_media_handler, pattern="^add_media_"),
+                CallbackQueryHandler(phone_from_settings_handler, pattern="^phone_from_settings_"),
+                CallbackQueryHandler(phone_custom_handler, pattern="^phone_custom_"),
+                CallbackQueryHandler(set_contact_name_handler, pattern="^set_contact_name_"),
+                CallbackQueryHandler(toggle_username_handler, pattern="^toggle_username_"),
+            ]
+        },
+        fallbacks=[
+            CallbackQueryHandler(back_to_preview_handler, pattern="^back_to_preview$"),
+            MessageHandler(filters.COMMAND, back_to_preview_handler)
+        ],
+        name="edit_object_handler"
+    )
+    application.add_handler(edit_conversation)
     
     # Log all updates (for debugging) - only non-command messages to avoid duplication
     async def log_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
