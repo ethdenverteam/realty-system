@@ -36,6 +36,9 @@ instance/
 logs/
 *.log
 
+# Synced logs from server (for AI analysis)
+logs_server/
+
 # Environment
 .env
 .env.local

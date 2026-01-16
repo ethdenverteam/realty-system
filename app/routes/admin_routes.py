@@ -642,11 +642,15 @@ def admin_add_district(current_user):
         
         db.session.commit()
         
-        log_action(
-            action='admin_district_added',
-            user_id=current_user.user_id,
-            details={'district_name': district_name}
-        )
+        # Log action (don't fail if logging fails)
+        try:
+            log_action(
+                action='admin_district_added',
+                user_id=current_user.user_id,
+                details={'district_name': district_name}
+            )
+        except Exception as log_error:
+            logger.warning(f"Failed to log district addition: {log_error}")
         
         return jsonify({
             'districts': districts_config
@@ -683,11 +687,15 @@ def admin_delete_district(district_name, current_user):
         
         db.session.commit()
         
-        log_action(
-            action='admin_district_deleted',
-            user_id=current_user.user_id,
-            details={'district_name': district_name}
-        )
+        # Log action (don't fail if logging fails)
+        try:
+            log_action(
+                action='admin_district_deleted',
+                user_id=current_user.user_id,
+                details={'district_name': district_name}
+            )
+        except Exception as log_error:
+            logger.warning(f"Failed to log district deletion: {log_error}")
         
         return jsonify({
             'districts': districts_config
