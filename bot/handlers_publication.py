@@ -49,33 +49,68 @@ async def get_target_chats_for_object(obj: Object) -> list:
                     all_districts.update(parent_districts)
         
         for chat in chats:
-            category = chat.category or ""
+            matches = False
+            filters = chat.filters_json or {}
             
-            # Check by rooms type
-            if category.startswith("rooms_") and category.replace("rooms_", "") == rooms_type:
-                if chat.chat_id not in target_chats:
-                    target_chats.append(chat.chat_id)
+            # Check if filters_json is used (has at least one filter)
+            has_filters_json = bool(filters.get('rooms_types') or filters.get('districts') or 
+                                   filters.get('price_min') is not None or filters.get('price_max') is not None)
             
-            # Check by district
-            if category.startswith("district_"):
-                district_name = category.replace("district_", "")
-                if district_name in all_districts:
-                    if chat.chat_id not in target_chats:
-                        target_chats.append(chat.chat_id)
+            if has_filters_json:
+                # Check all conditions - chat must match ALL specified filters
+                rooms_match = True
+                districts_match = True
+                price_match = True
+                
+                # Check by rooms type
+                if filters.get('rooms_types'):
+                    rooms_match = rooms_type in filters['rooms_types']
+                
+                # Check by districts
+                if filters.get('districts'):
+                    chat_districts = set(filters['districts'])
+                    districts_match = bool(chat_districts.intersection(all_districts))
+                
+                # Check by price range
+                price_min = filters.get('price_min')
+                price_max = filters.get('price_max')
+                if price_min is not None or price_max is not None:
+                    price_min = price_min or 0
+                    price_max = price_max if price_max is not None else float('inf')
+                    price_match = price_min <= price < price_max
+                
+                # Chat matches if all specified filters match
+                if rooms_match and districts_match and price_match:
+                    matches = True
+            else:
+                # Legacy category support
+                category = chat.category or ""
+                
+                # Check by rooms type
+                if category.startswith("rooms_") and category.replace("rooms_", "") == rooms_type:
+                    matches = True
+                
+                # Check by district
+                if category.startswith("district_"):
+                    district_name = category.replace("district_", "")
+                    if district_name in all_districts:
+                        matches = True
+                
+                # Check by price range
+                if category.startswith("price_"):
+                    try:
+                        # Format: price_4000_6000
+                        parts = category.replace("price_", "").split("_")
+                        if len(parts) == 2:
+                            min_price = float(parts[0])
+                            max_price = float(parts[1])
+                            if min_price <= price < max_price:
+                                matches = True
+                    except:
+                        pass
             
-            # Check by price range
-            if category.startswith("price_"):
-                try:
-                    # Format: price_4000_6000
-                    parts = category.replace("price_", "").split("_")
-                    if len(parts) == 2:
-                        min_price = float(parts[0])
-                        max_price = float(parts[1])
-                        if min_price <= price < max_price:
-                            if chat.chat_id not in target_chats:
-                                target_chats.append(chat.chat_id)
-                except:
-                    pass
+            if matches and chat.chat_id not in target_chats:
+                target_chats.append(chat.chat_id)
         
         return target_chats
     finally:

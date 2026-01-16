@@ -1136,8 +1136,43 @@ def admin_test_publish_to_chat(chat_id, current_user):
         if not BOT_TOKEN:
             return jsonify({'error': 'BOT_TOKEN is not configured'}), 500
         
-        # Create test message
-        test_message = "🧪 <b>Тестовая публикация</b>\n\nЭто тестовое сообщение для проверки работы публикации в чат."
+        # Create test message with binding information
+        test_message = "🧪 <b>Тестовая публикация</b>\n\nЭто тестовое сообщение для проверки работы публикации в чат.\n\n"
+        
+        # Add binding information
+        filters = chat.filters_json or {}
+        binding_parts = []
+        
+        if filters.get('rooms_types') and len(filters['rooms_types']) > 0:
+            binding_parts.append(f"Комнаты: {', '.join(filters['rooms_types'])}")
+        
+        if filters.get('districts') and len(filters['districts']) > 0:
+            binding_parts.append(f"Районы: {', '.join(filters['districts'])}")
+        
+        if filters.get('price_min') or filters.get('price_max'):
+            price_min = filters.get('price_min', 0)
+            price_max = filters.get('price_max', '∞')
+            binding_parts.append(f"Цена: {price_min} - {price_max} тыс. руб.")
+        
+        # Legacy category support
+        if not binding_parts and chat.category:
+            if chat.category.startswith('rooms_'):
+                room_type = chat.category.replace('rooms_', '')
+                binding_parts.append(f"Комнаты: {room_type}")
+            elif chat.category.startswith('district_'):
+                district = chat.category.replace('district_', '')
+                binding_parts.append(f"Район: {district}")
+            elif chat.category.startswith('price_'):
+                parts = chat.category.replace('price_', '').split('_')
+                if len(parts) == 2:
+                    binding_parts.append(f"Цена: {parts[0]} - {parts[1]} тыс. руб.")
+        
+        if binding_parts:
+            test_message += "<b>Привязка чата:</b>\n"
+            for part in binding_parts:
+                test_message += f"• {part}\n"
+        else:
+            test_message += "<b>Привязка чата:</b> не указана\n"
         
         # Send message via Telegram API
         url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'

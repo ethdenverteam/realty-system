@@ -21,12 +21,14 @@ from bot.handlers_object_edit import (
     edit_renovation_handler, edit_address_handler, edit_contacts_handler,
     edit_rooms_handler, edit_district_handler, add_district_handler,
     add_media_handler, back_to_preview_handler,
-    edit_price_input, edit_rooms_selected, edit_district_selected,
+    edit_price_input, edit_area_input, edit_floor_input, edit_comment_input,
+    edit_rooms_selected, edit_district_selected,
     add_district_selected, renovation_selected, address_input,
     contacts_input, phone_from_settings_handler,
     phone_custom_handler, set_contact_name_handler, toggle_username_handler,
     OBJECT_WAITING_EDIT_ROOMS, OBJECT_WAITING_EDIT_DISTRICT, OBJECT_WAITING_EDIT_PRICE,
-    OBJECT_WAITING_ADD_DISTRICT, OBJECT_PREVIEW_MENU
+    OBJECT_WAITING_ADD_DISTRICT, OBJECT_WAITING_EDIT_AREA, OBJECT_WAITING_EDIT_FLOOR,
+    OBJECT_WAITING_EDIT_COMMENT, OBJECT_PREVIEW_MENU
 )
 from bot.handlers_publication import (
     publish_immediate_handler, confirm_publish_handler
@@ -219,14 +221,14 @@ def main():
             OBJECT_WAITING_EDIT_PRICE: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, edit_price_input)
             ],
-            OBJECT_WAITING_AREA: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, object_area_input)
+            OBJECT_WAITING_EDIT_AREA: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, edit_area_input)
             ],
-            OBJECT_WAITING_FLOOR: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, object_floor_input)
+            OBJECT_WAITING_EDIT_FLOOR: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, edit_floor_input)
             ],
-            OBJECT_WAITING_COMMENT: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, object_comment_input)
+            OBJECT_WAITING_EDIT_COMMENT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, edit_comment_input)
             ],
             OBJECT_WAITING_RENOVATION: [
                 CallbackQueryHandler(renovation_selected, pattern="^renovation_")

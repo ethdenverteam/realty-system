@@ -23,7 +23,10 @@ OBJECT_WAITING_EDIT_ROOMS = 16
 OBJECT_WAITING_EDIT_DISTRICT = 17
 OBJECT_WAITING_EDIT_PRICE = 18
 OBJECT_WAITING_ADD_DISTRICT = 19
-OBJECT_PREVIEW_MENU = 20
+OBJECT_WAITING_EDIT_AREA = 20
+OBJECT_WAITING_EDIT_FLOOR = 21
+OBJECT_WAITING_EDIT_COMMENT = 22
+OBJECT_PREVIEW_MENU = 23
 
 
 async def delete_preview_and_menu(context: ContextTypes.DEFAULT_TYPE, user_id: int):
@@ -160,7 +163,50 @@ async def edit_area_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("🏠 Назад", callback_data="back_to_preview")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.message.reply_text("📐 Введите площадь в м²:", reply_markup=reply_markup)
-    return OBJECT_WAITING_AREA
+    return OBJECT_WAITING_EDIT_AREA
+
+
+async def edit_area_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка ввода площади при редактировании"""
+    user = update.effective_user
+    
+    if user.id not in user_data or "object_id" not in user_data[user.id]:
+        await update.message.reply_text("Ошибка: данные объекта не найдены.")
+        return ConversationHandler.END
+    
+    try:
+        area = float(update.message.text.replace(",", "."))
+        if area <= 0:
+            raise ValueError
+        
+        object_id = user_data[user.id]["object_id"]
+        update_object(object_id, {"area": area})
+        
+        # Log action
+        try:
+            db = get_db()
+            try:
+                user_obj = get_user(str(user.id))
+                if user_obj:
+                    action_log = ActionLog(
+                        user_id=user_obj.user_id,
+                        action='bot_object_area_edited',
+                        details_json={'object_id': object_id, 'area': area},
+                        created_at=datetime.utcnow()
+                    )
+                    db.add(action_log)
+                    db.commit()
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Failed to log action: {e}")
+        
+        await show_object_preview_with_menu(update, context, object_id)
+        return OBJECT_PREVIEW_MENU
+        
+    except ValueError:
+        await update.message.reply_text("❌ Неверный формат площади. Введите число больше нуля:")
+        return OBJECT_WAITING_EDIT_AREA
 
 
 async def edit_floor_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -180,7 +226,43 @@ async def edit_floor_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     keyboard = [[InlineKeyboardButton("🏠 Назад", callback_data="back_to_preview")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.message.reply_text("🏢 Введите этаж (например: 5/9):", reply_markup=reply_markup)
-    return OBJECT_WAITING_FLOOR
+    return OBJECT_WAITING_EDIT_FLOOR
+
+
+async def edit_floor_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка ввода этажа при редактировании"""
+    user = update.effective_user
+    
+    if user.id not in user_data or "object_id" not in user_data[user.id]:
+        await update.message.reply_text("Ошибка: данные объекта не найдены.")
+        return ConversationHandler.END
+    
+    floor = update.message.text.strip()
+    object_id = user_data[user.id]["object_id"]
+    
+    update_object(object_id, {"floor": floor})
+    
+    # Log action
+    try:
+        db = get_db()
+        try:
+            user_obj = get_user(str(user.id))
+            if user_obj:
+                action_log = ActionLog(
+                    user_id=user_obj.user_id,
+                    action='bot_object_floor_edited',
+                    details_json={'object_id': object_id, 'floor': floor},
+                    created_at=datetime.utcnow()
+                )
+                db.add(action_log)
+                db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to log action: {e}")
+    
+    await show_object_preview_with_menu(update, context, object_id)
+    return OBJECT_PREVIEW_MENU
 
 
 async def edit_comment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -200,7 +282,43 @@ async def edit_comment_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     keyboard = [[InlineKeyboardButton("🏠 Назад", callback_data="back_to_preview")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.message.reply_text("📝 Введите описание (комментарий):", reply_markup=reply_markup)
-    return OBJECT_WAITING_COMMENT
+    return OBJECT_WAITING_EDIT_COMMENT
+
+
+async def edit_comment_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка ввода комментария при редактировании"""
+    user = update.effective_user
+    
+    if user.id not in user_data or "object_id" not in user_data[user.id]:
+        await update.message.reply_text("Ошибка: данные объекта не найдены.")
+        return ConversationHandler.END
+    
+    comment = update.message.text.strip()
+    object_id = user_data[user.id]["object_id"]
+    
+    update_object(object_id, {"comment": comment})
+    
+    # Log action
+    try:
+        db = get_db()
+        try:
+            user_obj = get_user(str(user.id))
+            if user_obj:
+                action_log = ActionLog(
+                    user_id=user_obj.user_id,
+                    action='bot_object_comment_edited',
+                    details_json={'object_id': object_id, 'comment': comment},
+                    created_at=datetime.utcnow()
+                )
+                db.add(action_log)
+                db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to log action: {e}")
+    
+    await show_object_preview_with_menu(update, context, object_id)
+    return OBJECT_PREVIEW_MENU
 
 
 async def edit_renovation_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
