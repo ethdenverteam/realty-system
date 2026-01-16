@@ -73,8 +73,9 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: realty_bot
-    command: python -m bot.main
+    command: python -u -m bot.main
     environment:
+      - PYTHONUNBUFFERED=1
       - POSTGRES_USER=${POSTGRES_USER:-realty_user}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-realty_password}
       - POSTGRES_HOST=postgres

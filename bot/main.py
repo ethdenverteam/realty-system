@@ -49,32 +49,28 @@ def setup_bot_logging():
     
     # Console handler - use sys.stdout for docker-compose logs (unbuffered)
     import sys
-    # Create unbuffered stdout stream
-    class UnbufferedStream:
-        def __init__(self, stream):
-            self.stream = stream
-        def write(self, data):
-            self.stream.write(data)
-            self.stream.flush()
-        def flush(self):
-            self.stream.flush()
-        def __getattr__(self, name):
-            return getattr(self.stream, name)
+    # Force unbuffered output
+    sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
     
-    console_handler = logging.StreamHandler(UnbufferedStream(sys.stdout))
-    console_handler.setLevel(logging.DEBUG)  # Changed to DEBUG for more info
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)  # INFO level for console
     console_handler.setFormatter(simple_formatter)
+    # Force immediate flush
+    console_handler.stream = sys.stdout
     
-    # File handler - all logs
+    # File handler - all logs (with immediate flush)
     all_logs_file = os.path.join(log_dir, 'bot.log')
     file_handler = RotatingFileHandler(
         all_logs_file,
         maxBytes=10 * 1024 * 1024,  # 10MB
         backupCount=10,
-        encoding='utf-8'
+        encoding='utf-8',
+        delay=False  # Don't delay opening file
     )
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(detailed_formatter)
+    # Force flush after each write
+    file_handler.terminator = '\n'
     
     # Error handler
     error_logs_file = os.path.join(log_dir, 'bot_errors.log')
