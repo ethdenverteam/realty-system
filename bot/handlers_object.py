@@ -473,28 +473,49 @@ async def finish_object_creation(update: Update, context: ContextTypes.DEFAULT_T
     finally:
         db_session.close()
     
-    # Get object again for display (after commit)
-    obj = get_object(object_id)
+    # Get object again for display (after commit) - need to get all fields before closing session
+    db_session = get_db()
+    try:
+        obj = db_session.query(Object).filter_by(object_id=object_id).first()
+        
+        if not obj:
+            if update.callback_query:
+                await update.callback_query.edit_message_text("Ошибка: объект не найден после сохранения.")
+            else:
+                await update.message.reply_text("Ошибка: объект не найден после сохранения.")
+            return ConversationHandler.END
+        
+        # Get all needed fields before closing session
+        obj_id = obj.object_id
+        obj_rooms_type = obj.rooms_type
+        obj_price = obj.price
+        obj_area = obj.area
+        obj_floor = obj.floor
+        obj_districts = obj.districts_json
+        obj_comment = obj.comment
+        obj_status = obj.status
+    finally:
+        db_session.close()
     
     # Clear user data
     user_data.pop(user.id, None)
     
     # Show summary
     text = f"✅ <b>Объект создан!</b>\n\n"
-    text += f"<b>ID:</b> {obj.object_id}\n"
-    if obj.rooms_type:
-        text += f"<b>Тип:</b> {obj.rooms_type}\n"
-    if obj.price > 0:
-        text += f"<b>Цена:</b> {obj.price} тыс. руб.\n"
-    if obj.area:
-        text += f"<b>Площадь:</b> {obj.area} м²\n"
-    if obj.floor:
-        text += f"<b>Этаж:</b> {obj.floor}\n"
-    if obj.districts_json and len(obj.districts_json) > 0:
-        text += f"<b>Районы:</b> {', '.join(obj.districts_json)}\n"
-    if obj.comment:
-        text += f"<b>Описание:</b> {obj.comment[:50]}{'...' if len(obj.comment) > 50 else ''}\n"
-    text += f"\n<b>Статус:</b> {obj.status}"
+    text += f"<b>ID:</b> {obj_id}\n"
+    if obj_rooms_type:
+        text += f"<b>Тип:</b> {obj_rooms_type}\n"
+    if obj_price > 0:
+        text += f"<b>Цена:</b> {obj_price} тыс. руб.\n"
+    if obj_area:
+        text += f"<b>Площадь:</b> {obj_area} м²\n"
+    if obj_floor:
+        text += f"<b>Этаж:</b> {obj_floor}\n"
+    if obj_districts and len(obj_districts) > 0:
+        text += f"<b>Районы:</b> {', '.join(obj_districts)}\n"
+    if obj_comment:
+        text += f"<b>Описание:</b> {obj_comment[:50]}{'...' if len(obj_comment) > 50 else ''}\n"
+    text += f"\n<b>Статус:</b> {obj_status}"
     
     keyboard = [
         [InlineKeyboardButton("📋 Мои объекты", callback_data="my_objects")],
