@@ -549,7 +549,7 @@ export default function AdminBotChats() {
                           <br />
                           <small>{chat.telegram_chat_id}</small>
                         </td>
-                        <td>{getChatTypeLabel(chat.type)}</td>
+                        <td>{getFiltersText(chat) !== 'Нет фильтров' ? getFiltersText(chat) : getChatTypeLabel(chat.type)}</td>
                         <td><small>{getFiltersText(chat)}</small></td>
                         <td>
                           {chat.is_active ? (

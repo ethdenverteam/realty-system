@@ -210,10 +210,12 @@ def admin_bot_chats_list(current_user):
         # But still use raw SQL to be safe (filters_json might not be committed yet)
         try:
             # Use raw SQL even if column exists to avoid issues
+            # Try to include filters_json if column exists
             sql = text("""
                 SELECT chat_id, telegram_chat_id, title, type, category, 
                        owner_type, owner_account_id, is_active, members_count,
-                       added_date, last_publication, total_publications
+                       added_date, last_publication, total_publications,
+                       COALESCE(filters_json, '{}'::jsonb) as filters_json
                 FROM chats
                 WHERE owner_type = :owner_type AND is_active = true
             """)
@@ -222,6 +224,17 @@ def admin_bot_chats_list(current_user):
             
             result = []
             for row in rows:
+                # Parse filters_json if it's a string, otherwise use as-is
+                filters_json = row[12] if len(row) > 12 else {}
+                if isinstance(filters_json, str):
+                    try:
+                        import json
+                        filters_json = json.loads(filters_json)
+                    except:
+                        filters_json = {}
+                elif filters_json is None:
+                    filters_json = {}
+                
                 chat_dict = {
                     'chat_id': row[0],
                     'telegram_chat_id': row[1],
@@ -235,7 +248,7 @@ def admin_bot_chats_list(current_user):
                     'added_date': row[9].isoformat() if row[9] else None,
                     'last_publication': row[10].isoformat() if row[10] else None,
                     'total_publications': row[11],
-                    'filters_json': {}  # Default empty dict
+                    'filters_json': filters_json
                 }
                 result.append(chat_dict)
             
@@ -860,7 +873,8 @@ def admin_fetch_bot_chats(current_user):
                         'users': [],
                         'all': [],
                         'warning': 'No chats found from getUpdates. This might be because the bot is currently running and consuming updates. Consider using chats already in the database or temporarily stopping the bot.',
-                        'database_chats_count': db_chats_count
+                        'database_chats_count': db_chats_count,
+                        'error': 'No chats found from getUpdates. This might be because the bot is currently running and consuming updates. Consider using chats already in the database or temporarily stopping the bot.'
                     })
             except Exception as db_error:
                 logger.warning(f"Error checking database chats: {db_error}")
@@ -1008,7 +1022,7 @@ def admin_add_district(current_user):
                 # Update using JSON string
                 update_sql = text("""
                     UPDATE system_settings 
-                    SET value_json = :new_config::jsonb
+                    SET value_json = CAST(:new_config AS jsonb)
                     WHERE key = 'districts_config'
                 """)
                 new_config_json = json.dumps(current_config)
