@@ -234,6 +234,16 @@ def admin_bot_chats_list(current_user):
                         filters_json = {}
                 elif filters_json is None:
                     filters_json = {}
+                else:
+                    # If it's already a dict (from JSONB), use it directly
+                    if not isinstance(filters_json, dict):
+                        try:
+                            import json
+                            filters_json = json.loads(str(filters_json))
+                        except:
+                            filters_json = {}
+                
+                logger.debug(f"Chat {row[0]} ({row[2]}): filters_json = {filters_json}, type = {type(filters_json)}")
                 
                 chat_dict = {
                     'chat_id': row[0],
@@ -1102,5 +1112,188 @@ def admin_delete_district(district_name, current_user):
         db.session.rollback()
         logger.error(f"Error deleting district: {e}", exc_info=True)
         log_error(e, 'admin_district_delete_failed', current_user.user_id, {'district_name': district_name})
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_routes_bp.route('/dashboard/bot-chats/<int:chat_id>/test-publish', methods=['POST'])
+@jwt_required
+@role_required('admin')
+def admin_test_publish_to_chat(chat_id, current_user):
+    """Test publish a message to a chat"""
+    from app.models.chat import Chat
+    from bot.config import BOT_TOKEN
+    import requests
+    
+    try:
+        # Get chat
+        chat = Chat.query.filter_by(chat_id=chat_id, owner_type='bot').first()
+        if not chat:
+            return jsonify({'error': 'Chat not found'}), 404
+        
+        if not chat.is_active:
+            return jsonify({'error': 'Chat is not active'}), 400
+        
+        if not BOT_TOKEN:
+            return jsonify({'error': 'BOT_TOKEN is not configured'}), 500
+        
+        # Create test message
+        test_message = "🧪 <b>Тестовая публикация</b>\n\nЭто тестовое сообщение для проверки работы публикации в чат."
+        
+        # Send message via Telegram API
+        url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
+        payload = {
+            'chat_id': chat.telegram_chat_id,
+            'text': test_message,
+            'parse_mode': 'HTML'
+        }
+        
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+        result = response.json()
+        
+        if not result.get('ok'):
+            error_description = result.get('description', 'Unknown error')
+            return jsonify({
+                'error': f'Failed to send message: {error_description}',
+                'details': 'Check that the bot is added to the chat and has permission to send messages'
+            }), 500
+        
+        # Log action
+        try:
+            log_action(
+                action='admin_test_publish',
+                user_id=current_user.user_id,
+                details={'chat_id': chat_id, 'telegram_chat_id': chat.telegram_chat_id}
+            )
+        except Exception as log_error:
+            logger.warning(f"Failed to log test publish: {log_error}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Test message sent successfully',
+            'message_id': result.get('result', {}).get('message_id')
+        }), 200
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error sending test message: {e}", exc_info=True)
+        return jsonify({
+            'error': f'Request error: {str(e)}',
+            'details': 'Check your internet connection and bot token'
+        }), 500
+    except Exception as e:
+        logger.error(f"Error in test publish: {e}", exc_info=True)
+        log_error(e, 'admin_test_publish_failed', current_user.user_id, {'chat_id': chat_id})
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_routes_bp.route('/dashboard/bot-chats/<int:chat_id>/publish-object', methods=['POST'])
+@jwt_required
+@role_required('admin')
+def admin_publish_object_to_chat(chat_id, current_user):
+    """Publish an object to a specific chat"""
+    from app.models.chat import Chat
+    from app.models.object import Object
+    from bot.config import BOT_TOKEN
+    from bot.utils import format_publication_text
+    import requests
+    from datetime import datetime
+    
+    try:
+        data = request.get_json()
+        object_id = data.get('object_id')
+        
+        if not object_id:
+            return jsonify({'error': 'object_id is required'}), 400
+        
+        # Get chat
+        chat = Chat.query.filter_by(chat_id=chat_id, owner_type='bot').first()
+        if not chat:
+            return jsonify({'error': 'Chat not found'}), 404
+        
+        if not chat.is_active:
+            return jsonify({'error': 'Chat is not active'}), 400
+        
+        # Get object
+        obj = Object.query.filter_by(object_id=object_id).first()
+        if not obj:
+            return jsonify({'error': 'Object not found'}), 404
+        
+        if not BOT_TOKEN:
+            return jsonify({'error': 'BOT_TOKEN is not configured'}), 500
+        
+        # Format publication text
+        user = obj.user
+        publication_text = format_publication_text(obj, user, is_preview=False)
+        
+        # Send message via Telegram API
+        url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
+        payload = {
+            'chat_id': chat.telegram_chat_id,
+            'text': publication_text,
+            'parse_mode': 'HTML'
+        }
+        
+        # If object has photos, send with media
+        photos_json = obj.photos_json or []
+        if photos_json and len(photos_json) > 0:
+            # For now, send text only. Media support can be added later
+            # TODO: Implement media sending
+            pass
+        
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+        result = response.json()
+        
+        if not result.get('ok'):
+            error_description = result.get('description', 'Unknown error')
+            return jsonify({
+                'error': f'Failed to send message: {error_description}',
+                'details': 'Check that the bot is added to the chat and has permission to send messages'
+            }), 500
+        
+        message_id = result.get('result', {}).get('message_id')
+        
+        # Update chat statistics
+        chat.total_publications = (chat.total_publications or 0) + 1
+        chat.last_publication = datetime.utcnow()
+        db.session.commit()
+        
+        # Update object status if needed
+        if obj.status != 'опубликовано':
+            obj.status = 'опубликовано'
+            obj.publication_date = datetime.utcnow()
+            db.session.commit()
+        
+        # Log action
+        try:
+            log_action(
+                action='admin_publish_object',
+                user_id=current_user.user_id,
+                details={
+                    'chat_id': chat_id,
+                    'telegram_chat_id': chat.telegram_chat_id,
+                    'object_id': object_id,
+                    'message_id': message_id
+                }
+            )
+        except Exception as log_error:
+            logger.warning(f"Failed to log publish: {log_error}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Object published successfully',
+            'message_id': message_id
+        }), 200
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error publishing object: {e}", exc_info=True)
+        return jsonify({
+            'error': f'Request error: {str(e)}',
+            'details': 'Check your internet connection and bot token'
+        }), 500
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in publish object: {e}", exc_info=True)
+        log_error(e, 'admin_publish_object_failed', current_user.user_id, {'chat_id': chat_id, 'object_id': object_id})
         return jsonify({'error': str(e)}), 500
 

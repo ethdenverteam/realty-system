@@ -185,6 +185,19 @@ export default function AdminBotChats() {
     }
   }
 
+  const handleTestPublish = async (chatId) => {
+    if (!confirm('Отправить тестовое сообщение в этот чат?')) return
+
+    try {
+      setError('')
+      setSuccess('')
+      const response = await api.post(`/admin/dashboard/bot-chats/${chatId}/test-publish`)
+      setSuccess('Тестовое сообщение отправлено успешно')
+    } catch (err) {
+      setError(err.response?.data?.error || err.response?.data?.details || 'Ошибка при отправке тестового сообщения')
+    }
+  }
+
   const handleDelete = async (chatId) => {
     if (!confirm('Удалить этот чат?')) return
 
@@ -559,12 +572,21 @@ export default function AdminBotChats() {
                           )}
                         </td>
                         <td>
-                          <button 
-                            className="btn btn-sm btn-danger"
-                            onClick={() => handleDelete(chat.chat_id)}
-                          >
-                            Удалить
-                          </button>
+                          <div className="btn-group">
+                            <button 
+                              className="btn btn-sm btn-secondary"
+                              onClick={() => handleTestPublish(chat.chat_id)}
+                              title="Отправить тестовое сообщение в чат"
+                            >
+                              Тест
+                            </button>
+                            <button 
+                              className="btn btn-sm btn-danger"
+                              onClick={() => handleDelete(chat.chat_id)}
+                            >
+                              Удалить
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
