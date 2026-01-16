@@ -108,10 +108,8 @@ export default function AdminBotChats() {
     }
 
     try {
-      // If chat_id is selected from list, use it directly, otherwise use as link
-      const chatLink = formData.chat_id.includes('@') || formData.chat_id.includes('t.me') || formData.chat_id.includes('http')
-        ? formData.chat_id
-        : formData.chat_id // Use as direct ID or username
+      // Use chat_id as-is - it can be ID, username, or link
+      const chatLink = formData.chat_id.trim()
       
       await api.post('/admin/dashboard/bot-chats', {
         chat_link: chatLink,
@@ -289,7 +287,7 @@ export default function AdminBotChats() {
                   </div>
                 )}
 
-                {!formData.chat_id && (
+                {!formData.chat_title && (
                   <div className="form-group">
                     <label className="form-label">Ссылка на чат или ID</label>
                     <input
@@ -297,7 +295,7 @@ export default function AdminBotChats() {
                       className="form-input"
                       value={formData.chat_id}
                       onChange={(e) => setFormData({...formData, chat_id: e.target.value})}
-                      placeholder="https://t.me/chatname, @chatname или ID чата"
+                      placeholder="https://t.me/chatname, @chatname или ID чата (например: -1002632748579)"
                       required
                     />
                     <button 

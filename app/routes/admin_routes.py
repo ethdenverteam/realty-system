@@ -207,8 +207,40 @@ def admin_bot_chats_list(current_user):
             return jsonify(result)
         
         # Column exists, use normal ORM query
+        # But still use raw SQL to be safe (filters_json might not be committed yet)
         try:
-            chats = Chat.query.filter_by(owner_type='bot', is_active=True).all()
+            # Use raw SQL even if column exists to avoid issues
+            sql = text("""
+                SELECT chat_id, telegram_chat_id, title, type, category, 
+                       owner_type, owner_account_id, is_active, members_count,
+                       added_date, last_publication, total_publications
+                FROM chats
+                WHERE owner_type = :owner_type AND is_active = true
+            """)
+            result_proxy = db.session.execute(sql, {'owner_type': 'bot'})
+            rows = result_proxy.fetchall()
+            
+            result = []
+            for row in rows:
+                chat_dict = {
+                    'chat_id': row[0],
+                    'telegram_chat_id': row[1],
+                    'title': row[2],
+                    'type': row[3],
+                    'category': row[4],
+                    'owner_type': row[5],
+                    'owner_account_id': row[6],
+                    'is_active': row[7],
+                    'members_count': row[8],
+                    'added_date': row[9].isoformat() if row[9] else None,
+                    'last_publication': row[10].isoformat() if row[10] else None,
+                    'total_publications': row[11],
+                    'filters_json': {}  # Default empty dict
+                }
+                result.append(chat_dict)
+            
+            logger.info(f"Returned {len(result)} chats using raw SQL query")
+            return jsonify(result)
         except ProgrammingError as query_error:
             # If query still fails, try using raw SQL without filters_json
             if 'filters_json' in str(query_error):
@@ -358,10 +390,24 @@ def admin_add_bot_chat(current_user):
         title = chat_info.title or (chat_info.first_name or '') + ' ' + (chat_info.last_name or '') or username or f'Chat {telegram_chat_id}'
         chat_type = chat_info.type
         
-        # Check if chat already exists
-        existing = Chat.query.filter_by(telegram_chat_id=telegram_chat_id).first()
-        if existing:
-            return jsonify({'error': 'Chat already exists'}), 400
+        # Check if chat already exists (using raw SQL to avoid filters_json issue)
+        from sqlalchemy import text
+        try:
+            sql = text("""
+                SELECT chat_id, telegram_chat_id, title, type, category, 
+                       owner_type, owner_account_id, is_active, members_count,
+                       added_date, last_publication, total_publications
+                FROM chats
+                WHERE telegram_chat_id = :telegram_chat_id
+                LIMIT 1
+            """)
+            result_proxy = db.session.execute(sql, {'telegram_chat_id': telegram_chat_id})
+            existing_row = result_proxy.fetchone()
+            if existing_row:
+                return jsonify({'error': 'Chat already exists'}), 400
+        except Exception as check_error:
+            logger.warning(f"Error checking existing chat: {check_error}")
+            # Continue anyway - might be filters_json issue
         
         # Create chat
         chat = Chat(
@@ -403,10 +449,28 @@ def admin_add_bot_chat(current_user):
 @role_required('admin')
 def admin_update_bot_chat(chat_id, current_user):
     """Update bot chat filters"""
-    chat = Chat.query.filter_by(chat_id=chat_id, owner_type='bot').first()
-    
-    if not chat:
-        return jsonify({'error': 'Chat not found'}), 404
+    # Use raw SQL to check existence first
+    from sqlalchemy import text
+    try:
+        sql = text("""
+            SELECT chat_id FROM chats
+            WHERE chat_id = :chat_id AND owner_type = :owner_type
+            LIMIT 1
+        """)
+        result_proxy = db.session.execute(sql, {'chat_id': chat_id, 'owner_type': 'bot'})
+        if not result_proxy.fetchone():
+            return jsonify({'error': 'Chat not found'}), 404
+        
+        # Use ORM for update (filters_json might exist after migration)
+        chat = Chat.query.filter_by(chat_id=chat_id, owner_type='bot').first()
+        if not chat:
+            return jsonify({'error': 'Chat not found'}), 404
+    except Exception as e:
+        logger.error(f"Error getting chat for update: {e}", exc_info=True)
+        # Fallback
+        chat = Chat.query.filter_by(chat_id=chat_id, owner_type='bot').first()
+        if not chat:
+            return jsonify({'error': 'Chat not found'}), 404
     
     data = request.get_json()
     
@@ -439,13 +503,34 @@ def admin_update_bot_chat(chat_id, current_user):
 @role_required('admin')
 def admin_delete_bot_chat(chat_id, current_user):
     """Delete bot chat"""
-    chat = Chat.query.filter_by(chat_id=chat_id, owner_type='bot').first()
-    
-    if not chat:
-        return jsonify({'error': 'Chat not found'}), 404
+    # Use raw SQL to delete (avoids filters_json issue)
+    from sqlalchemy import text
+    try:
+        # Check if chat exists
+        sql = text("""
+            SELECT chat_id FROM chats
+            WHERE chat_id = :chat_id AND owner_type = :owner_type
+            LIMIT 1
+        """)
+        result_proxy = db.session.execute(sql, {'chat_id': chat_id, 'owner_type': 'bot'})
+        if not result_proxy.fetchone():
+            return jsonify({'error': 'Chat not found'}), 404
+        
+        # Delete using raw SQL
+        delete_sql = text("""
+            DELETE FROM chats
+            WHERE chat_id = :chat_id AND owner_type = :owner_type
+        """)
+        db.session.execute(delete_sql, {'chat_id': chat_id, 'owner_type': 'bot'})
+    except Exception as e:
+        logger.error(f"Error deleting chat: {e}", exc_info=True)
+        # Fallback to ORM
+        chat = Chat.query.filter_by(chat_id=chat_id, owner_type='bot').first()
+        if not chat:
+            return jsonify({'error': 'Chat not found'}), 404
+        db.session.delete(chat)
     
     try:
-        db.session.delete(chat)
         db.session.commit()
         
         log_action(
@@ -575,14 +660,46 @@ def admin_get_chat_by_id(current_user):
 def admin_fetch_bot_chats(current_user):
     """Fetch all chats from Telegram bot using getUpdates
     
-    NOTE: This will conflict if the bot is currently running with polling.
-    The bot must be stopped temporarily to use this endpoint.
-    
+    This will automatically stop the bot, fetch chats, then restart it.
     For getting a specific chat, use /dashboard/bot-chats/get-by-id instead.
     """
+    import subprocess
+    import time
+    import os
+    
+    bot_stopped = False
+    bot_container_name = os.getenv('BOT_CONTAINER_NAME', 'realty_bot')
+    
     try:
         from bot.config import BOT_TOKEN
         import requests
+        
+        # Check if we should stop the bot
+        data = request.get_json() or {}
+        stop_bot = data.get('stop_bot', True)  # Default to True
+        
+        if stop_bot:
+            # Try to stop the bot container
+            try:
+                logger.info(f"Stopping bot container: {bot_container_name}")
+                result = subprocess.run(
+                    ['docker', 'stop', bot_container_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode == 0:
+                    bot_stopped = True
+                    logger.info("Bot stopped successfully, waiting 2 seconds...")
+                    time.sleep(2)  # Wait for bot to fully stop
+                else:
+                    logger.warning(f"Failed to stop bot: {result.stderr}")
+                    # Continue anyway - might not be running
+            except FileNotFoundError:
+                logger.warning("Docker command not found - cannot stop bot automatically")
+            except Exception as stop_error:
+                logger.warning(f"Error stopping bot: {stop_error}")
+                # Continue anyway
         
         if not BOT_TOKEN:
             logger.error("BOT_TOKEN is not configured")
@@ -776,6 +893,23 @@ def admin_fetch_bot_chats(current_user):
             'error': str(e),
             'details': 'Check server logs for details'
         }), 500
+    finally:
+        # Always try to restart the bot if we stopped it
+        if 'bot_stopped' in locals() and bot_stopped:
+            try:
+                logger.info(f"Restarting bot container: {bot_container_name}")
+                result = subprocess.run(
+                    ['docker', 'start', bot_container_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode == 0:
+                    logger.info("Bot restarted successfully")
+                else:
+                    logger.error(f"Failed to restart bot: {result.stderr}")
+            except Exception as restart_error:
+                logger.error(f"Error restarting bot: {restart_error}")
 
 
 @admin_routes_bp.route('/dashboard/bot-chats/districts', methods=['GET'])
@@ -831,23 +965,59 @@ def admin_add_district(current_user):
         # Add district to config
         districts_config[district_name] = district_name
         
-        # Update the setting
-        districts_setting.value_json = districts_config
+        # Update the setting - make sure we're working with a fresh dict
+        districts_setting.value_json = dict(districts_config)  # Create new dict to ensure it's saved
         districts_setting.updated_by = current_user.user_id
         
         # Commit the changes
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as commit_error:
+            db.session.rollback()
+            logger.error(f"Error committing district: {commit_error}", exc_info=True)
+            return jsonify({'error': f'Failed to save district: {str(commit_error)}'}), 500
         
-        # Re-query to verify (don't use refresh as it might not work with JSON)
-        db.session.expire(districts_setting)
-        districts_setting = SystemSetting.query.filter_by(key='districts_config').first()
-        saved_config = districts_setting.value_json if districts_setting else {}
+        # Verify by re-querying (don't use refresh/expire for JSON fields)
+        db.session.expire_all()  # Expire all to force reload
+        districts_setting_verify = SystemSetting.query.filter_by(key='districts_config').first()
+        
+        if not districts_setting_verify:
+            logger.error("districts_setting was deleted after commit!")
+            return jsonify({'error': 'Failed to save district - setting not found after commit'}), 500
+        
+        saved_config = districts_setting_verify.value_json if districts_setting_verify.value_json is not None else {}
+        
+        # Ensure it's a dict
+        if not isinstance(saved_config, dict):
+            logger.error(f"Saved config is not a dict! Type: {type(saved_config)}, Value: {saved_config}")
+            saved_config = {}
         
         logger.info(f"District '{district_name}' added. Total districts: {len(saved_config)}")
         
         if district_name not in saved_config:
-            logger.error(f"District '{district_name}' was not saved correctly! Saved config: {saved_config}, Type: {type(saved_config)}")
-            return jsonify({'error': 'Failed to save district - verification failed'}), 500
+            logger.error(f"District '{district_name}' was not saved correctly! Saved config keys: {list(saved_config.keys()) if isinstance(saved_config, dict) else 'not a dict'}")
+            # Try one more time with direct SQL update
+            try:
+                from sqlalchemy import text
+                # Get current value as JSON string and update it
+                update_sql = text("""
+                    UPDATE system_settings 
+                    SET value_json = value_json || :new_district::jsonb
+                    WHERE key = 'districts_config'
+                """)
+                import json
+                new_district_json = json.dumps({district_name: district_name})
+                db.session.execute(update_sql, {'new_district': new_district_json})
+                db.session.commit()
+                
+                # Verify again
+                districts_setting_verify = SystemSetting.query.filter_by(key='districts_config').first()
+                saved_config = districts_setting_verify.value_json if districts_setting_verify else {}
+                if district_name not in saved_config:
+                    return jsonify({'error': 'Failed to save district - database update failed'}), 500
+            except Exception as sql_error:
+                logger.error(f"SQL update fallback failed: {sql_error}", exc_info=True)
+                return jsonify({'error': f'Failed to save district: {str(sql_error)}'}), 500
         
         # Log action (don't fail if logging fails)
         try:

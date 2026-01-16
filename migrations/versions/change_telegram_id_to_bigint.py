@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'change_telegram_id_bigint'
-down_revision = None  # This is the initial migration - no previous revision
+down_revision = 'eef5d1222136'  # Initial migration revision
 branch_labels = None
 depends_on = None
 
