@@ -10,22 +10,31 @@ from bot.config import ADMIN_ID
 from bot.database import get_db
 from bot.models import ActionLog
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('bot.handlers')
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
     user = update.effective_user
+    logger.info(f"Received /start command from user {user.id} (@{user.username})")
     
-    # Update user activity
-    update_user_activity(str(user.id), user.username)
-    
-    # Show main menu
-    await show_main_menu(update, context)
+    try:
+        # Update user activity
+        update_user_activity(str(user.id), user.username)
+        
+        # Show main menu
+        await show_main_menu(update, context)
+        logger.info(f"Successfully processed /start for user {user.id}")
+    except Exception as e:
+        logger.error(f"Error in start_command for user {user.id}: {e}", exc_info=True)
+        raise
 
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показать главное меню"""
+    user = update.effective_user
+    logger.info(f"Showing main menu for user {user.id}")
+    
     keyboard = [
         [InlineKeyboardButton("➕ Добавить объект", callback_data="add_object")],
         [InlineKeyboardButton("📋 Мои объекты", callback_data="my_objects")],
@@ -39,10 +48,16 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = "Добро пожаловать! Выберите действие:"
     
-    if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=reply_markup)
-    elif update.message:
-        await update.message.reply_text(text, reply_markup=reply_markup)
+    try:
+        if update.callback_query:
+            await update.callback_query.edit_message_text(text, reply_markup=reply_markup)
+            logger.debug(f"Edited message for user {user.id}")
+        elif update.message:
+            await update.message.reply_text(text, reply_markup=reply_markup)
+            logger.debug(f"Sent message to user {user.id}")
+    except Exception as e:
+        logger.error(f"Error showing main menu for user {user.id}: {e}", exc_info=True)
+        raise
 
 
 # Object creation moved to bot/handlers_object.py

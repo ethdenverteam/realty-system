@@ -103,7 +103,15 @@ def main():
     # Create application
     application = Application.builder().token(BOT_TOKEN).build()
     
+    # Add error handler first
+    async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+        """Log errors"""
+        logger.error(f"Exception while handling an update: {context.error}", exc_info=context.error)
+    
+    application.add_error_handler(error_handler)
+    
     # Register handlers
+    logger.info("Registering command handlers...")
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("getcode", getcode_command))
     application.add_handler(CommandHandler("myobjects", my_objects_command))
@@ -112,7 +120,22 @@ def main():
     application.add_handler(CallbackQueryHandler(my_objects_callback, pattern="^my_objects$"))
     
     # Add object creation conversation handler
+    logger.info("Registering conversation handlers...")
     application.add_handler(create_object_conversation_handler())
+    
+    # Log all updates (for debugging)
+    async def log_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Log all incoming updates"""
+        if update.message:
+            logger.info(f"Received message from {update.effective_user.id}: {update.message.text or 'media'}")
+        elif update.callback_query:
+            logger.info(f"Received callback_query from {update.effective_user.id}: {update.callback_query.data}")
+    
+    # Add update logger (lowest priority)
+    application.add_handler(MessageHandler(filters.ALL, log_update), group=-1)
+    application.add_handler(CallbackQueryHandler(log_update, pattern=".*"), group=-1)
+    
+    logger.info("All handlers registered successfully")
     
     # Add more handlers from botOLD.py as needed
     # TODO: Port all handlers from botOLD.py
