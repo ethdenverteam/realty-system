@@ -999,15 +999,20 @@ def admin_add_district(current_user):
             # Try one more time with direct SQL update
             try:
                 from sqlalchemy import text
-                # Get current value as JSON string and update it
+                import json
+                # Get current value and merge with new district
+                current_config = districts_setting_verify.value_json or {}
+                if not isinstance(current_config, dict):
+                    current_config = {}
+                current_config[district_name] = district_name
+                # Update using JSON string
                 update_sql = text("""
                     UPDATE system_settings 
-                    SET value_json = value_json || :new_district::jsonb
+                    SET value_json = :new_config::jsonb
                     WHERE key = 'districts_config'
                 """)
-                import json
-                new_district_json = json.dumps({district_name: district_name})
-                db.session.execute(update_sql, {'new_district': new_district_json})
+                new_config_json = json.dumps(current_config)
+                db.session.execute(update_sql, {'new_config': new_config_json})
                 db.session.commit()
                 
                 # Verify again

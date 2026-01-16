@@ -72,11 +72,18 @@ export default function AdminBotChats() {
     try {
       setFetching(true)
       setError('')
-      const response = await api.post('/admin/dashboard/bot-chats/fetch')
+      const response = await api.post('/admin/dashboard/bot-chats/fetch', { stop_bot: true }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
       setFetchedChats(response.data)
       setShowFetchModal(true)
+      if (response.data.warning) {
+        setError(response.data.warning)
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Ошибка при получении чатов')
+      setError(err.response?.data?.error || err.response?.data?.details || 'Ошибка при получении чатов')
     } finally {
       setFetching(false)
     }
@@ -193,6 +200,8 @@ export default function AdminBotChats() {
   const getFiltersText = (chat) => {
     const filters = chat.filters_json || {}
     const parts = []
+    
+    // Show filter type and values
     if (filters.rooms_types?.length) {
       parts.push(`Комнаты: ${filters.rooms_types.join(', ')}`)
     }
@@ -202,7 +211,35 @@ export default function AdminBotChats() {
     if (filters.price_min || filters.price_max) {
       parts.push(`Цена: ${filters.price_min || 0} - ${filters.price_max || '∞'} тыс. руб.`)
     }
-    return parts.length ? parts.join(' | ') : (chat.category || 'Нет фильтров')
+    
+    // If no filters_json but has category (legacy)
+    if (parts.length === 0 && chat.category) {
+      // Parse legacy category format
+      if (chat.category.startsWith('rooms_')) {
+        parts.push(`Комнаты: ${chat.category.replace('rooms_', '')}`)
+      } else if (chat.category.startsWith('district_')) {
+        parts.push(`Районы: ${chat.category.replace('district_', '')}`)
+      } else if (chat.category.startsWith('price_')) {
+        const priceParts = chat.category.replace('price_', '').split('_')
+        if (priceParts.length === 2) {
+          parts.push(`Цена: ${priceParts[0]} - ${priceParts[1]} тыс. руб.`)
+        }
+      } else {
+        parts.push(chat.category)
+      }
+    }
+    
+    return parts.length ? parts.join(' | ') : 'Нет фильтров'
+  }
+  
+  const getChatTypeLabel = (type) => {
+    const typeMap = {
+      'group': 'Группа',
+      'supergroup': 'Супергруппа',
+      'channel': 'Канал',
+      'private': 'Личный'
+    }
+    return typeMap[type] || type
   }
 
   const filteredChats = chatFilter === 'all' 
@@ -257,7 +294,7 @@ export default function AdminBotChats() {
                     >
                       <div className="chat-item-title">{chat.title}</div>
                       <div className="chat-item-meta">
-                        <span className="chat-item-type">{chat.type}</span>
+                        <span className="chat-item-type">{getChatTypeLabel(chat.type)}</span>
                         <span className="chat-item-id">ID: {chat.id}</span>
                       </div>
                     </div>
@@ -512,7 +549,7 @@ export default function AdminBotChats() {
                           <br />
                           <small>{chat.telegram_chat_id}</small>
                         </td>
-                        <td>{chat.type}</td>
+                        <td>{getChatTypeLabel(chat.type)}</td>
                         <td><small>{getFiltersText(chat)}</small></td>
                         <td>
                           {chat.is_active ? (
