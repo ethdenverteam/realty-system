@@ -313,3 +313,218 @@ def generate_web_code(user_id: str) -> str:
     finally:
         db.close()
 
+
+def replace_digits_with_special(text: str) -> str:
+    """Заменить обычные цифры на специальные символы для красивого отображения"""
+    digit_map = {
+        '0': '𝟬', '1': '𝟭', '2': '𝟮', '3': '𝟯', '4': '𝟰',
+        '5': '𝟱', '6': '𝟲', '7': '𝟳', '8': '𝟴', '9': '𝟵'
+    }
+    return ''.join(digit_map.get(char, char) for char in text)
+
+
+def get_districts_config() -> Dict:
+    """Получить конфигурацию районов из SystemSetting"""
+    db = get_db()
+    try:
+        setting = db.query(SystemSetting).filter_by(key='districts_config').first()
+        if setting and setting.value_json:
+            return setting.value_json
+        return {}
+    finally:
+        db.close()
+
+
+def get_hashtag_suffix() -> str:
+    """Получить суффикс хэштегов"""
+    db = get_db()
+    try:
+        setting = db.query(SystemSetting).filter_by(key='hashtag_suffix').first()
+        if setting and setting.value_json:
+            return setting.value_json
+        return "_ф"
+    finally:
+        db.close()
+
+
+def get_price_ranges() -> Dict:
+    """Получить ценовые диапазоны"""
+    db = get_db()
+    try:
+        setting = db.query(SystemSetting).filter_by(key='price_ranges').first()
+        if setting and setting.value_json:
+            return setting.value_json
+        return {}
+    finally:
+        db.close()
+
+
+def generate_district_hashtag(district_name: str, suffix: str = "_ф") -> str:
+    """Генерировать хэштег для района"""
+    hashtag_name = district_name.replace(" ", "")
+    return f"#_{hashtag_name}{suffix}"
+
+
+def generate_room_hashtag(room_type: str, suffix: str = "_ф") -> str:
+    """Генерировать хэштег для типа комнат"""
+    room_mapping = {
+        "Студия": "студия_ст",
+        "1к": "однокомнатная_1к",
+        "2к": "двухкомнатная_2к",
+        "3к": "трехкомнатная_3к",
+        "4+к": "четырехкомнатная_4к",
+        "Дом": "дом",
+        "евро1к": "еврооднокомнатная_евро1к",
+        "евро2к": "евродвухкомнатная_евро2к",
+        "евро3к": "евротрехкомнатная_евро3к"
+    }
+    room_key = room_mapping.get(room_type, room_type.lower().replace(" ", ""))
+    return f"#_{room_key}{suffix}"
+
+
+def generate_price_range_hashtag(range_name: str, suffix: str = "_ф") -> str:
+    """Генерировать хэштег для ценового диапазона"""
+    range_key = range_name.replace(" ", "").replace("-", "_")
+    return f"#_{range_key}{suffix}"
+
+
+def format_publication_text(obj: Object, user: User = None, is_preview: bool = False) -> str:
+    """Сформировать текст публикации объекта"""
+    lines = []
+    
+    # Цена: 🔑¦ 𝟲𝟲𝟲
+    price = obj.price or 0
+    if price > 0:
+        price_str = replace_digits_with_special(str(int(price)) if isinstance(price, float) else str(price))
+        lines.append(f"🔑¦ {price_str}")
+    
+    # Тип комнат: 🏠¦1к
+    if obj.rooms_type:
+        lines.append(f"🏠¦{obj.rooms_type}")
+    
+    # Районы
+    districts = obj.districts_json or []
+    districts_config = get_districts_config()
+    
+    # Собираем родительские районы
+    parent_districts = set()
+    second_level_districts = []
+    first_level_districts = []
+    
+    for district in districts:
+        if isinstance(district, str) and district in districts_config:
+            parents = districts_config[district]
+            if isinstance(parents, list) and parents:
+                parent_districts.update(parents)
+                second_level_districts.append(district)
+            else:
+                first_level_districts.append(district)
+        else:
+            first_level_districts.append(district)
+    
+    # Районы первого уровня
+    if len(first_level_districts) == 1:
+        lines.append(f"🗺¦{first_level_districts[0]}")
+    elif len(first_level_districts) > 1:
+        lines.append(f"🗺¦{', '.join(first_level_districts)}")
+    
+    # Площадь
+    if obj.area:
+        area_str = replace_digits_with_special(str(obj.area))
+        lines.append(f"𝙈 ²¦{area_str}")
+    
+    # Этаж
+    if obj.floor:
+        floor_str = replace_digits_with_special(str(obj.floor))
+        lines.append(f"📐¦{floor_str}")
+    
+    # Ремонт
+    if obj.renovation:
+        lines.append(f"🛋¦{obj.renovation}")
+    
+    # Адрес
+    if obj.address:
+        lines.append(f"📍¦{obj.address}")
+    
+    # Родительские районы
+    if parent_districts:
+        parent_list = list(parent_districts)
+        if len(parent_list) == 1:
+            lines.append(f"🗾¦{parent_list[0]}")
+        else:
+            lines.append(f"🗾¦{', '.join(parent_list)}")
+    
+    # Пустая строка перед комментарием
+    lines.append("")
+    
+    # Комментарий
+    if obj.comment:
+        lines.append(f"📝¦")
+        lines.append(obj.comment)
+    
+    # Футер (только если не превью)
+    if user and not is_preview:
+        show_footer = False
+        if user.settings_json:
+            show_footer = user.settings_json.get('show_footer', False)
+        
+        if show_footer:
+            lines.append("")
+            lines.append("🔑¦<a href=\"http://t.me/keyskrd\">Ключи</a>")
+            lines.append("🏢¦<a href=\"http://t.me/MasterKeyRobot\">@MasterKeyRobot</a>")
+            lines.append("🗂¦<a href=\"https://t.me/addlist/QDGm9RwOldE4YzM6\">Папка со всеми чатами</a>")
+            lines.append("")
+    
+    # Хэштеги
+    hashtags = []
+    suffix = get_hashtag_suffix()
+    
+    if obj.rooms_type:
+        hashtags.append(generate_room_hashtag(obj.rooms_type, suffix))
+    
+    for district in districts:
+        if isinstance(district, str):
+            hashtags.append(generate_district_hashtag(district, suffix))
+    
+    price_ranges = get_price_ranges()
+    if price > 0 and price_ranges:
+        for range_name, range_values in price_ranges.items():
+            if isinstance(range_values, list) and len(range_values) >= 2:
+                if range_values[0] <= price < range_values[1]:
+                    hashtags.append(generate_price_range_hashtag(range_name, suffix))
+                    break
+    
+    if hashtags:
+        lines.append(" ".join(hashtags))
+        lines.append("")
+    
+    # Контакты
+    phone = obj.phone_number or (user.phone if user else None)
+    contact_name = obj.contact_name or ""
+    show_username = obj.show_username or False
+    
+    if contact_name or phone or (show_username and user and user.username):
+        if not hashtags:
+            lines.append("")
+        if contact_name:
+            contact_name_str = replace_digits_with_special(contact_name)
+            lines.append(f"🕴🏻¦{contact_name_str}")
+        if phone:
+            lines.append(f"☎️¦{phone}")
+        if show_username and user and user.username:
+            username_str = replace_digits_with_special(user.username)
+            lines.append(f"📩¦@{username_str}")
+    
+    # Показываем родительские районы в конце
+    if parent_districts:
+        parent_list = list(parent_districts)
+        if len(parent_list) == 1:
+            lines.append(f"🗺¦ {parent_list[0]}")
+        else:
+            lines.append(f"🗺¦ {', '.join(parent_list)}")
+    
+    # Районы второго уровня
+    if len(second_level_districts) > 1:
+        lines.append(f"🗾¦ {', '.join(second_level_districts)}")
+    
+    return "\n".join(lines)

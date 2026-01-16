@@ -3,11 +3,12 @@ Object creation handlers for bot
 """
 import logging
 from datetime import datetime
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CallbackQueryHandler, filters
 from bot.utils import (
     get_user, update_user_activity, create_object, get_object, update_object,
-    get_user_id_prefix, set_user_id_prefix, generate_next_id_prefix
+    get_user_id_prefix, set_user_id_prefix, generate_next_id_prefix,
+    format_publication_text
 )
 from bot.database import get_db
 from bot.models import Object, SystemSetting, ActionLog
@@ -445,8 +446,136 @@ async def skip_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await finish_object_creation(update, context)
 
 
+async def show_object_preview_with_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, object_id: str = None):
+    """Показать предпросмотр объекта с меню редактирования"""
+    user = update.effective_user
+    user_id_str = str(user.id)
+    
+    # Get object_id from user_data if not provided
+    if not object_id:
+        if user.id not in user_data:
+            if update.callback_query:
+                await update.callback_query.edit_message_text("Ошибка: сессия истекла.")
+            else:
+                await update.message.reply_text("Ошибка: сессия истекла.")
+            return ConversationHandler.END
+        object_id = user_data[user.id]["object_id"]
+    
+    # Get object and user
+    db_session = get_db()
+    try:
+        obj = db_session.query(Object).filter_by(object_id=object_id).first()
+        user_obj = get_user(user_id_str)
+        
+        if not obj:
+            if update.callback_query:
+                await update.callback_query.edit_message_text("Ошибка: объект не найден.")
+            else:
+                await update.message.reply_text("Ошибка: объект не найден.")
+            return ConversationHandler.END
+        
+        # Format text
+        text = format_publication_text(obj, user_obj, is_preview=True)
+        
+        # Add media count
+        photos_count = len(obj.photos_json) if obj.photos_json else 0
+        if photos_count > 0:
+            text += f"\n<b>Медиа:</b> {photos_count} файл(ов)\n"
+        
+        # Create menu keyboard
+        keyboard = [
+            [InlineKeyboardButton("Изменить стоимость", callback_data=f"edit_price_{object_id}")],
+            [InlineKeyboardButton("Выбрать фото", callback_data=f"add_media_{object_id}")],
+            [InlineKeyboardButton("Изменить комментарий", callback_data=f"edit_comment_{object_id}")],
+            [
+                InlineKeyboardButton("Добавить еще район", callback_data=f"add_district_{object_id}"),
+                InlineKeyboardButton("Изменить район", callback_data=f"edit_district_{object_id}")
+            ],
+            [
+                InlineKeyboardButton("Площадь", callback_data=f"edit_area_{object_id}"),
+                InlineKeyboardButton("Этаж", callback_data=f"edit_floor_{object_id}")
+            ],
+            [
+                InlineKeyboardButton("Изменить комнаты", callback_data=f"edit_rooms_{object_id}"),
+                InlineKeyboardButton("Состояние ремонта", callback_data=f"edit_renovation_{object_id}")
+            ],
+            [
+                InlineKeyboardButton("Адрес", callback_data=f"edit_address_{object_id}"),
+                InlineKeyboardButton("Контакты", callback_data=f"edit_contacts_{object_id}")
+            ],
+            [InlineKeyboardButton("Опубликовать сейчас", callback_data=f"publish_immediate_{object_id}")],
+            [InlineKeyboardButton("Автопубликация", callback_data=f"toggle_autopublish_{object_id}")],
+            [
+                InlineKeyboardButton("Удалить", callback_data=f"delete_object_{object_id}"),
+                InlineKeyboardButton("Мои объекты", callback_data="my_objects")
+            ],
+            [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Determine message source
+        if update.message:
+            message = update.message
+        elif update.callback_query:
+            message = update.callback_query.message
+        else:
+            return ConversationHandler.END
+        
+        # Send media if exists
+        photos_json = obj.photos_json or []
+        preview_message = None
+        
+        if photos_json:
+            try:
+                media_group = []
+                for photo_data in photos_json[:10]:
+                    if isinstance(photo_data, dict):
+                        file_id = photo_data.get('file_id')
+                        if file_id:
+                            media_group.append(InputMediaPhoto(
+                                file_id,
+                                caption=text if len(media_group) == 0 else None
+                            ))
+                
+                if len(media_group) == 1:
+                    preview_message = await message.reply_photo(
+                        photo=media_group[0].media,
+                        caption=text,
+                        parse_mode='HTML'
+                    )
+                elif len(media_group) > 1:
+                    # Update first media with HTML parse mode
+                    if media_group[0].caption:
+                        media_group[0].parse_mode = 'HTML'
+                    sent_messages = await message.reply_media_group(media=media_group)
+                    if sent_messages:
+                        preview_message = sent_messages[0]
+                else:
+                    preview_message = await message.reply_text(text, parse_mode='HTML')
+            except Exception as e:
+                logger.error(f"Error sending media: {e}")
+                preview_message = await message.reply_text(text, parse_mode='HTML')
+        else:
+            preview_message = await message.reply_text(text, parse_mode='HTML')
+        
+        # Send menu
+        menu_text = "Выберите действие:"
+        menu_message = await message.reply_text(menu_text, reply_markup=reply_markup)
+        
+        # Store message IDs for later deletion if needed
+        if user.id not in user_data:
+            user_data[user.id] = {}
+        user_data[user.id]["preview_message_id"] = preview_message.message_id
+        user_data[user.id]["menu_message_id"] = menu_message.message_id
+        
+    finally:
+        db_session.close()
+    
+    return ConversationHandler.END
+
+
 async def finish_object_creation(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Finish object creation and show summary"""
+    """Finish object creation and show editing menu"""
     user = update.effective_user
     if user.id not in user_data:
         if update.callback_query:
@@ -473,62 +602,8 @@ async def finish_object_creation(update: Update, context: ContextTypes.DEFAULT_T
     finally:
         db_session.close()
     
-    # Get object again for display (after commit) - need to get all fields before closing session
-    db_session = get_db()
-    try:
-        obj = db_session.query(Object).filter_by(object_id=object_id).first()
-        
-        if not obj:
-            if update.callback_query:
-                await update.callback_query.edit_message_text("Ошибка: объект не найден после сохранения.")
-            else:
-                await update.message.reply_text("Ошибка: объект не найден после сохранения.")
-            return ConversationHandler.END
-        
-        # Get all needed fields before closing session
-        obj_id = obj.object_id
-        obj_rooms_type = obj.rooms_type
-        obj_price = obj.price
-        obj_area = obj.area
-        obj_floor = obj.floor
-        obj_districts = obj.districts_json
-        obj_comment = obj.comment
-        obj_status = obj.status
-    finally:
-        db_session.close()
-    
-    # Clear user data
-    user_data.pop(user.id, None)
-    
-    # Show summary
-    text = f"✅ <b>Объект создан!</b>\n\n"
-    text += f"<b>ID:</b> {obj_id}\n"
-    if obj_rooms_type:
-        text += f"<b>Тип:</b> {obj_rooms_type}\n"
-    if obj_price > 0:
-        text += f"<b>Цена:</b> {obj_price} тыс. руб.\n"
-    if obj_area:
-        text += f"<b>Площадь:</b> {obj_area} м²\n"
-    if obj_floor:
-        text += f"<b>Этаж:</b> {obj_floor}\n"
-    if obj_districts and len(obj_districts) > 0:
-        text += f"<b>Районы:</b> {', '.join(obj_districts)}\n"
-    if obj_comment:
-        text += f"<b>Описание:</b> {obj_comment[:50]}{'...' if len(obj_comment) > 50 else ''}\n"
-    text += f"\n<b>Статус:</b> {obj_status}"
-    
-    keyboard = [
-        [InlineKeyboardButton("📋 Мои объекты", callback_data="my_objects")],
-        [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='HTML')
-    else:
-        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='HTML')
-    
-    return ConversationHandler.END
+    # Show preview with menu (don't clear user_data - keep object_id for editing)
+    return await show_object_preview_with_menu(update, context, object_id)
 
 
 async def cancel_object_creation(update: Update, context: ContextTypes.DEFAULT_TYPE):
