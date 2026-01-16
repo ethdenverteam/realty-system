@@ -130,19 +130,21 @@ def main():
     logger.info("Registering conversation handlers...")
     application.add_handler(create_object_conversation_handler())
     
-    # Log all updates (for debugging)
+    # Log all updates (for debugging) - only non-command messages to avoid duplication
     async def log_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Log all incoming updates"""
+        """Log all incoming updates (non-commands only)"""
         import sys
+        # Skip commands - they're already logged in handlers
         if update.message:
-            logger.info(f"Received message from {update.effective_user.id}: {update.message.text or 'media'}")
+            if not update.message.text or not update.message.text.startswith('/'):
+                logger.debug(f"Received message from {update.effective_user.id}: {update.message.text or 'media'}")
         elif update.callback_query:
-            logger.info(f"Received callback_query from {update.effective_user.id}: {update.callback_query.data}")
+            # Callback queries are already logged, skip
+            pass
         sys.stdout.flush()
     
-    # Add update logger (lowest priority)
-    application.add_handler(MessageHandler(filters.ALL, log_update), group=-1)
-    application.add_handler(CallbackQueryHandler(log_update, pattern=".*"), group=-1)
+    # Add update logger (lowest priority, only for non-command text messages)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, log_update), group=-1)
     
     logger.info("All handlers registered successfully")
     
