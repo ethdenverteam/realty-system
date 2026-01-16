@@ -97,8 +97,15 @@ def create_app(config_class=Config):
     app.register_blueprint(dashboard_bp, url_prefix='/system/dashboard/legacy')
     app.register_blueprint(logs_bp, url_prefix='/system/logs/legacy')
     app.register_blueprint(logs_viewer_bp, url_prefix='/system/logs-viewer/legacy')
-    # Also register for /api/logs for frontend compatibility
-    app.register_blueprint(logs_viewer_bp, url_prefix='/api/logs')
+    # Also register for /api/logs for frontend compatibility with unique name
+    from flask import Blueprint
+    from app.routes.logs_viewer import stream_logs, list_log_files, view_logs_page
+    
+    logs_viewer_api_bp = Blueprint('logs_viewer_api', __name__)
+    logs_viewer_api_bp.add_url_rule('/stream', 'stream_logs', stream_logs, methods=['GET'])
+    logs_viewer_api_bp.add_url_rule('/files', 'list_log_files', list_log_files, methods=['GET'])
+    logs_viewer_api_bp.add_url_rule('/view', 'view_logs_page', view_logs_page, methods=['GET'])
+    app.register_blueprint(logs_viewer_api_bp, url_prefix='/api/logs')
     
     # Serve React app static files (must be last to catch all non-API routes)
     @app.route('/', defaults={'path': ''})
