@@ -175,6 +175,8 @@ def admin_bot_chats_list(current_user):
             # If query fails due to missing column, try using raw SQL without filters_json
             if 'filters_json' in str(query_error):
                 logger.warning(f"filters_json column missing, using alternative query: {query_error}")
+                # IMPORTANT: Rollback failed transaction before executing new query
+                db.session.rollback()
                 # Use raw SQL to query without filters_json column
                 sql = text("""
                     SELECT chat_id, telegram_chat_id, title, type, category, 
@@ -239,6 +241,8 @@ def admin_bot_chats_list(current_user):
         
         return jsonify(result)
     except ProgrammingError as e:
+        # Rollback failed transaction
+        db.session.rollback()
         if 'filters_json' in str(e):
             logger.error(f"Database column 'filters_json' does not exist. Please run migrations: {e}", exc_info=True)
             return jsonify({
@@ -247,6 +251,8 @@ def admin_bot_chats_list(current_user):
             }), 500
         raise
     except Exception as e:
+        # Rollback failed transaction
+        db.session.rollback()
         logger.error(f"Error getting bot chats list: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
