@@ -159,8 +159,12 @@ def admin_bot_chats_page(current_user):
 @role_required('admin')
 def admin_bot_chats_list(current_user):
     """Get list of bot chats"""
-    chats = Chat.query.filter_by(owner_type='bot', is_active=True).all()
-    return jsonify([chat.to_dict() for chat in chats])
+    try:
+        chats = Chat.query.filter_by(owner_type='bot', is_active=True).all()
+        return jsonify([chat.to_dict() for chat in chats])
+    except Exception as e:
+        logger.error(f"Error getting bot chats list: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 
 @admin_routes_bp.route('/dashboard/bot-chats', methods=['POST'])
@@ -369,6 +373,10 @@ def admin_fetch_bot_chats(current_user):
         from bot.config import BOT_TOKEN
         import requests
         
+        if not BOT_TOKEN:
+            logger.error("BOT_TOKEN is not configured")
+            return jsonify({'error': 'BOT_TOKEN не настроен'}), 500
+        
         chats_dict = {}
         
         # Get updates using Telegram API
@@ -376,22 +384,46 @@ def admin_fetch_bot_chats(current_user):
         offset = 0
         max_iterations = 10  # Limit iterations to avoid infinite loops
         
-        for _ in range(max_iterations):
+        logger.info(f"Starting to fetch chats, BOT_TOKEN length: {len(BOT_TOKEN)}")
+        
+        for iteration in range(max_iterations):
             params = {'offset': offset, 'timeout': 1, 'limit': 100}
             try:
+                logger.debug(f"Fetching updates, iteration {iteration + 1}, offset: {offset}")
                 response = requests.get(url, params=params, timeout=10)
                 response.raise_for_status()
                 data = response.json()
+                
+                if not data.get('ok'):
+                    error_description = data.get('description', 'Unknown error')
+                    logger.error(f"Telegram API error: {error_description}")
+                    return jsonify({
+                        'error': f'Telegram API error: {error_description}',
+                        'details': 'Проверьте, что бот запущен и токен правильный'
+                    }), 500
+                
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Request error fetching updates: {e}", exc_info=True)
+                return jsonify({
+                    'error': f'Ошибка запроса к Telegram API: {str(e)}',
+                    'details': 'Проверьте подключение к интернету и токен бота'
+                }), 500
             except Exception as e:
-                logger.error(f"Error fetching updates: {e}")
-                break
+                logger.error(f"Unexpected error fetching updates: {e}", exc_info=True)
+                return jsonify({
+                    'error': f'Неожиданная ошибка: {str(e)}'
+                }), 500
             
-            if not data.get('ok') or not data.get('result'):
+            if not data.get('result'):
+                logger.info("No more updates to process")
                 break
             
             updates = data['result']
             if not updates:
+                logger.info("No updates in this batch")
                 break
+            
+            logger.info(f"Processing {len(updates)} updates")
             
             for update in updates:
                 if 'message' in update:
@@ -416,18 +448,23 @@ def admin_fetch_bot_chats(current_user):
                             'type': chat_type,
                             'username': username
                         }
+                        logger.debug(f"Added chat: {chat_id} ({title})")
                 
                 offset = max(offset, update.get('update_id', 0) + 1)
             
             if len(updates) < 100:  # Last batch
+                logger.info("Last batch of updates processed")
                 break
         
         # Convert to list
         chats = list(chats_dict.values())
+        logger.info(f"Total chats found: {len(chats)}")
         
         # Separate groups and users
         groups = [c for c in chats if c['type'] in ['group', 'supergroup', 'channel']]
         users = [c for c in chats if c['type'] == 'private']
+        
+        logger.info(f"Groups: {len(groups)}, Users: {len(users)}")
         
         return jsonify({
             'groups': groups,
@@ -438,7 +475,10 @@ def admin_fetch_bot_chats(current_user):
     except Exception as e:
         logger.error(f"Error fetching chats: {e}", exc_info=True)
         log_error(e, 'admin_fetch_chats_failed', current_user.user_id, {})
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'error': str(e),
+            'details': 'Проверьте логи сервера для подробностей'
+        }), 500
 
 
 @admin_routes_bp.route('/dashboard/bot-chats/districts', methods=['GET'])

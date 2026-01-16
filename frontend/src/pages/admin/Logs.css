@@ -4,12 +4,109 @@
   gap: var(--spacing-lg);
 }
 
-.pagination {
+.log-terminal-container {
+  background: #1e1e1e;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  max-height: 70vh;
+  overflow-y: auto;
+  font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+[data-theme="light"] .log-terminal-container {
+  background: #f5f5f5;
+  color: #000;
+}
+
+[data-theme="dark"] .log-terminal-container {
+  background: #0a0a0a;
+  color: #e0e0e0;
+}
+
+.log-placeholder {
+  padding: var(--spacing-xl);
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.log-terminal {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.log-line {
+  padding: 2px 0;
+  word-break: break-all;
+  white-space: pre-wrap;
+  color: #e0e0e0;
+}
+
+[data-theme="light"] .log-line {
+  color: #333;
+}
+
+/* Color coding for log levels */
+.log-line:has-text("ERROR") {
+  color: #ff5252;
+}
+
+.log-line:has-text("WARNING") {
+  color: #ffb74d;
+}
+
+.log-line:has-text("INFO") {
+  color: #4caf50;
+}
+
+.log-line:has-text("DEBUG") {
+  color: #90caf9;
+}
+
+/* Scrollbar styling */
+.log-terminal-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.log-terminal-container::-webkit-scrollbar-track {
+  background: #1a1a1a;
+  border-radius: 4px;
+}
+
+.log-terminal-container::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 4px;
+}
+
+.log-terminal-container::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
+
+.log-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: var(--spacing-lg);
-  padding-top: var(--spacing-lg);
+  padding-top: var(--spacing-md);
   border-top: 1px solid var(--color-border);
+  margin-top: var(--spacing-md);
 }
 
+.log-stats {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.card-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.card-actions .form-input {
+  min-width: 250px;
+}

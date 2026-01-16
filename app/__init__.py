@@ -97,6 +97,8 @@ def create_app(config_class=Config):
     app.register_blueprint(dashboard_bp, url_prefix='/system/dashboard/legacy')
     app.register_blueprint(logs_bp, url_prefix='/system/logs/legacy')
     app.register_blueprint(logs_viewer_bp, url_prefix='/system/logs-viewer/legacy')
+    # Also register for /api/logs for frontend compatibility
+    app.register_blueprint(logs_viewer_bp, url_prefix='/api/logs')
     
     # Serve React app static files (must be last to catch all non-API routes)
     @app.route('/', defaults={'path': ''})

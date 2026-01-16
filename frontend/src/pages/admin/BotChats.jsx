@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import api from '../../utils/api'
 import './BotChats.css'
@@ -204,6 +205,11 @@ export default function AdminBotChats() {
     <Layout 
       title="Управление чатами и районами бота" 
       isAdmin
+      headerActions={
+        <Link to="/admin/dashboard" className="btn btn-secondary">
+          ← Назад в дашборд
+        </Link>
+      }
     >
       <div className="bot-chats-page">
         {error && <div className="alert alert-error">{error}</div>}

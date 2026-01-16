@@ -40,6 +40,15 @@
   justify-content: space-between;
   align-items: center;
   gap: var(--spacing-md);
+  color: var(--color-text);
+}
+
+[data-theme="dark"] .header-content {
+  color: var(--color-text);
+}
+
+[data-theme="dark"] .header-content a {
+  color: var(--color-text);
 }
 
 .header-title {

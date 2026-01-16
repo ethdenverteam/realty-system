@@ -14,10 +14,37 @@ logger = logging.getLogger(__name__)
 
 
 @logs_viewer_bp.route('/stream', methods=['GET'])
-@jwt_required
-@role_required('admin')
-def stream_logs(current_user):
+def stream_logs():
     """Stream logs in real-time using Server-Sent Events"""
+    # Check auth manually since EventSource doesn't support headers
+    from app.utils.jwt import verify_token
+    token = request.args.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+    
+    if not token:
+        return Response(
+            'data: {"error": "Unauthorized"}\n\n',
+            mimetype='text/event-stream',
+            status=401
+        )
+    
+    try:
+        payload = verify_token(token)
+        from app.models.user import User
+        user = User.query.get(payload.get('user_id'))
+        if not user or user.web_role != 'admin':
+            return Response(
+                'data: {"error": "Forbidden"}\n\n',
+                mimetype='text/event-stream',
+                status=403
+            )
+    except Exception as e:
+        logger.error(f"Auth error in stream_logs: {e}")
+        return Response(
+            'data: {"error": "Unauthorized"}\n\n',
+            mimetype='text/event-stream',
+            status=401
+        )
+    
     log_type = request.args.get('type', 'app')  # app, errors, bot
     lines = request.args.get('lines', 100, type=int)
     
