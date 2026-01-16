@@ -134,10 +134,12 @@ def main():
     # Log all updates (for debugging)
     async def log_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Log all incoming updates"""
+        import sys
         if update.message:
             logger.info(f"Received message from {update.effective_user.id}: {update.message.text or 'media'}")
         elif update.callback_query:
             logger.info(f"Received callback_query from {update.effective_user.id}: {update.callback_query.data}")
+        sys.stdout.flush()
     
     # Add update logger (lowest priority)
     application.add_handler(MessageHandler(filters.ALL, log_update), group=-1)

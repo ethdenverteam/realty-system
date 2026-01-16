@@ -15,8 +15,10 @@ logger = logging.getLogger('bot.handlers')
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
+    import sys
     user = update.effective_user
     logger.info(f"Received /start command from user {user.id} (@{user.username})")
+    sys.stdout.flush()
     
     try:
         # Update user activity
@@ -25,15 +27,19 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Show main menu
         await show_main_menu(update, context)
         logger.info(f"Successfully processed /start for user {user.id}")
+        sys.stdout.flush()
     except Exception as e:
         logger.error(f"Error in start_command for user {user.id}: {e}", exc_info=True)
+        sys.stdout.flush()
         raise
 
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показать главное меню"""
+    import sys
     user = update.effective_user
     logger.info(f"Showing main menu for user {user.id}")
+    sys.stdout.flush()
     
     keyboard = [
         [InlineKeyboardButton("➕ Добавить объект", callback_data="add_object")],
@@ -51,12 +57,14 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if update.callback_query:
             await update.callback_query.edit_message_text(text, reply_markup=reply_markup)
-            logger.debug(f"Edited message for user {user.id}")
+            logger.info(f"Edited message for user {user.id}")
         elif update.message:
             await update.message.reply_text(text, reply_markup=reply_markup)
-            logger.debug(f"Sent message to user {user.id}")
+            logger.info(f"Sent message to user {user.id}")
+        sys.stdout.flush()
     except Exception as e:
         logger.error(f"Error showing main menu for user {user.id}: {e}", exc_info=True)
+        sys.stdout.flush()
         raise
 
 
