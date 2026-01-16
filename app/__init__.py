@@ -114,15 +114,19 @@ def create_app(config_class=Config):
         # Serve static files
         static_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
         
-        # If file exists, serve it
-        if path and os.path.exists(os.path.join(static_folder, path)):
-            return send_from_directory(static_folder, path)
+        # If path is a static asset (JS, CSS, images), serve it
+        if path and not path.endswith('/'):
+            # Check if it's a static file
+            static_file = os.path.join(static_folder, path)
+            if os.path.exists(static_file) and os.path.isfile(static_file):
+                return send_from_directory(static_folder, path)
         
-        # Otherwise serve index.html for React Router
-        if os.path.exists(os.path.join(static_folder, 'index.html')):
+        # Otherwise serve index.html for React Router (SPA routing)
+        index_file = os.path.join(static_folder, 'index.html')
+        if os.path.exists(index_file):
             return send_from_directory(static_folder, 'index.html')
         
-        # Fallback if static folder doesn't exist yet
+        # Fallback - redirect to login (if static files not built yet)
         from flask import redirect
         return redirect('/system/auth/login')
     
