@@ -1,37 +1,37 @@
 #!/bin/bash
-# Скрипт для автоматического деплоя после git pull
+# Script for automatic deployment after git pull
 
-set -e  # Остановить при ошибке
+set -e  # Stop on error
 
-echo "🚀 Начинаем деплой..."
+echo "🚀 Starting deployment..."
 
-# Переходим в директорию проекта
+# Navigate to project directory
 cd ~/realty-system
 
-# Получаем обновления
-echo "📥 Получаем обновления из git..."
+# Get updates
+echo "📥 Getting updates from git..."
 git pull
 
-# Проверяем, были ли изменения во фронтенде
+# Check if there were changes in the frontend
 FRONTEND_CHANGED=$(git diff HEAD@{1} HEAD --name-only | grep -E "^frontend/" | wc -l)
 
 if [ "$FRONTEND_CHANGED" -gt 0 ]; then
-    echo "📦 Обнаружены изменения во фронтенде, собираем..."
+    echo "📦 Frontend changes detected, building..."
     cd frontend
     npm run build
     cd ..
 else
-    echo "✅ Изменений во фронтенде нет, пропускаем сборку"
+    echo "✅ No frontend changes, skipping build"
 fi
 
-# Перезапускаем контейнеры
-echo "🔄 Перезапускаем контейнеры..."
+# Restart containers
+echo "🔄 Restarting containers..."
 docker-compose down
 docker-compose up -d --build
 
-echo "✅ Деплой завершен!"
+echo "✅ Deployment completed!"
 echo ""
-echo "Проверьте статус:"
+echo "Check status:"
 echo "  docker ps"
 echo "  docker logs realty_web"
 echo "  docker logs realty_bot"

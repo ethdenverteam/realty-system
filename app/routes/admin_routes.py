@@ -160,8 +160,92 @@ def admin_bot_chats_page(current_user):
 def admin_bot_chats_list(current_user):
     """Get list of bot chats"""
     try:
-        chats = Chat.query.filter_by(owner_type='bot', is_active=True).all()
-        return jsonify([chat.to_dict() for chat in chats])
+        from sqlalchemy.exc import ProgrammingError
+        from sqlalchemy import inspect as sqlalchemy_inspect
+        from sqlalchemy import text
+        
+        # Check if filters_json column exists before querying
+        inspector = sqlalchemy_inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('chats')]
+        has_filters_json = 'filters_json' in columns
+        
+        try:
+            chats = Chat.query.filter_by(owner_type='bot', is_active=True).all()
+        except ProgrammingError as query_error:
+            # If query fails due to missing column, try using raw SQL without filters_json
+            if 'filters_json' in str(query_error):
+                logger.warning(f"filters_json column missing, using alternative query: {query_error}")
+                # Use raw SQL to query without filters_json column
+                sql = text("""
+                    SELECT chat_id, telegram_chat_id, title, type, category, 
+                           owner_type, owner_account_id, is_active, members_count,
+                           added_date, last_publication, total_publications
+                    FROM chats
+                    WHERE owner_type = :owner_type AND is_active = true
+                """)
+                result_proxy = db.session.execute(sql, {'owner_type': 'bot'})
+                rows = result_proxy.fetchall()
+                
+                # Convert rows to dict
+                result = []
+                for row in rows:
+                    chat_dict = {
+                        'chat_id': row[0],
+                        'telegram_chat_id': row[1],
+                        'title': row[2],
+                        'type': row[3],
+                        'category': row[4],
+                        'owner_type': row[5],
+                        'owner_account_id': row[6],
+                        'is_active': row[7],
+                        'members_count': row[8],
+                        'added_date': row[9].isoformat() if row[9] else None,
+                        'last_publication': row[10].isoformat() if row[10] else None,
+                        'total_publications': row[11],
+                        'filters_json': {}  # Default empty dict since column doesn't exist
+                    }
+                    result.append(chat_dict)
+                
+                logger.info(f"Returned {len(result)} chats using fallback query (filters_json column missing)")
+                return jsonify(result)
+            raise
+        
+        # Convert to dict, handling missing filters_json column
+        result = []
+        for chat in chats:
+            chat_dict = {
+                'chat_id': chat.chat_id,
+                'telegram_chat_id': chat.telegram_chat_id,
+                'title': chat.title,
+                'type': chat.type,
+                'category': chat.category,
+                'owner_type': chat.owner_type,
+                'owner_account_id': chat.owner_account_id,
+                'is_active': chat.is_active,
+                'members_count': chat.members_count,
+                'added_date': chat.added_date.isoformat() if chat.added_date else None,
+                'last_publication': chat.last_publication.isoformat() if chat.last_publication else None,
+                'total_publications': chat.total_publications,
+            }
+            # Only add filters_json if column exists and we can access it
+            if has_filters_json:
+                try:
+                    chat_dict['filters_json'] = chat.filters_json or {}
+                except AttributeError:
+                    chat_dict['filters_json'] = {}
+            else:
+                chat_dict['filters_json'] = {}
+            result.append(chat_dict)
+        
+        return jsonify(result)
+    except ProgrammingError as e:
+        if 'filters_json' in str(e):
+            logger.error(f"Database column 'filters_json' does not exist. Please run migrations: {e}", exc_info=True)
+            return jsonify({
+                'error': 'Database schema is outdated. The filters_json column is missing.',
+                'details': 'Please run database migrations: alembic upgrade head'
+            }), 500
+        raise
     except Exception as e:
         logger.error(f"Error getting bot chats list: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
@@ -375,7 +459,7 @@ def admin_fetch_bot_chats(current_user):
         
         if not BOT_TOKEN:
             logger.error("BOT_TOKEN is not configured")
-            return jsonify({'error': 'BOT_TOKEN не настроен'}), 500
+            return jsonify({'error': 'BOT_TOKEN is not configured'}), 500
         
         chats_dict = {}
         
@@ -396,22 +480,33 @@ def admin_fetch_bot_chats(current_user):
                 
                 if not data.get('ok'):
                     error_description = data.get('description', 'Unknown error')
+                    error_code = data.get('error_code', 0)
+                    
+                    # Handle conflict error (409) - bot is already running
+                    if error_code == 409 or 'Conflict' in error_description or 'getUpdates' in error_description:
+                        logger.warning(f"Bot conflict detected: {error_description}")
+                        return jsonify({
+                            'error': 'Bot conflict: Another bot instance is running',
+                            'details': 'The bot is currently running and using getUpdates. To fetch chats, you need to temporarily stop the bot or use chats that are already in the database.',
+                            'conflict': True
+                        }), 409
+                    
                     logger.error(f"Telegram API error: {error_description}")
                     return jsonify({
                         'error': f'Telegram API error: {error_description}',
-                        'details': 'Проверьте, что бот запущен и токен правильный'
+                        'details': 'Check that the bot is running and the token is correct'
                     }), 500
                 
             except requests.exceptions.RequestException as e:
                 logger.error(f"Request error fetching updates: {e}", exc_info=True)
                 return jsonify({
-                    'error': f'Ошибка запроса к Telegram API: {str(e)}',
-                    'details': 'Проверьте подключение к интернету и токен бота'
+                    'error': f'Request error to Telegram API: {str(e)}',
+                    'details': 'Check your internet connection and bot token'
                 }), 500
             except Exception as e:
                 logger.error(f"Unexpected error fetching updates: {e}", exc_info=True)
                 return jsonify({
-                    'error': f'Неожиданная ошибка: {str(e)}'
+                    'error': f'Unexpected error: {str(e)}'
                 }), 500
             
             if not data.get('result'):
@@ -475,9 +570,18 @@ def admin_fetch_bot_chats(current_user):
     except Exception as e:
         logger.error(f"Error fetching chats: {e}", exc_info=True)
         log_error(e, 'admin_fetch_chats_failed', current_user.user_id, {})
+        
+        # Check if it's a conflict error
+        if 'Conflict' in str(e) or 'getUpdates' in str(e):
+            return jsonify({
+                'error': 'Bot conflict: Another bot instance is running',
+                'details': 'The bot is currently running and using getUpdates. To fetch chats, you need to temporarily stop the bot.',
+                'conflict': True
+            }), 409
+        
         return jsonify({
             'error': str(e),
-            'details': 'Проверьте логи сервера для подробностей'
+            'details': 'Check server logs for details'
         }), 500
 
 

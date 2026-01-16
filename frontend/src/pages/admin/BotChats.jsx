@@ -44,7 +44,13 @@ export default function AdminBotChats() {
       ])
       setChats(chatsRes.data)
       setConfig(configRes.data)
-      setDistricts(districtsRes.data.districts || {})
+      // Ensure districts is an object, not null or undefined
+      const districtsData = districtsRes.data.districts || {}
+      setDistricts(districtsData)
+      // Also update config districts if config exists
+      if (configRes.data) {
+        setConfig({ ...configRes.data, districts: districtsData })
+      }
     } catch (err) {
       console.error('Error loading data:', err)
       setError(err.response?.data?.error || 'Ошибка загрузки данных')
@@ -139,12 +145,15 @@ export default function AdminBotChats() {
       })
       setSuccess('Район успешно добавлен')
       setNewDistrict('')
-      // Обновляем список районов
-      setDistricts(response.data.districts || {})
+      // Обновляем список районов из ответа
+      const districtsData = response.data.districts || {}
+      setDistricts(districtsData)
       // Также обновляем конфиг для формы
       if (config) {
-        setConfig({ ...config, districts: response.data.districts || {} })
+        setConfig({ ...config, districts: districtsData })
       }
+      // Перезагружаем данные для уверенности
+      await loadDistricts()
     } catch (err) {
       setError(err.response?.data?.error || 'Ошибка при добавлении района')
     }
@@ -157,12 +166,15 @@ export default function AdminBotChats() {
       setError('')
       const response = await api.delete(`/admin/dashboard/bot-chats/districts/${encodeURIComponent(districtName)}`)
       setSuccess('Район успешно удален')
-      // Обновляем список районов
-      setDistricts(response.data.districts || {})
+      // Обновляем список районов из ответа
+      const districtsData = response.data.districts || {}
+      setDistricts(districtsData)
       // Также обновляем конфиг для формы
       if (config) {
-        setConfig({ ...config, districts: response.data.districts || {} })
+        setConfig({ ...config, districts: districtsData })
       }
+      // Перезагружаем данные для уверенности
+      await loadDistricts()
     } catch (err) {
       setError(err.response?.data?.error || 'Ошибка при удалении района')
     }
