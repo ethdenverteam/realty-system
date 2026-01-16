@@ -8,7 +8,6 @@ export default function AdminBotChats() {
   const [config, setConfig] = useState(null)
   const [districts, setDistricts] = useState({})
   const [showAddModal, setShowAddModal] = useState(false)
-  const [showDistrictsModal, setShowDistrictsModal] = useState(false)
   const [showFetchModal, setShowFetchModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
@@ -36,6 +35,7 @@ export default function AdminBotChats() {
   const loadData = async () => {
     try {
       setLoading(true)
+      setError('')
       const [chatsRes, configRes, districtsRes] = await Promise.all([
         api.get('/admin/dashboard/bot-chats/list'),
         api.get('/admin/dashboard/bot-chats/config'),
@@ -45,9 +45,19 @@ export default function AdminBotChats() {
       setConfig(configRes.data)
       setDistricts(districtsRes.data.districts || {})
     } catch (err) {
-      setError('Ошибка загрузки данных')
+      console.error('Error loading data:', err)
+      setError(err.response?.data?.error || 'Ошибка загрузки данных')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadDistricts = async () => {
+    try {
+      const districtsRes = await api.get('/admin/dashboard/bot-chats/districts')
+      setDistricts(districtsRes.data.districts || {})
+    } catch (err) {
+      console.error('Error loading districts:', err)
     }
   }
 
@@ -122,12 +132,18 @@ export default function AdminBotChats() {
     if (!newDistrict.trim()) return
 
     try {
-      await api.post('/admin/dashboard/bot-chats/districts', {
+      setError('')
+      const response = await api.post('/admin/dashboard/bot-chats/districts', {
         name: newDistrict.trim()
       })
       setSuccess('Район успешно добавлен')
       setNewDistrict('')
-      loadData()
+      // Обновляем список районов
+      setDistricts(response.data.districts || {})
+      // Также обновляем конфиг для формы
+      if (config) {
+        setConfig({ ...config, districts: response.data.districts || {} })
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Ошибка при добавлении района')
     }
@@ -137,9 +153,15 @@ export default function AdminBotChats() {
     if (!confirm(`Удалить район "${districtName}"?`)) return
 
     try {
-      await api.delete(`/admin/dashboard/bot-chats/districts/${encodeURIComponent(districtName)}`)
+      setError('')
+      const response = await api.delete(`/admin/dashboard/bot-chats/districts/${encodeURIComponent(districtName)}`)
       setSuccess('Район успешно удален')
-      loadData()
+      // Обновляем список районов
+      setDistricts(response.data.districts || {})
+      // Также обновляем конфиг для формы
+      if (config) {
+        setConfig({ ...config, districts: response.data.districts || {} })
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Ошибка при удалении района')
     }
@@ -182,32 +204,6 @@ export default function AdminBotChats() {
     <Layout 
       title="Управление чатами и районами бота" 
       isAdmin
-      headerActions={
-        <>
-          <button 
-            className="btn btn-secondary"
-            onClick={handleFetchChats}
-            disabled={fetching}
-          >
-            {fetching ? 'Загрузка...' : 'Получить чаты'}
-          </button>
-          <button 
-            className="btn btn-secondary"
-            onClick={() => setShowDistrictsModal(true)}
-          >
-            Управление районами
-          </button>
-          <button 
-            className="header-icon-btn" 
-            onClick={() => setShowAddModal(true)}
-            aria-label="Добавить чат"
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </button>
-        </>
-      }
     >
       <div className="bot-chats-page">
         {error && <div className="alert alert-error">{error}</div>}
@@ -397,50 +393,65 @@ export default function AdminBotChats() {
           </div>
         )}
 
-        {/* Districts Management Modal */}
-        {showDistrictsModal && (
-          <div className="modal-overlay" onClick={() => setShowDistrictsModal(false)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h2>Управление районами</h2>
-                <button className="modal-close" onClick={() => setShowDistrictsModal(false)}>×</button>
-              </div>
-              <div className="modal-content">
-                <form onSubmit={handleAddDistrict} className="form-inline">
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={newDistrict}
-                    onChange={(e) => setNewDistrict(e.target.value)}
-                    placeholder="Название района"
-                  />
-                  <button type="submit" className="btn btn-primary">Добавить</button>
-                </form>
-                <div className="districts-list">
-                  {Object.keys(districts).length === 0 ? (
-                    <div className="empty-state">Нет районов. Добавьте первый район.</div>
-                  ) : (
-                    Object.keys(districts).map(district => (
-                      <div key={district} className="district-item">
-                        <span>{district}</span>
-                        <button 
-                          className="btn btn-sm btn-danger"
-                          onClick={() => handleDeleteDistrict(district)}
-                        >
-                          Удалить
-                        </button>
-                      </div>
-                    ))
-                  )}
+        {/* Districts Management Card - Always visible */}
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Управление районами</h2>
+          </div>
+          <div className="card-content">
+            <form onSubmit={handleAddDistrict} className="form-inline">
+              <input
+                type="text"
+                className="form-input"
+                value={newDistrict}
+                onChange={(e) => setNewDistrict(e.target.value)}
+                placeholder="Название района"
+              />
+              <button type="submit" className="btn btn-primary">Добавить район</button>
+            </form>
+            <div className="districts-list">
+              {Object.keys(districts).length === 0 ? (
+                <div className="empty-state">Нет районов. Добавьте первый район.</div>
+              ) : (
+                <div className="districts-grid">
+                  {Object.keys(districts).map(district => (
+                    <div key={district} className="district-item">
+                      <span>{district}</span>
+                      <button 
+                        className="btn btn-sm btn-danger"
+                        onClick={() => handleDeleteDistrict(district)}
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
             </div>
           </div>
-        )}
+        </div>
 
+        {/* Chats List Card */}
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">Список чатов</h2>
+            <div className="card-actions">
+              <button 
+                className="btn btn-secondary"
+                onClick={handleFetchChats}
+                disabled={fetching}
+              >
+                {fetching ? 'Загрузка...' : 'Получить чаты'}
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={() => setShowAddModal(true)}
+              >
+                Добавить чат
+              </button>
+            </div>
+          </div>
+          <div className="card-content">
             <div className="chat-filter-tabs">
               <button 
                 className={`tab ${chatFilter === 'all' ? 'active' : ''}`}
@@ -461,54 +472,54 @@ export default function AdminBotChats() {
                 Пользователи ({chats.filter(c => c.type === 'private').length})
               </button>
             </div>
-          </div>
-          {loading ? (
-            <div className="loading">Загрузка...</div>
-          ) : filteredChats.length === 0 ? (
-            <div className="empty-state">Нет чатов. Добавьте первый чат.</div>
-          ) : (
-            <div className="table-container">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Название</th>
-                    <th>Тип</th>
-                    <th>Фильтры</th>
-                    <th>Статус</th>
-                    <th>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredChats.map(chat => (
-                    <tr key={chat.chat_id}>
-                      <td>
-                        <strong>{chat.title}</strong>
-                        <br />
-                        <small>{chat.telegram_chat_id}</small>
-                      </td>
-                      <td>{chat.type}</td>
-                      <td><small>{getFiltersText(chat)}</small></td>
-                      <td>
-                        {chat.is_active ? (
-                          <span className="badge badge-success">Активен</span>
-                        ) : (
-                          <span className="badge badge-danger">Неактивен</span>
-                        )}
-                      </td>
-                      <td>
-                        <button 
-                          className="btn btn-sm btn-danger"
-                          onClick={() => handleDelete(chat.chat_id)}
-                        >
-                          Удалить
-                        </button>
-                      </td>
+            {loading ? (
+              <div className="loading">Загрузка...</div>
+            ) : filteredChats.length === 0 ? (
+              <div className="empty-state">Нет чатов. Добавьте первый чат.</div>
+            ) : (
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Название</th>
+                      <th>Тип</th>
+                      <th>Фильтры</th>
+                      <th>Статус</th>
+                      <th>Действия</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {filteredChats.map(chat => (
+                      <tr key={chat.chat_id}>
+                        <td>
+                          <strong>{chat.title}</strong>
+                          <br />
+                          <small>{chat.telegram_chat_id}</small>
+                        </td>
+                        <td>{chat.type}</td>
+                        <td><small>{getFiltersText(chat)}</small></td>
+                        <td>
+                          {chat.is_active ? (
+                            <span className="badge badge-success">Активен</span>
+                          ) : (
+                            <span className="badge badge-danger">Неактивен</span>
+                          )}
+                        </td>
+                        <td>
+                          <button 
+                            className="btn btn-sm btn-danger"
+                            onClick={() => handleDelete(chat.chat_id)}
+                          >
+                            Удалить
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </Layout>

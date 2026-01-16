@@ -9,7 +9,7 @@
   /* Colors inspired by luma.com */
   --color-primary: #000000;
   --color-secondary: #666666;
-  --color-accent: #0066ff;
+  --color-accent: #dc3545; /* Changed from blue to red */
   --color-success: #00c853;
   --color-danger: #ff3d00;
   --color-warning: #ffa000;
@@ -33,21 +33,22 @@
 [data-theme="dark"] {
   --color-primary: #ffffff;
   --color-secondary: #999999;
-  --color-accent: #4a9eff;
+  --color-accent: #ff1744; /* Changed from blue to red */
   --color-success: #4caf50;
   --color-danger: #ff5252;
   --color-warning: #ffb74d;
   
-  --color-bg: #121212;
-  --color-bg-secondary: #1e1e1e;
-  --color-bg-tertiary: #2a2a2a;
+  /* Gradient background - black with pink */
+  --color-bg: #0a0a0a;
+  --color-bg-secondary: #1a0f14;
+  --color-bg-tertiary: #2a1a24;
   
   --color-text: #ffffff;
   --color-text-secondary: #b0b0b0;
   --color-text-tertiary: #808080;
   
-  --color-border: #333333;
-  --color-border-light: #2a2a2a;
+  --color-border: #2a1a24;
+  --color-border-light: #1a0f14;
   
   /* Admin colors - dark theme with pink-purple gradient */
   --color-admin: #ff1744;
@@ -62,6 +63,12 @@ body {
   background-color: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+[data-theme="dark"] body {
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a0f14 25%, #2a1a24 50%, #1a0f14 75%, #0a0a0a 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
 }
 
 /* Mobile-first base styles */
