@@ -492,6 +492,83 @@ def admin_bot_chats_config(current_user):
     })
 
 
+@admin_routes_bp.route('/dashboard/bot-chats/get-by-id', methods=['POST'])
+@jwt_required
+@role_required('admin')
+def admin_get_chat_by_id(current_user):
+    """Get chat information by chat ID using getChat API
+    
+    This method uses getChat which doesn't conflict with bot polling.
+    You can provide chat ID directly (e.g., -1002632748579) or username.
+    """
+    try:
+        from bot.config import BOT_TOKEN
+        from telegram import Bot
+        import asyncio
+        
+        if not BOT_TOKEN:
+            logger.error("BOT_TOKEN is not configured")
+            return jsonify({'error': 'BOT_TOKEN is not configured'}), 500
+        
+        data = request.get_json()
+        chat_id_input = data.get('chat_id', '').strip()
+        
+        if not chat_id_input:
+            return jsonify({'error': 'chat_id is required'}), 400
+        
+        async def get_chat_info():
+            bot = Bot(token=BOT_TOKEN)
+            try:
+                # Try as integer first (for group/channel IDs like -1002632748579)
+                if chat_id_input.lstrip('-').isdigit():
+                    chat_info = await bot.get_chat(chat_id=int(chat_id_input))
+                # Try as username (with or without @)
+                elif chat_id_input.startswith('@'):
+                    chat_info = await bot.get_chat(chat_id=chat_id_input)
+                else:
+                    # Try with @ prefix
+                    chat_info = await bot.get_chat(chat_id=f"@{chat_id_input}")
+            except Exception as e:
+                logger.error(f"Error getting chat info for {chat_id_input}: {e}")
+                raise
+            return chat_info
+        
+        chat_info = asyncio.run(get_chat_info())
+        
+        # Format response
+        chat_data = {
+            'id': str(chat_info.id),
+            'title': chat_info.title or (chat_info.first_name or '') + ' ' + (chat_info.last_name or '') or chat_info.username or f'Chat {chat_info.id}',
+            'type': chat_info.type,
+            'username': chat_info.username or '',
+            'description': getattr(chat_info, 'description', '') or '',
+            'members_count': getattr(chat_info, 'members_count', 0) or 0
+        }
+        
+        logger.info(f"Retrieved chat info: {chat_data['id']} ({chat_data['title']})")
+        
+        return jsonify({
+            'chat': chat_data,
+            'message': 'Chat retrieved successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting chat by ID: {e}", exc_info=True)
+        log_error(e, 'admin_get_chat_by_id_failed', current_user.user_id, {'chat_id': chat_id_input})
+        
+        error_msg = str(e)
+        if 'chat not found' in error_msg.lower() or 'not found' in error_msg.lower():
+            return jsonify({
+                'error': 'Chat not found',
+                'details': f'The chat with ID "{chat_id_input}" was not found. Make sure the bot is a member of the chat or the chat ID is correct.'
+            }), 404
+        
+        return jsonify({
+            'error': str(e),
+            'details': 'Check server logs for details'
+        }), 500
+
+
 @admin_routes_bp.route('/dashboard/bot-chats/fetch', methods=['POST'])
 @jwt_required
 @role_required('admin')
@@ -500,6 +577,8 @@ def admin_fetch_bot_chats(current_user):
     
     NOTE: This will conflict if the bot is currently running with polling.
     The bot must be stopped temporarily to use this endpoint.
+    
+    For getting a specific chat, use /dashboard/bot-chats/get-by-id instead.
     """
     try:
         from bot.config import BOT_TOKEN
@@ -643,18 +722,31 @@ def admin_fetch_bot_chats(current_user):
         # If no chats found and we got empty result, it might be because bot is consuming updates
         if len(chats) == 0:
             logger.warning("No chats found - this might indicate bot conflict or no updates available")
-            # Check if there are any chats in database as alternative
-            from app.models.chat import Chat
-            db_chats = Chat.query.filter_by(owner_type='bot', is_active=True).all()
-            if db_chats:
-                logger.info(f"Found {len(db_chats)} chats in database - suggesting to use those instead")
-                return jsonify({
-                    'groups': [],
-                    'users': [],
-                    'all': [],
-                    'warning': 'No chats found from getUpdates. This might be because the bot is currently running and consuming updates. Consider using chats already in the database or temporarily stopping the bot.',
-                    'database_chats_count': len(db_chats)
-                })
+            # Check if there are any chats in database as alternative (using raw SQL to avoid filters_json issue)
+            from sqlalchemy import text
+            try:
+                sql = text("""
+                    SELECT chat_id, telegram_chat_id, title, type, category, 
+                           owner_type, owner_account_id, is_active, members_count,
+                           added_date, last_publication, total_publications
+                    FROM chats
+                    WHERE owner_type = :owner_type AND is_active = true
+                """)
+                result_proxy = db.session.execute(sql, {'owner_type': 'bot'})
+                rows = result_proxy.fetchall()
+                db_chats_count = len(rows)
+                
+                if db_chats_count > 0:
+                    logger.info(f"Found {db_chats_count} chats in database - suggesting to use those instead")
+                    return jsonify({
+                        'groups': [],
+                        'users': [],
+                        'all': [],
+                        'warning': 'No chats found from getUpdates. This might be because the bot is currently running and consuming updates. Consider using chats already in the database or temporarily stopping the bot.',
+                        'database_chats_count': db_chats_count
+                    })
+            except Exception as db_error:
+                logger.warning(f"Error checking database chats: {db_error}")
         
         # Separate groups and users
         groups = [c for c in chats if c['type'] in ['group', 'supergroup', 'channel']]
@@ -718,7 +810,11 @@ def admin_add_district(current_user):
         districts_setting = SystemSetting.query.filter_by(key='districts_config').first()
         
         if districts_setting:
-            districts_config = districts_setting.value_json or {}
+            # Ensure we have a dict, not None
+            districts_config = districts_setting.value_json if districts_setting.value_json is not None else {}
+            if not isinstance(districts_config, dict):
+                logger.warning(f"districts_config is not a dict, converting. Type: {type(districts_config)}, Value: {districts_config}")
+                districts_config = {}
         else:
             districts_config = {}
             districts_setting = SystemSetting(
@@ -727,25 +823,31 @@ def admin_add_district(current_user):
                 description='Configuration for districts'
             )
             db.session.add(districts_setting)
+            db.session.flush()  # Flush to get the ID
         
         if district_name in districts_config:
             return jsonify({'error': 'District already exists'}), 400
         
+        # Add district to config
         districts_config[district_name] = district_name
+        
+        # Update the setting
         districts_setting.value_json = districts_config
         districts_setting.updated_by = current_user.user_id
         
+        # Commit the changes
         db.session.commit()
         
-        # Verify the district was saved
-        db.session.refresh(districts_setting)
-        saved_config = districts_setting.value_json or {}
+        # Re-query to verify (don't use refresh as it might not work with JSON)
+        db.session.expire(districts_setting)
+        districts_setting = SystemSetting.query.filter_by(key='districts_config').first()
+        saved_config = districts_setting.value_json if districts_setting else {}
+        
         logger.info(f"District '{district_name}' added. Total districts: {len(saved_config)}")
         
         if district_name not in saved_config:
-            logger.error(f"District '{district_name}' was not saved correctly!")
-            db.session.rollback()
-            return jsonify({'error': 'Failed to save district'}), 500
+            logger.error(f"District '{district_name}' was not saved correctly! Saved config: {saved_config}, Type: {type(saved_config)}")
+            return jsonify({'error': 'Failed to save district - verification failed'}), 500
         
         # Log action (don't fail if logging fails)
         try:
