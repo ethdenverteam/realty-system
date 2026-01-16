@@ -42,7 +42,7 @@
     <nav class="navbar navbar-dark bg-dark">
         <div class="container-fluid">
             <span class="navbar-brand">Просмотр логов</span>
-            <a href="/api/dashboard/" class="btn btn-outline-light btn-sm">Назад в дашборд</a>
+            <a href="/system/dashboard/" class="btn btn-outline-light btn-sm">Назад в дашборд</a>
         </div>
     </nav>
     
@@ -126,7 +126,7 @@
             
             // Build URL with token
             const token = getToken();
-            const url = `/api/logs-viewer/stream?type=${logType}&lines=${lines}`;
+            const url = `/system/logs-viewer/stream?type=${logType}&lines=${lines}`;
             
             eventSource = new EventSource(url);
             

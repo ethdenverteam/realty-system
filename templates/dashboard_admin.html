@@ -167,7 +167,7 @@
             <div class="user-info">
                 <span class="user-name" id="userName">Загрузка...</span>
                 <span class="badge-admin">ADMIN</span>
-                <a href="/api/dashboard/" class="logout-btn">Пользовательский дашборд</a>
+                <a href="/system/dashboard/" class="logout-btn">Пользовательский дашборд</a>
                 <a href="#" class="logout-btn" onclick="logout(); return false;">Выйти</a>
             </div>
         </div>
@@ -201,11 +201,11 @@
         
         <div class="section">
             <h2>Административные функции</h2>
-            <a href="/api/admin/users" class="btn">👥 Управление пользователями</a>
-            <a href="/api/logs-viewer/view" class="btn">📊 Просмотр логов</a>
-            <a href="/api/logs/" class="btn">📋 Логи действий</a>
-            <a href="/api/objects" class="btn btn-secondary">🏠 Все объекты</a>
-            <a href="/api/objects/create" class="btn btn-secondary">➕ Создать объект</a>
+            <a href="/system/admin/users" class="btn">👥 Управление пользователями</a>
+            <a href="/system/logs-viewer/view" class="btn">📊 Просмотр логов</a>
+            <a href="/system/logs/" class="btn">📋 Логи действий</a>
+            <a href="/system/objects" class="btn btn-secondary">🏠 Все объекты</a>
+            <a href="/system/objects/create" class="btn btn-secondary">➕ Создать объект</a>
         </div>
         
         <div class="section">
@@ -225,7 +225,7 @@
         }
         
         if (user.web_role !== 'admin') {
-            window.location.href = '/api/dashboard/';
+            window.location.href = '/system/dashboard/';
             return;
         }
         
@@ -236,7 +236,7 @@
         async function loadDashboard() {
             try {
                 // Get admin stats
-                const statsRes = await fetch('/api/admin/stats', {
+                const statsRes = await fetch('/system/admin/stats', {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
@@ -252,7 +252,7 @@
                 }
                 
                 // Get recent actions
-                const logsRes = await fetch('/api/logs/?per_page=10', {
+                const logsRes = await fetch('/system/logs/?per_page=10', {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
@@ -288,7 +288,7 @@
         }
         
         function logout() {
-            fetch('/api/auth/logout', {
+            fetch('/system/auth/logout', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`

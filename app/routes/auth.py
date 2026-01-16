@@ -123,5 +123,25 @@ def get_current_user():
 @auth_bp.route('/login', methods=['GET'])
 def login_page():
     """Login page"""
+    # Check if already logged in
+    from flask import request
+    token = request.cookies.get('jwt_token')
+    if token:
+        # Try to verify token and redirect
+        try:
+            from app.utils.jwt import verify_token
+            user_data = verify_token(token)
+            if user_data:
+                from app.models.user import User
+                user = User.query.get(user_data.get('user_id'))
+                if user:
+                    if user.web_role == 'admin':
+                        from flask import redirect
+                        return redirect('/system/admin/dashboard')
+                    else:
+                        from flask import redirect
+                        return redirect('/system/user/dashboard')
+        except:
+            pass
     return render_template('login.html')
 

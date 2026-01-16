@@ -48,7 +48,7 @@
     <nav class="navbar navbar-dark bg-dark">
         <div class="container-fluid">
             <span class="navbar-brand">Создание объекта</span>
-            <a href="/api/dashboard/" class="btn btn-outline-light btn-sm">Назад в дашборд</a>
+            <a href="/system/dashboard/" class="btn btn-outline-light btn-sm">Назад в дашборд</a>
         </div>
     </nav>
     
@@ -166,7 +166,7 @@
             
             <div class="d-grid gap-2">
                 <button type="submit" class="btn btn-primary btn-lg">Создать объект</button>
-                <a href="/api/dashboard/" class="btn btn-secondary">Отмена</a>
+                <a href="/system/dashboard/" class="btn btn-secondary">Отмена</a>
             </div>
         </form>
     </div>
@@ -257,7 +257,7 @@
             });
             
             try {
-                const response = await fetch('/api/objects/', {
+                const response = await fetch('/system/objects/', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -272,7 +272,7 @@
                     document.getElementById('success').textContent = `✅ Объект создан! ID: ${objectId}`;
                     document.getElementById('success').style.display = 'block';
                     setTimeout(() => {
-                        window.location.href = '/api/objects/list';
+                        window.location.href = '/system/objects/list';
                     }, 2000);
                 } else {
                     document.getElementById('error').textContent = result.error || 'Ошибка при создании объекта';

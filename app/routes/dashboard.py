@@ -18,8 +18,8 @@ dashboard_bp = Blueprint('dashboard', __name__)
 def dashboard_page(current_user):
     """Show dashboard page (redirects to admin or user dashboard)"""
     if current_user.web_role == 'admin':
-        return redirect('/api/admin/dashboard')
-    return render_template('dashboard.html')
+        return redirect('/system/admin/dashboard')
+    return redirect('/system/user/dashboard')
 
 
 @dashboard_bp.route('/stats', methods=['GET'])

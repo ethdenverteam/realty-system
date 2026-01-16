@@ -159,7 +159,7 @@
             }
             
             try {
-                const response = await fetch('/api/auth/login', {
+                const response = await fetch('/system/auth/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -177,9 +177,13 @@
                     localStorage.setItem('jwt_token', data.token);
                     localStorage.setItem('user', JSON.stringify(data.user));
                     
-                    // Redirect to dashboard
+                    // Redirect to dashboard based on role
                     setTimeout(() => {
-                        window.location.href = '/dashboard';
+                        if (data.user.web_role === 'admin') {
+                            window.location.href = '/system/admin/dashboard';
+                        } else {
+                            window.location.href = '/system/user/dashboard';
+                        }
                     }, 1000);
                 } else {
                     errorDiv.textContent = data.error || 'Ошибка входа';

@@ -3,7 +3,7 @@ Chat model - Чаты для публикации
 """
 from app.database import db
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, JSON
 from sqlalchemy.orm import relationship
 
 
@@ -15,7 +15,8 @@ class Chat(db.Model):
     telegram_chat_id = Column(String(50), unique=True, nullable=False, index=True)
     title = Column(String(255), nullable=False)
     type = Column(String(20), nullable=False)  # group/channel/supergroup
-    category = Column(String(100), nullable=True)  # rooms_1k/rooms_2k/district_center/price_4000_6000
+    category = Column(String(100), nullable=True)  # rooms_1k/rooms_2k/district_center/price_4000_6000 (legacy)
+    filters_json = Column(JSON, nullable=True)  # Extended filters: {rooms_types: [], districts: [], price_min: 0, price_max: 0}
     owner_type = Column(String(10), default='bot', nullable=False)  # bot/user
     owner_account_id = Column(Integer, ForeignKey('telegram_accounts.account_id'), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
@@ -40,6 +41,7 @@ class Chat(db.Model):
             'title': self.title,
             'type': self.type,
             'category': self.category,
+            'filters_json': self.filters_json or {},
             'owner_type': self.owner_type,
             'owner_account_id': self.owner_account_id,
             'is_active': self.is_active,

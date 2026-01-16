@@ -13,7 +13,8 @@ def create_app(config_class=Config):
     """Create and configure Flask application"""
     import os
     template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates')
-    app = Flask(__name__, template_folder=template_dir)
+    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
+    app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
     app.config.from_object(config_class)
     
     # Setup logging first
@@ -42,6 +43,7 @@ def create_app(config_class=Config):
         import traceback
         
         # Don't log 404 errors for /metrics (Prometheus)
+        from flask import request
         if isinstance(e, NotFound) and request.path == '/metrics':
             from flask import jsonify
             return jsonify({'error': 'Not found'}), 404
@@ -74,33 +76,55 @@ def create_app(config_class=Config):
     from app.routes.accounts import accounts_bp
     from app.routes.chats import chats_bp
     from app.routes.publications import publications_bp
-    from app.routes.admin import admin_bp
-    from app.routes.dashboard import dashboard_bp
-    from app.routes.logs import logs_bp
-    from app.routes.logs_viewer import logs_viewer_bp
+    from app.routes.admin import admin_bp  # Legacy, keep for backward compatibility
+    from app.routes.dashboard import dashboard_bp  # Legacy
+    from app.routes.logs import logs_bp  # Legacy
+    from app.routes.logs_viewer import logs_viewer_bp  # Legacy
+    from app.routes.admin_routes import admin_routes_bp
+    from app.routes.user_routes import user_routes_bp
     
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.register_blueprint(objects_bp, url_prefix='/api/objects')
-    app.register_blueprint(accounts_bp, url_prefix='/api/accounts')
-    app.register_blueprint(chats_bp, url_prefix='/api/chats')
-    app.register_blueprint(publications_bp, url_prefix='/api/publications')
-    app.register_blueprint(admin_bp, url_prefix='/api/admin')
-    app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
-    app.register_blueprint(logs_bp, url_prefix='/api/logs')
-    app.register_blueprint(logs_viewer_bp, url_prefix='/api/logs-viewer')
+    # New structure
+    app.register_blueprint(admin_routes_bp, url_prefix='/system/admin')
+    app.register_blueprint(user_routes_bp, url_prefix='/system/user')
     
-    # Web pages
-    @app.route('/')
-    def index():
-        """Redirect to login"""
+    # Legacy routes (keep for backward compatibility)
+    app.register_blueprint(auth_bp, url_prefix='/system/auth')
+    app.register_blueprint(objects_bp, url_prefix='/system/objects')
+    app.register_blueprint(accounts_bp, url_prefix='/system/accounts')
+    app.register_blueprint(chats_bp, url_prefix='/system/chats')
+    app.register_blueprint(publications_bp, url_prefix='/system/publications')
+    app.register_blueprint(admin_bp, url_prefix='/system/admin/legacy')
+    app.register_blueprint(dashboard_bp, url_prefix='/system/dashboard/legacy')
+    app.register_blueprint(logs_bp, url_prefix='/system/logs/legacy')
+    app.register_blueprint(logs_viewer_bp, url_prefix='/system/logs-viewer/legacy')
+    
+    # Serve React app static files (must be last to catch all non-API routes)
+    @app.route('/', defaults={'path': ''})
+    @app.route('/<path:path>')
+    def serve_react_app(path):
+        """Serve React app for all routes"""
+        import os
+        from flask import send_from_directory
+        from werkzeug.exceptions import NotFound
+        
+        # If path is an API route, let it pass through (should be handled by blueprints above)
+        if path.startswith('system/'):
+            raise NotFound()
+        
+        # Serve static files
+        static_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
+        
+        # If file exists, serve it
+        if path and os.path.exists(os.path.join(static_folder, path)):
+            return send_from_directory(static_folder, path)
+        
+        # Otherwise serve index.html for React Router
+        if os.path.exists(os.path.join(static_folder, 'index.html')):
+            return send_from_directory(static_folder, 'index.html')
+        
+        # Fallback if static folder doesn't exist yet
         from flask import redirect
-        return redirect('/api/auth/login')
-    
-    @app.route('/dashboard')
-    def dashboard_page():
-        """Dashboard page"""
-        from flask import render_template
-        return render_template('dashboard.html')
+        return redirect('/system/auth/login')
     
     # Initialize database
     with app.app_context():

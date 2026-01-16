@@ -160,10 +160,10 @@
         
         <div class="section">
             <h2>Быстрые действия</h2>
-            <a href="/api/objects/create" class="btn">➕ Создать объект</a>
-            <a href="/api/objects/list" class="btn" style="margin-left: 10px;">📋 Мои объекты</a>
-            <a href="/api/objects" class="btn" target="_blank" style="margin-left: 10px;">API объектов</a>
-            <a href="/api/logs-viewer/view" class="btn" id="logsLink" style="margin-left: 10px; display: none;">📊 Просмотр логов</a>
+            <a href="/system/objects/create" class="btn">➕ Создать объект</a>
+            <a href="/system/objects/list" class="btn" style="margin-left: 10px;">📋 Мои объекты</a>
+            <a href="/system/objects" class="btn" target="_blank" style="margin-left: 10px;">API объектов</a>
+            <a href="/system/logs-viewer/view" class="btn" id="logsLink" style="margin-left: 10px; display: none;">📊 Просмотр логов</a>
         </div>
     </div>
 
@@ -189,7 +189,7 @@
         async function loadDashboard() {
             try {
                 // Get objects count
-                const objectsRes = await fetch('/api/objects', {
+                const objectsRes = await fetch('/system/objects', {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
@@ -205,7 +205,7 @@
                 }
                 
                 // Get dashboard stats
-                const dashboardRes = await fetch('/api/dashboard', {
+                const dashboardRes = await fetch('/system/dashboard', {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
@@ -228,7 +228,7 @@
         }
         
         function logout() {
-            fetch('/api/auth/logout', {
+            fetch('/system/auth/logout', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`

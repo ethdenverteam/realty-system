@@ -1,0 +1,139 @@
+{% extends "layout.html" %}
+
+{% block title %}Админ панель - Realty System{% endblock %}
+
+{% block header_class %}admin{% endblock %}
+
+{% block header_title %}🔐 Админ панель{% endblock %}
+
+{% block header_actions %}
+    <button class="btn-icon" onclick="logout()" title="Выйти">
+        <i class="bi bi-box-arrow-right"></i>
+    </button>
+{% endblock %}
+
+{% block content %}
+<div id="error" class="alert alert-danger" style="display: none;"></div>
+
+<div class="stats-grid" id="statsGrid">
+    <div class="stat-card">
+        <div class="stat-value" id="usersCount">-</div>
+        <div class="stat-label">Пользователей</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="objectsCount">-</div>
+        <div class="stat-label">Объектов</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="publicationsToday">-</div>
+        <div class="stat-label">Публикаций сегодня</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="accountsCount">-</div>
+        <div class="stat-label">Активных аккаунтов</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Быстрые действия</div>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="/system/admin/dashboard/bot-chats" class="btn btn-primary btn-sm">
+            <i class="bi bi-chat-dots"></i> Управление чатами
+        </a>
+        <a href="/system/admin/dashboard/logs" class="btn btn-primary btn-sm">
+            <i class="bi bi-file-text"></i> Просмотр логов
+        </a>
+        <a href="/system/user/dashboard" class="btn btn-secondary btn-sm">
+            <i class="bi bi-person"></i> Пользовательский режим
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Последние действия</div>
+    <div id="recentActions" class="loading">Загрузка...</div>
+</div>
+{% endblock %}
+
+{% block bottom_nav %}
+<nav class="bottom-nav">
+    <a href="/system/admin/dashboard" class="nav-item active">
+        <i class="bi bi-house-door"></i>
+        <span>Главная</span>
+    </a>
+    <a href="/system/admin/dashboard/bot-chats" class="nav-item">
+        <i class="bi bi-chat-dots"></i>
+        <span>Чаты</span>
+    </a>
+    <a href="/system/admin/dashboard/logs" class="nav-item">
+        <i class="bi bi-file-text"></i>
+        <span>Логи</span>
+    </a>
+    <a href="/system/user/dashboard" class="nav-item">
+        <i class="bi bi-person"></i>
+        <span>Пользователь</span>
+    </a>
+</nav>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    if (!checkAuth()) return;
+    
+    const user = getUser();
+    if (user.web_role !== 'admin') {
+        window.location.href = '/system/user/dashboard';
+        return;
+    }
+    
+    async function loadStats() {
+        try {
+            const res = await apiFetch('/admin/dashboard/stats');
+            if (res.ok) {
+                const stats = await res.json();
+                document.getElementById('usersCount').textContent = stats.users_count || 0;
+                document.getElementById('objectsCount').textContent = stats.objects_count || 0;
+                document.getElementById('publicationsToday').textContent = stats.publications_today || 0;
+                document.getElementById('accountsCount').textContent = stats.accounts_count || 0;
+            }
+        } catch (error) {
+            console.error('Error loading stats:', error);
+            document.getElementById('error').textContent = 'Ошибка загрузки статистики';
+            document.getElementById('error').style.display = 'block';
+        }
+    }
+    
+    async function loadRecentActions() {
+        try {
+            const res = await apiFetch('/admin/dashboard/logs/data?per_page=5');
+            if (res.ok) {
+                const data = await res.json();
+                const logs = data.logs || [];
+                
+                if (logs.length > 0) {
+                    let html = '<div class="table-responsive"><table class="table"><thead><tr><th>Время</th><th>Действие</th><th>Пользователь</th></tr></thead><tbody>';
+                    logs.forEach(log => {
+                        const date = new Date(log.created_at);
+                        html += `<tr>
+                            <td>${date.toLocaleString('ru-RU')}</td>
+                            <td><code>${log.action}</code></td>
+                            <td>${log.user_id || 'System'}</td>
+                        </tr>`;
+                    });
+                    html += '</tbody></table></div>';
+                    document.getElementById('recentActions').innerHTML = html;
+                } else {
+                    document.getElementById('recentActions').textContent = 'Нет действий';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading actions:', error);
+            document.getElementById('recentActions').textContent = 'Ошибка загрузки';
+        }
+    }
+    
+    loadStats();
+    loadRecentActions();
+</script>
+{% endblock %}
+

@@ -1,0 +1,104 @@
+{% extends "layout.html" %}
+
+{% block title %}Панель управления - Realty System{% endblock %}
+
+{% block header_title %}🏠 Моя панель{% endblock %}
+
+{% block header_actions %}
+    <button class="btn-icon" onclick="logout()" title="Выйти">
+        <i class="bi bi-box-arrow-right"></i>
+    </button>
+{% endblock %}
+
+{% block content %}
+<div id="error" class="alert alert-danger" style="display: none;"></div>
+
+<div class="stats-grid" id="statsGrid">
+    <div class="stat-card">
+        <div class="stat-value" id="objectsCount">-</div>
+        <div class="stat-label">Мои объекты</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="publicationsCount">-</div>
+        <div class="stat-label">Публикаций</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="todayPublications">-</div>
+        <div class="stat-label">Сегодня</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="accountsCount">-</div>
+        <div class="stat-label">Аккаунтов</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Быстрые действия</div>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="/system/user/dashboard/objects/create" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-circle"></i> Создать объект
+        </a>
+        <a href="/system/user/dashboard/objects" class="btn btn-primary btn-sm">
+            <i class="bi bi-list-ul"></i> Мои объекты
+        </a>
+    </div>
+</div>
+
+{% if user.web_role == 'admin' %}
+<div class="card">
+    <div class="card-header">Админ функции</div>
+    <a href="/system/admin/dashboard" class="btn btn-danger btn-sm">
+        <i class="bi bi-shield-lock"></i> Админ панель
+    </a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block bottom_nav %}
+<nav class="bottom-nav">
+    <a href="/system/user/dashboard" class="nav-item active">
+        <i class="bi bi-house-door"></i>
+        <span>Главная</span>
+    </a>
+    <a href="/system/user/dashboard/objects" class="nav-item">
+        <i class="bi bi-list-ul"></i>
+        <span>Объекты</span>
+    </a>
+    <a href="/system/user/dashboard/objects/create" class="nav-item">
+        <i class="bi bi-plus-circle"></i>
+        <span>Создать</span>
+    </a>
+    {% if user.web_role == 'admin' %}
+    <a href="/system/admin/dashboard" class="nav-item">
+        <i class="bi bi-shield-lock"></i>
+        <span>Админ</span>
+    </a>
+    {% endif %}
+</nav>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    if (!checkAuth()) return;
+    
+    async function loadStats() {
+        try {
+            const res = await apiFetch('/user/dashboard/stats');
+            if (res.ok) {
+                const stats = await res.json();
+                document.getElementById('objectsCount').textContent = stats.objects_count || 0;
+                document.getElementById('publicationsCount').textContent = stats.total_publications || 0;
+                document.getElementById('todayPublications').textContent = stats.today_publications || 0;
+                document.getElementById('accountsCount').textContent = stats.accounts_count || 0;
+            }
+        } catch (error) {
+            console.error('Error loading stats:', error);
+            document.getElementById('error').textContent = 'Ошибка загрузки статистики';
+            document.getElementById('error').style.display = 'block';
+        }
+    }
+    
+    loadStats();
+</script>
+{% endblock %}
+

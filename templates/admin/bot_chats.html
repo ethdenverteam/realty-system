@@ -1,0 +1,327 @@
+{% extends "layout.html" %}
+
+{% block title %}Управление чатами бота - Realty System{% endblock %}
+
+{% block header_class %}admin{% endblock %}
+
+{% block header_title %}💬 Чаты бота{% endblock %}
+
+{% block header_actions %}
+    <button class="btn-icon" onclick="showAddChatModal()" title="Добавить чат">
+        <i class="bi bi-plus-lg"></i>
+    </button>
+    <a href="/system/admin/dashboard" class="btn-icon" title="Назад">
+        <i class="bi bi-arrow-left"></i>
+    </a>
+{% endblock %}
+
+{% block content %}
+<div id="error" class="alert alert-danger" style="display: none;"></div>
+<div id="success" class="alert alert-success" style="display: none;"></div>
+
+<!-- Add Chat Modal -->
+<div id="addChatModal" class="card" style="display: none; margin-bottom: 20px;">
+    <div class="card-header">Добавить чат</div>
+    <form id="addChatForm">
+        <div class="form-group">
+            <label class="form-label">Ссылка на чат</label>
+            <input type="text" class="form-control" id="chatLink" placeholder="https://t.me/chatname или @chatname" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Тип фильтра</label>
+            <select class="form-control" id="filterType" onchange="updateFilterFields()">
+                <option value="">Выберите тип</option>
+                <option value="rooms">По типу комнат</option>
+                <option value="district">По району</option>
+                <option value="price">По диапазону цен</option>
+                <option value="custom">Произвольный</option>
+            </select>
+        </div>
+        <div id="filterFields"></div>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Добавить</button>
+            <button type="button" class="btn btn-secondary" onclick="hideAddChatModal()">Отмена</button>
+        </div>
+    </form>
+</div>
+
+<!-- Chats List -->
+<div class="card">
+    <div class="card-header">Список чатов</div>
+    <div id="chatsList" class="loading">Загрузка...</div>
+</div>
+{% endblock %}
+
+{% block bottom_nav %}
+<nav class="bottom-nav">
+    <a href="/system/admin/dashboard" class="nav-item">
+        <i class="bi bi-house-door"></i>
+        <span>Главная</span>
+    </a>
+    <a href="/system/admin/dashboard/bot-chats" class="nav-item active">
+        <i class="bi bi-chat-dots"></i>
+        <span>Чаты</span>
+    </a>
+    <a href="/system/admin/dashboard/logs" class="nav-item">
+        <i class="bi bi-file-text"></i>
+        <span>Логи</span>
+    </a>
+    <a href="/system/user/dashboard" class="nav-item">
+        <i class="bi bi-person"></i>
+        <span>Пользователь</span>
+    </a>
+</nav>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    if (!checkAuth()) return;
+    
+    const user = getUser();
+    if (user.web_role !== 'admin') {
+        window.location.href = '/system/user/dashboard';
+        return;
+    }
+    
+    let config = null;
+    let chats = [];
+    
+    async function loadConfig() {
+        try {
+            const res = await apiFetch('/admin/dashboard/bot-chats/config');
+            if (res.ok) {
+                config = await res.json();
+            }
+        } catch (error) {
+            console.error('Error loading config:', error);
+        }
+    }
+    
+    async function loadChats() {
+        try {
+            const res = await apiFetch('/admin/dashboard/bot-chats/list');
+            if (res.ok) {
+                chats = await res.json();
+                displayChats();
+            } else {
+                document.getElementById('chatsList').textContent = 'Ошибка загрузки';
+            }
+        } catch (error) {
+            console.error('Error loading chats:', error);
+            document.getElementById('chatsList').textContent = 'Ошибка загрузки';
+        }
+    }
+    
+    function displayChats() {
+        const container = document.getElementById('chatsList');
+        
+        if (chats.length === 0) {
+            container.innerHTML = '<div class="text-center">Нет чатов. Добавьте первый чат.</div>';
+            return;
+        }
+        
+        let html = '<div class="table-responsive"><table class="table"><thead><tr><th>Название</th><th>Тип</th><th>Фильтры</th><th>Статус</th><th>Действия</th></tr></thead><tbody>';
+        
+        chats.forEach(chat => {
+            const filters = chat.filters_json || {};
+            let filtersText = '';
+            
+            if (filters.rooms_types && filters.rooms_types.length > 0) {
+                filtersText += `Комнаты: ${filters.rooms_types.join(', ')}<br>`;
+            }
+            if (filters.districts && filters.districts.length > 0) {
+                filtersText += `Районы: ${filters.districts.join(', ')}<br>`;
+            }
+            if (filters.price_min || filters.price_max) {
+                filtersText += `Цена: ${filters.price_min || 0} - ${filters.price_max || '∞'}`;
+            }
+            if (!filtersText) {
+                filtersText = chat.category || 'Нет фильтров';
+            }
+            
+            html += `<tr>
+                <td><strong>${chat.title}</strong><br><small>${chat.telegram_chat_id}</small></td>
+                <td>${chat.type}</td>
+                <td><small>${filtersText}</small></td>
+                <td>${chat.is_active ? '<span class="badge badge-success">Активен</span>' : '<span class="badge badge-danger">Неактивен</span>'}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="editChat(${chat.chat_id})">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteChat(${chat.chat_id})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    }
+    
+    function showAddChatModal() {
+        document.getElementById('addChatModal').style.display = 'block';
+        document.getElementById('chatLink').focus();
+    }
+    
+    function hideAddChatModal() {
+        document.getElementById('addChatModal').style.display = 'none';
+        document.getElementById('addChatForm').reset();
+        document.getElementById('filterFields').innerHTML = '';
+    }
+    
+    function updateFilterFields() {
+        const filterType = document.getElementById('filterType').value;
+        const container = document.getElementById('filterFields');
+        container.innerHTML = '';
+        
+        if (!config) {
+            container.innerHTML = '<div class="alert alert-danger">Конфигурация не загружена</div>';
+            return;
+        }
+        
+        if (filterType === 'rooms') {
+            container.innerHTML = `
+                <div class="form-group">
+                    <label class="form-label">Типы комнат</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        ${config.rooms_types.map(rt => `
+                            <label class="form-check-label">
+                                <input type="checkbox" name="rooms_types" value="${rt}" class="form-check-input">
+                                ${rt}
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        } else if (filterType === 'district') {
+            const districts = Object.keys(config.districts || {});
+            container.innerHTML = `
+                <div class="form-group">
+                    <label class="form-label">Районы</label>
+                    <select class="form-control" name="districts" multiple>
+                        ${districts.map(d => `<option value="${d}">${d}</option>`).join('')}
+                    </select>
+                    <small class="form-text text-muted">Удерживайте Ctrl для выбора нескольких</small>
+                </div>
+            `;
+        } else if (filterType === 'price') {
+            container.innerHTML = `
+                <div class="form-group">
+                    <label class="form-label">Минимальная цена (тыс. руб.)</label>
+                    <input type="number" class="form-control" name="price_min" min="0" step="100">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Максимальная цена (тыс. руб.)</label>
+                    <input type="number" class="form-control" name="price_max" min="0" step="100">
+                </div>
+            `;
+        } else if (filterType === 'custom') {
+            container.innerHTML = `
+                <div class="form-group">
+                    <label class="form-label">JSON фильтры</label>
+                    <textarea class="form-control" name="filters_json" rows="4" placeholder='{"rooms_types": ["1к"], "districts": ["ККБ"], "price_min": 3000, "price_max": 5000}'></textarea>
+                </div>
+            `;
+        }
+    }
+    
+    document.getElementById('addChatForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const chatLink = document.getElementById('chatLink').value.trim();
+        const filterType = document.getElementById('filterType').value;
+        
+        if (!chatLink || !filterType) {
+            showError('Заполните все поля');
+            return;
+        }
+        
+        let filters = {};
+        
+        if (filterType === 'rooms') {
+            const checked = Array.from(document.querySelectorAll('input[name="rooms_types"]:checked'));
+            filters.rooms_types = checked.map(c => c.value);
+        } else if (filterType === 'district') {
+            const selected = Array.from(document.querySelectorAll('select[name="districts"] option:checked'));
+            filters.districts = selected.map(s => s.value);
+        } else if (filterType === 'price') {
+            filters.price_min = parseFloat(document.querySelector('input[name="price_min"]').value) || null;
+            filters.price_max = parseFloat(document.querySelector('input[name="price_max"]').value) || null;
+        } else if (filterType === 'custom') {
+            try {
+                filters = JSON.parse(document.querySelector('textarea[name="filters_json"]').value);
+            } catch (e) {
+                showError('Неверный JSON формат');
+                return;
+            }
+        }
+        
+        try {
+            const res = await apiFetch('/admin/dashboard/bot-chats', {
+                method: 'POST',
+                body: JSON.stringify({
+                    chat_link: chatLink,
+                    filters: filters
+                })
+            });
+            
+            if (res.ok) {
+                showSuccess('Чат успешно добавлен');
+                hideAddChatModal();
+                loadChats();
+            } else {
+                const data = await res.json();
+                showError(data.error || 'Ошибка при добавлении чата');
+            }
+        } catch (error) {
+            showError('Ошибка: ' + error.message);
+        }
+    });
+    
+    async function editChat(chatId) {
+        const chat = chats.find(c => c.chat_id === chatId);
+        if (!chat) return;
+        
+        // TODO: Implement edit modal
+        alert('Редактирование чата (в разработке)');
+    }
+    
+    async function deleteChat(chatId) {
+        if (!confirm('Удалить этот чат?')) return;
+        
+        try {
+            const res = await apiFetch(`/admin/dashboard/bot-chats/${chatId}`, {
+                method: 'DELETE'
+            });
+            
+            if (res.ok) {
+                showSuccess('Чат удален');
+                loadChats();
+            } else {
+                showError('Ошибка при удалении');
+            }
+        } catch (error) {
+            showError('Ошибка: ' + error.message);
+        }
+    }
+    
+    function showError(msg) {
+        const el = document.getElementById('error');
+        el.textContent = msg;
+        el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 5000);
+    }
+    
+    function showSuccess(msg) {
+        const el = document.getElementById('success');
+        el.textContent = msg;
+        el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 5000);
+    }
+    
+    loadConfig();
+    loadChats();
+</script>
+{% endblock %}
+
