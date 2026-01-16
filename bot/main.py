@@ -105,10 +105,34 @@ def setup_bot_logging():
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(detailed_formatter)
     
+    # ========== TEST LOGS (cleared on deploy) ==========
+    
+    # Test bot logs - cleared on each deploy
+    test_bot_logs_file = os.path.join(log_dir, 'test_bot.log')
+    test_bot_handler = logging.FileHandler(
+        test_bot_logs_file,
+        mode='a',  # Append mode (will be cleared by deploy.sh)
+        encoding='utf-8'
+    )
+    test_bot_handler.setLevel(logging.DEBUG)
+    test_bot_handler.setFormatter(detailed_formatter)
+    
+    # Test bot errors log
+    test_bot_errors_file = os.path.join(log_dir, 'test_bot_errors.log')
+    test_bot_errors_handler = logging.FileHandler(
+        test_bot_errors_file,
+        mode='a',  # Append mode (will be cleared by deploy.sh)
+        encoding='utf-8'
+    )
+    test_bot_errors_handler.setLevel(logging.ERROR)
+    test_bot_errors_handler.setFormatter(detailed_formatter)
+    
     # Add handlers
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
     logger.addHandler(error_handler)
+    logger.addHandler(test_bot_handler)
+    logger.addHandler(test_bot_errors_handler)
     
     # Set levels for libraries
     logging.getLogger('telegram').setLevel(logging.WARNING)

@@ -102,12 +102,13 @@ def create_app(config_class=Config):
     from app.routes.logs_viewer import stream_logs, list_log_files, view_logs_page
     
     logs_viewer_api_bp = Blueprint('logs_viewer_api', __name__)
-    from app.routes.logs_viewer import download_logs, download_log_file
+    from app.routes.logs_viewer import download_logs, download_log_file, download_test_logs
     logs_viewer_api_bp.add_url_rule('/stream', 'stream_logs', stream_logs, methods=['GET'])
     logs_viewer_api_bp.add_url_rule('/files', 'list_log_files', list_log_files, methods=['GET'])
     logs_viewer_api_bp.add_url_rule('/view', 'view_logs_page', view_logs_page, methods=['GET'])
     logs_viewer_api_bp.add_url_rule('/download', 'download_logs', download_logs, methods=['GET'])
     logs_viewer_api_bp.add_url_rule('/file/<log_type>', 'download_log_file', download_log_file, methods=['GET'])
+    logs_viewer_api_bp.add_url_rule('/test', 'download_test_logs', download_test_logs, methods=['GET'])
     app.register_blueprint(logs_viewer_api_bp, url_prefix='/api/logs')
     
     # Serve React app static files (must be last to catch all non-API routes)

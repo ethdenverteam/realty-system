@@ -24,6 +24,20 @@ else
     echo "✅ No frontend changes, skipping build"
 fi
 
+# Clear test logs (fresh start for testing)
+echo "🧹 Clearing test logs for fresh testing session..."
+if [ -d "logs" ]; then
+    # Clear test log files (they will be recreated on container start)
+    > logs/test_app.log 2>/dev/null || true
+    > logs/test_errors.log 2>/dev/null || true
+    > logs/test_database.log 2>/dev/null || true
+    > logs/test_api.log 2>/dev/null || true
+    > logs/test_celery.log 2>/dev/null || true
+    > logs/test_bot.log 2>/dev/null || true
+    > logs/test_bot_errors.log 2>/dev/null || true
+    echo "✅ Test logs cleared (fresh start for AI analysis)"
+fi
+
 # Restart containers
 echo "🔄 Restarting containers..."
 docker-compose down

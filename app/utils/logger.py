@@ -51,7 +51,7 @@ class DatabaseLogHandler(logging.Handler):
 
 
 def setup_logging():
-    """Setup centralized logging system"""
+    """Setup centralized logging system with test logs"""
     # Create logs directory if it doesn't exist
     os.makedirs(Config.LOG_FOLDER, exist_ok=True)
     
@@ -78,6 +78,8 @@ def setup_logging():
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(simple_formatter)
     
+    # ========== PRODUCTION LOGS (permanent, rotating) ==========
+    
     # File handler - all logs (rotating, 10MB, 10 files)
     all_logs_file = os.path.join(Config.LOG_FOLDER, 'app.log')
     file_handler = logging.handlers.RotatingFileHandler(
@@ -100,21 +102,99 @@ def setup_logging():
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(detailed_formatter)
     
+    # ========== TEST LOGS (cleared on deploy, for AI analysis) ==========
+    
+    # Test logs - cleared on each deploy, fresh start for testing
+    test_logs_file = os.path.join(Config.LOG_FOLDER, 'test_app.log')
+    test_file_handler = logging.FileHandler(
+        test_logs_file,
+        mode='a',  # Append mode (will be cleared by deploy.sh)
+        encoding='utf-8'
+    )
+    test_file_handler.setLevel(logging.DEBUG)
+    test_file_handler.setFormatter(detailed_formatter)
+    
+    # Test errors log
+    test_errors_file = os.path.join(Config.LOG_FOLDER, 'test_errors.log')
+    test_error_handler = logging.FileHandler(
+        test_errors_file,
+        mode='a',  # Append mode (will be cleared by deploy.sh)
+        encoding='utf-8'
+    )
+    test_error_handler.setLevel(logging.ERROR)
+    test_error_handler.setFormatter(detailed_formatter)
+    
+    # ========== EXTENDED LOGGING ==========
+    
+    # Database operations logger (SQLAlchemy queries)
+    db_logs_file = os.path.join(Config.LOG_FOLDER, 'test_database.log')
+    db_file_handler = logging.FileHandler(
+        db_logs_file,
+        mode='a',
+        encoding='utf-8'
+    )
+    db_file_handler.setLevel(logging.INFO)
+    db_file_handler.setFormatter(detailed_formatter)
+    
+    # SQLAlchemy engine logger (SQL queries)
+    sqlalchemy_logger = logging.getLogger('sqlalchemy.engine')
+    sqlalchemy_logger.addHandler(db_file_handler)
+    sqlalchemy_logger.setLevel(logging.INFO)
+    sqlalchemy_logger.propagate = False  # Don't propagate to root
+    
+    # Custom database logger for app.database
+    db_logger = logging.getLogger('app.database')
+    db_logger.addHandler(db_file_handler)
+    db_logger.setLevel(logging.DEBUG)
+    db_logger.propagate = False
+    
+    # API requests/responses logger (detailed)
+    api_logger = logging.getLogger('app.requests')
+    api_logs_file = os.path.join(Config.LOG_FOLDER, 'test_api.log')
+    api_file_handler = logging.FileHandler(
+        api_logs_file,
+        mode='a',
+        encoding='utf-8'
+    )
+    api_file_handler.setLevel(logging.DEBUG)
+    api_file_handler.setFormatter(detailed_formatter)
+    api_logger.addHandler(api_file_handler)
+    api_logger.setLevel(logging.DEBUG)
+    api_logger.propagate = True  # Also propagate to root
+    
+    # Celery tasks logger
+    celery_logger = logging.getLogger('celery')
+    celery_logs_file = os.path.join(Config.LOG_FOLDER, 'test_celery.log')
+    celery_file_handler = logging.FileHandler(
+        celery_logs_file,
+        mode='a',
+        encoding='utf-8'
+    )
+    celery_file_handler.setLevel(logging.DEBUG)
+    celery_file_handler.setFormatter(detailed_formatter)
+    celery_logger.addHandler(celery_file_handler)
+    celery_logger.setLevel(logging.DEBUG)
+    celery_logger.propagate = True
+    
     # Database handler for errors
     db_handler = DatabaseLogHandler()
     db_handler.setLevel(logging.ERROR)
     
-    # Add handlers
+    # Add handlers to root logger
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
     root_logger.addHandler(error_handler)
+    root_logger.addHandler(test_file_handler)
+    root_logger.addHandler(test_error_handler)
     root_logger.addHandler(db_handler)
     
     # Set levels for third-party libraries
-    logging.getLogger('werkzeug').setLevel(logging.WARNING)
-    logging.getLogger('sqlalchemy').setLevel(logging.WARNING)
-    logging.getLogger('telegram').setLevel(logging.WARNING)
-    logging.getLogger('httpx').setLevel(logging.WARNING)
+    # Note: sqlalchemy.engine is handled separately above with test_database.log handler
+    logging.getLogger('werkzeug').setLevel(logging.INFO)  # Changed to INFO for more details
+    logging.getLogger('sqlalchemy').setLevel(logging.WARNING)  # General SQLAlchemy (warnings only)
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)  # SQL queries go to test_database.log
+    logging.getLogger('telegram').setLevel(logging.INFO)  # Changed to INFO for bot details
+    logging.getLogger('httpx').setLevel(logging.INFO)
     logging.getLogger('asyncio').setLevel(logging.WARNING)
     
     return root_logger

@@ -65,4 +65,7 @@ class Config:
     
     # Logging
     LOG_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
+    
+    # Logs download token (separate from JWT, for script access)
+    LOGS_DOWNLOAD_TOKEN = os.getenv('LOGS_DOWNLOAD_TOKEN', '')
 

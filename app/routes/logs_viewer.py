@@ -189,23 +189,63 @@ def download_logs(current_user):
 
 
 @logs_viewer_bp.route('/file/<log_type>', methods=['GET'])
-@jwt_required
-@role_required('admin')
-def download_log_file(log_type, current_user):
-    """Download specific log file"""
+def download_log_file(log_type):
+    """Download specific log file - supports both JWT and LOGS_DOWNLOAD_TOKEN"""
     from flask import send_file
+    from app.utils.jwt import verify_token
     
-    log_files = {
+    # Check authentication - either JWT (for web) or LOGS_DOWNLOAD_TOKEN (for scripts)
+    token = request.args.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+    
+    if not token:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    # Try LOGS_DOWNLOAD_TOKEN first (for scripts)
+    if token == Config.LOGS_DOWNLOAD_TOKEN and Config.LOGS_DOWNLOAD_TOKEN:
+        # Authenticated with download token
+        pass
+    else:
+        # Try JWT token (for web interface)
+        try:
+            payload = verify_token(token)
+            from app.models.user import User
+            user = User.query.get(payload.get('user_id'))
+            if not user or user.web_role != 'admin':
+                return jsonify({'error': 'Forbidden'}), 403
+        except Exception:
+            return jsonify({'error': 'Invalid token'}), 401
+    
+    # Test logs (for AI analysis - short, fresh logs)
+    test_log_files = {
+        'test_app': 'test_app.log',
+        'test_errors': 'test_errors.log',
+        'test_database': 'test_database.log',
+        'test_api': 'test_api.log',
+        'test_celery': 'test_celery.log',
+        'test_bot': 'test_bot.log',
+        'test_bot_errors': 'test_bot_errors.log'
+    }
+    
+    # Production logs (full history)
+    prod_log_files = {
         'app': 'app.log',
         'errors': 'errors.log',
         'bot': 'bot.log',
         'bot_errors': 'bot_errors.log'
     }
     
-    if log_type not in log_files:
-        return jsonify({'error': f'Invalid log type. Allowed: {", ".join(log_files.keys())}'}), 400
+    # Check if it's a test log
+    if log_type in test_log_files:
+        log_filename = test_log_files[log_type]
+    elif log_type in prod_log_files:
+        log_filename = prod_log_files[log_type]
+    else:
+        return jsonify({
+            'error': f'Invalid log type',
+            'test_logs': list(test_log_files.keys()),
+            'production_logs': list(prod_log_files.keys())
+        }), 400
     
-    log_filename = log_files[log_type]
     log_path = os.path.join(Config.LOG_FOLDER, log_filename)
     
     if not os.path.exists(log_path):
@@ -221,4 +261,63 @@ def download_log_file(log_type, current_user):
         )
     except Exception as e:
         logger.error(f"Error sending log file {log_filename}: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@logs_viewer_bp.route('/test', methods=['GET'])
+def download_test_logs():
+    """Download all test logs (for AI analysis) - uses LOGS_DOWNLOAD_TOKEN"""
+    from flask import send_file
+    import zipfile
+    import io
+    from datetime import datetime
+    
+    # Check LOGS_DOWNLOAD_TOKEN
+    token = request.args.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+    
+    if not token or token != Config.LOGS_DOWNLOAD_TOKEN or not Config.LOGS_DOWNLOAD_TOKEN:
+        return jsonify({'error': 'Unauthorized. Use LOGS_DOWNLOAD_TOKEN'}), 401
+    
+    try:
+        # Create in-memory ZIP file with test logs only
+        zip_buffer = io.BytesIO()
+        
+        test_log_files = {
+            'test_app.log': os.path.join(Config.LOG_FOLDER, 'test_app.log'),
+            'test_errors.log': os.path.join(Config.LOG_FOLDER, 'test_errors.log'),
+            'test_database.log': os.path.join(Config.LOG_FOLDER, 'test_database.log'),
+            'test_api.log': os.path.join(Config.LOG_FOLDER, 'test_api.log'),
+            'test_celery.log': os.path.join(Config.LOG_FOLDER, 'test_celery.log'),
+            'test_bot.log': os.path.join(Config.LOG_FOLDER, 'test_bot.log'),
+            'test_bot_errors.log': os.path.join(Config.LOG_FOLDER, 'test_bot_errors.log')
+        }
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            files_added = 0
+            for log_filename, log_path in test_log_files.items():
+                if os.path.exists(log_path):
+                    try:
+                        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()
+                            zip_file.writestr(log_filename, content)
+                        files_added += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to add {log_filename} to archive: {e}")
+        
+        if files_added == 0:
+            return jsonify({'error': 'No test log files found'}), 404
+        
+        zip_buffer.seek(0)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'realty_test_logs_{timestamp}.zip'
+        
+        return send_file(
+            zip_buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        logger.error(f"Error creating test logs archive: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
