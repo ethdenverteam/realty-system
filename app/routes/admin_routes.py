@@ -107,6 +107,73 @@ def update_user_role(user_id, current_user):
         return jsonify({'error': str(e)}), 500
 
 
+@admin_routes_bp.route('/dashboard/users/add-admin-by-telegram-id', methods=['POST'])
+@jwt_required
+@role_required('admin')
+def add_admin_by_telegram_id(current_user):
+    """Add admin role to user by telegram_id"""
+    data = request.get_json()
+    telegram_id = data.get('telegram_id')
+    
+    if not telegram_id:
+        return jsonify({'error': 'telegram_id is required'}), 400
+    
+    try:
+        telegram_id_int = int(telegram_id) if isinstance(telegram_id, str) else int(telegram_id)
+        user = User.query.filter_by(telegram_id=telegram_id_int).first()
+        
+        if not user:
+            # Create new user with admin role
+            user = User(
+                telegram_id=telegram_id_int,
+                web_role='admin',
+                bot_role='premium'
+            )
+            db.session.add(user)
+            db.session.commit()
+            logger.info(f"Created new user with telegram_id {telegram_id_int} and admin role")
+            
+            log_action(
+                action='admin_user_created',
+                user_id=current_user.user_id,
+                details={
+                    'target_telegram_id': telegram_id_int,
+                    'web_role': 'admin',
+                    'bot_role': 'premium'
+                }
+            )
+        else:
+            old_role = user.web_role
+            user.web_role = 'admin'
+            db.session.commit()
+            logger.info(f"Updated user {user.user_id} (telegram_id: {telegram_id_int}) role from '{old_role}' to 'admin'")
+            
+            log_action(
+                action='admin_role_changed',
+                user_id=current_user.user_id,
+                details={
+                    'target_user_id': user.user_id,
+                    'target_telegram_id': telegram_id_int,
+                    'target_username': user.username,
+                    'old_web_role': old_role,
+                    'new_web_role': 'admin'
+                }
+            )
+        
+        return jsonify({
+            'success': True,
+            'user': user.to_dict(),
+            'message': f'User {telegram_id_int} is now admin'
+        })
+    except ValueError:
+        return jsonify({'error': f'Invalid telegram_id: {telegram_id}. Must be a number.'}), 400
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error adding admin: {e}", exc_info=True)
+        log_error(e, 'add_admin_failed', current_user.user_id, {'telegram_id': telegram_id})
+        return jsonify({'error': str(e)}), 500
+
+
 @admin_routes_bp.route('/dashboard/logs', methods=['GET'])
 @jwt_required
 @role_required('admin')
@@ -881,41 +948,77 @@ def admin_fetch_bot_chats(current_user):
         chats = list(chats_dict.values())
         logger.info(f"Total chats found: {len(chats)}")
         
-        # If no chats found and we got empty result, it might be because bot is consuming updates
-        if len(chats) == 0:
-            logger.warning("No chats found - this might indicate bot conflict or no updates available")
-            # Check if there are any chats in database as alternative (using raw SQL to avoid filters_json issue)
-            from sqlalchemy import text
+        # Save found chats to database (if any found)
+        if len(chats) > 0:
             try:
-                sql = text("""
-                    SELECT chat_id, telegram_chat_id, title, type, category, 
-                           owner_type, owner_account_id, is_active, members_count,
-                           added_date, last_publication, total_publications
-                    FROM chats
-                    WHERE owner_type = :owner_type AND is_active = true
-                """)
-                result_proxy = db.session.execute(sql, {'owner_type': 'bot'})
-                rows = result_proxy.fetchall()
-                db_chats_count = len(rows)
+                saved_count = 0
+                updated_count = 0
+                for chat_data in chats:
+                    chat_id_str = str(chat_data['id'])
+                    existing_chat = Chat.query.filter_by(telegram_chat_id=chat_id_str, owner_type='bot').first()
+                    
+                    if existing_chat:
+                        # Update existing chat
+                        existing_chat.title = chat_data.get('title', existing_chat.title)
+                        existing_chat.type = chat_data.get('type', existing_chat.type)
+                        if chat_data.get('username'):
+                            # Store username in filters_json (we'll use it as metadata storage)
+                            if not existing_chat.filters_json:
+                                existing_chat.filters_json = {}
+                            existing_chat.filters_json['username'] = chat_data['username']
+                        updated_count += 1
+                    else:
+                        # Create new chat
+                        filters_data = {}
+                        if chat_data.get('username'):
+                            filters_data['username'] = chat_data['username']
+                        
+                        new_chat = Chat(
+                            telegram_chat_id=chat_id_str,
+                            title=chat_data.get('title', f'Chat {chat_id_str}'),
+                            type=chat_data.get('type', 'private'),
+                            owner_type='bot',
+                            is_active=False,  # Not active by default, needs to be configured
+                            filters_json=filters_data if filters_data else None
+                        )
+                        db.session.add(new_chat)
+                        saved_count += 1
                 
-                if db_chats_count > 0:
-                    logger.info(f"Found {db_chats_count} chats in database - suggesting to use those instead")
-                    return jsonify({
-                        'groups': [],
-                        'users': [],
-                        'all': [],
-                        'warning': 'No chats found from getUpdates. This might be because the bot is currently running and consuming updates. Consider using chats already in the database or temporarily stopping the bot.',
-                        'database_chats_count': db_chats_count,
-                        'error': 'No chats found from getUpdates. This might be because the bot is currently running and consuming updates. Consider using chats already in the database or temporarily stopping the bot.'
-                    })
+                db.session.commit()
+                logger.info(f"Saved {saved_count} new chats, updated {updated_count} existing chats in database")
+            except Exception as save_error:
+                logger.error(f"Error saving chats to database: {save_error}", exc_info=True)
+                db.session.rollback()
+        
+        # If no chats found from getUpdates, try to get from database
+        if len(chats) == 0:
+            logger.warning("No chats found from getUpdates - trying to get from database")
+            try:
+                db_chats = Chat.query.filter_by(owner_type='bot').all()
+                if db_chats:
+                    logger.info(f"Found {len(db_chats)} chats in database")
+                    chats = []
+                    for db_chat in db_chats:
+                        username = ''
+                        if db_chat.filters_json and isinstance(db_chat.filters_json, dict):
+                            username = db_chat.filters_json.get('username', '')
+                        
+                        chats.append({
+                            'id': db_chat.telegram_chat_id,
+                            'title': db_chat.title,
+                            'type': db_chat.type,
+                            'username': username
+                        })
+                else:
+                    logger.warning("No chats found in database either")
             except Exception as db_error:
-                logger.warning(f"Error checking database chats: {db_error}")
+                logger.warning(f"Error getting chats from database: {db_error}")
         
         # Separate groups and users
         groups = [c for c in chats if c['type'] in ['group', 'supergroup', 'channel']]
         users = [c for c in chats if c['type'] == 'private']
         
-        logger.info(f"Groups: {len(groups)}, Users: {len(users)}")
+        logger.info(f"Groups: {len(groups)}, Users: {len(users)}, Total: {len(chats)}")
         
         return jsonify({
             'groups': groups,
