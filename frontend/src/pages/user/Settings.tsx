@@ -46,6 +46,16 @@ export default function UserSettings(): JSX.Element {
     e.preventDefault()
     setError('')
     setSuccess('')
+    
+    // Validate phone number format if provided
+    if (settings.phone && settings.phone.trim()) {
+      const phonePattern = /^8\d{10}$/
+      if (!phonePattern.test(settings.phone.trim())) {
+        setError('Номер телефона должен быть в формате 89693386969 (11 цифр, начинается с 8)')
+        return
+      }
+    }
+    
     setLoading(true)
 
     try {
@@ -54,7 +64,7 @@ export default function UserSettings(): JSX.Element {
     } catch (err: unknown) {
       let message = 'Ошибка сохранения настроек'
       if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        message = err.response?.data?.error || err.message || message
+        message = err.response?.data?.error || err.response?.data?.details || err.message || message
       }
       setError(message)
     } finally {
@@ -90,9 +100,11 @@ export default function UserSettings(): JSX.Element {
                   className="form-input"
                   value={settings.phone}
                   onChange={(e) => handleChange('phone', e.target.value)}
-                  placeholder="+79991234567"
+                  placeholder="89693386969"
+                  pattern="^8\d{10}$"
+                  title="Номер должен быть в формате 89693386969 (11 цифр, начинается с 8)"
                 />
-                <small className="form-hint">Номер будет использоваться для контактов в объявлениях</small>
+                <small className="form-hint">Формат: 89693386969 (11 цифр, начинается с 8)</small>
               </div>
 
               <div className="form-group">

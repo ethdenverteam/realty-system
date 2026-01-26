@@ -127,9 +127,13 @@ export default function ObjectForm({
               className="form-input"
               value={formData.districts}
               onChange={handleInputChange('districts')}
-              placeholder="Введите районы через запятую"
+              placeholder="Введите районы через запятую или выберите из списка"
+              list="districts-list"
             />
-            <small className="form-hint">Например: ККБ, Музыкальный</small>
+            <datalist id="districts-list">
+              {/* Districts will be loaded from API and populated here */}
+            </datalist>
+            <small className="form-hint">Начните вводить название района или выберите из списка</small>
           </div>
         </div>
 

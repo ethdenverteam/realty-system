@@ -10,16 +10,22 @@ export default function UserObjects(): JSX.Element {
   const [objects, setObjects] = useState<RealtyObjectListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
+  const [sortBy, setSortBy] = useState('creation_date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [roomsTypeFilter, setRoomsTypeFilter] = useState('')
 
   useEffect(() => {
     void loadObjects()
-  }, [statusFilter])
+  }, [statusFilter, sortBy, sortOrder, roomsTypeFilter])
 
   const loadObjects = async (): Promise<void> => {
     try {
       setLoading(true)
-      const params: { status?: string } = {}
+      const params: { status?: string; sort_by?: string; sort_order?: string; rooms_type?: string } = {}
       if (statusFilter) params.status = statusFilter
+      if (sortBy) params.sort_by = sortBy
+      if (sortOrder) params.sort_order = sortOrder
+      if (roomsTypeFilter) params.rooms_type = roomsTypeFilter
       const res = await api.get<ObjectsListResponse>('/user/dashboard/objects/list', { params })
       setObjects(res.data.objects || [])
     } catch (err: unknown) {
@@ -48,17 +54,47 @@ export default function UserObjects(): JSX.Element {
         <div className="card">
           <div className="card-header-row">
             <h2 className="card-title">Список объектов</h2>
-            <select
-              className="form-input form-input-sm"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="">Все статусы</option>
-              <option value="черновик">Черновики</option>
-              <option value="опубликовано">Опубликованные</option>
-              <option value="запланировано">Запланированные</option>
-              <option value="архив">Архив</option>
-            </select>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <select
+                className="form-input form-input-sm"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="">Все статусы</option>
+                <option value="черновик">Черновики</option>
+                <option value="опубликовано">Опубликованные</option>
+                <option value="запланировано">Запланированные</option>
+                <option value="архив">Архив</option>
+              </select>
+              <select
+                className="form-input form-input-sm"
+                value={roomsTypeFilter}
+                onChange={(e) => setRoomsTypeFilter(e.target.value)}
+              >
+                <option value="">Все типы комнат</option>
+                <option value="1к">1к</option>
+                <option value="2к">2к</option>
+                <option value="3к">3к</option>
+                <option value="4к">4к</option>
+                <option value="5к+">5к+</option>
+              </select>
+              <select
+                className="form-input form-input-sm"
+                value={`${sortBy}_${sortOrder}`}
+                onChange={(e) => {
+                  const [by, order] = e.target.value.split('_')
+                  setSortBy(by)
+                  setSortOrder(order as 'asc' | 'desc')
+                }}
+              >
+                <option value="creation_date_desc">Новые сначала</option>
+                <option value="creation_date_asc">Старые сначала</option>
+                <option value="price_desc">Цена: дороже</option>
+                <option value="price_asc">Цена: дешевле</option>
+                <option value="rooms_type_asc">Тип комнат: А-Я</option>
+                <option value="rooms_type_desc">Тип комнат: Я-А</option>
+              </select>
+            </div>
           </div>
 
           {loading ? (
@@ -158,6 +194,27 @@ export default function UserObjects(): JSX.Element {
                       disabled={!obj.can_publish}
                     >
                       {!obj.can_publish ? 'Опубликовать (нельзя)' : 'Опубликовать'}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`Вы уверены, что хотите удалить объект ${obj.object_id}? Это действие нельзя отменить!`)) {
+                          return
+                        }
+                        try {
+                          await api.delete(`/objects/${obj.object_id}`)
+                          alert('Объект успешно удален!')
+                          await loadObjects()
+                        } catch (err: unknown) {
+                          let message = 'Ошибка удаления объекта'
+                          if (axios.isAxiosError<ApiErrorResponse>(err)) {
+                            message = err.response?.data?.error || err.message || message
+                          }
+                          alert(message)
+                        }
+                      }}
+                      className="btn btn-sm btn-danger"
+                    >
+                      Удалить
                     </button>
                   </div>
                 </div>

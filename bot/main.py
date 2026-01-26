@@ -28,6 +28,7 @@ from bot.handlers_object_edit import (
     add_district_selected, renovation_selected, address_input,
     contacts_input, phone_from_settings_handler,
     phone_custom_handler, set_contact_name_handler, toggle_username_handler,
+    delete_object_handler, confirm_delete_object_handler,
     OBJECT_WAITING_EDIT_ROOMS, OBJECT_WAITING_EDIT_DISTRICT, OBJECT_WAITING_EDIT_PRICE,
     OBJECT_WAITING_ADD_DISTRICT, OBJECT_WAITING_EDIT_AREA, OBJECT_WAITING_EDIT_FLOOR,
     OBJECT_WAITING_EDIT_COMMENT, OBJECT_PREVIEW_MENU
@@ -183,6 +184,12 @@ def main():
     application.add_handler(CallbackQueryHandler(show_main_menu, pattern="^main_menu$"))
     application.add_handler(CallbackQueryHandler(getcode_command, pattern="^getcode$"))
     application.add_handler(CallbackQueryHandler(my_objects_callback, pattern="^(my_objects|my_objects_page_|edit_object_from_list_)"))
+    # Register publish and delete handlers outside conversation for list view
+    from bot.handlers_publication import publish_immediate_handler
+    from bot.handlers_object_edit import delete_object_handler, confirm_delete_object_handler
+    application.add_handler(CallbackQueryHandler(publish_immediate_handler, pattern="^publish_immediate_"))
+    application.add_handler(CallbackQueryHandler(delete_object_handler, pattern="^delete_object_"))
+    application.add_handler(CallbackQueryHandler(confirm_delete_object_handler, pattern="^confirm_delete_"))
     
     # Add object creation conversation handler
     logger.info("Registering conversation handlers...")
@@ -269,6 +276,8 @@ def main():
                 CallbackQueryHandler(toggle_username_handler, pattern="^toggle_username_"),
                 CallbackQueryHandler(publish_immediate_handler, pattern="^publish_immediate_"),
                 CallbackQueryHandler(confirm_publish_handler, pattern="^confirm_publish_"),
+                CallbackQueryHandler(delete_object_handler, pattern="^delete_object_"),
+                CallbackQueryHandler(confirm_delete_object_handler, pattern="^confirm_delete_"),
             ]
         },
         fallbacks=[

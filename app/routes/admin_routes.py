@@ -25,6 +25,90 @@ def admin_dashboard(current_user):
     return render_template('admin/dashboard.html', user=current_user)
 
 
+@admin_routes_bp.route('/dashboard/database-schema', methods=['GET'])
+@jwt_required
+@role_required('admin')
+def admin_database_schema_page(current_user):
+    """Database schema viewer page"""
+    return render_template('admin/database_schema.html', user=current_user)
+
+
+@admin_routes_bp.route('/dashboard/database-schema/data', methods=['GET'])
+@jwt_required
+@role_required('admin')
+def admin_database_schema_data(current_user):
+    """Get database schema information"""
+    from sqlalchemy import inspect
+    from sqlalchemy.engine import reflection
+    
+    try:
+        inspector = inspect(db.engine)
+        schema_info = {}
+        
+        # Get all table names
+        table_names = inspector.get_table_names()
+        
+        for table_name in table_names:
+            table_info = {
+                'name': table_name,
+                'columns': [],
+                'primary_keys': [],
+                'foreign_keys': [],
+                'indexes': []
+            }
+            
+            # Get columns
+            columns = inspector.get_columns(table_name)
+            for col in columns:
+                col_info = {
+                    'name': col['name'],
+                    'type': str(col['type']),
+                    'nullable': col.get('nullable', True),
+                    'default': str(col.get('default', 'None')),
+                    'autoincrement': col.get('autoincrement', False)
+                }
+                table_info['columns'].append(col_info)
+            
+            # Get primary keys
+            pk_constraint = inspector.get_pk_constraint(table_name)
+            if pk_constraint:
+                table_info['primary_keys'] = pk_constraint.get('constrained_columns', [])
+            
+            # Get foreign keys
+            fks = inspector.get_foreign_keys(table_name)
+            for fk in fks:
+                fk_info = {
+                    'constrained_columns': fk.get('constrained_columns', []),
+                    'referred_table': fk.get('referred_table', ''),
+                    'referred_columns': fk.get('referred_columns', [])
+                }
+                table_info['foreign_keys'].append(fk_info)
+            
+            # Get indexes
+            indexes = inspector.get_indexes(table_name)
+            for idx in indexes:
+                idx_info = {
+                    'name': idx.get('name', ''),
+                    'columns': idx.get('column_names', []),
+                    'unique': idx.get('unique', False)
+                }
+                table_info['indexes'].append(idx_info)
+            
+            schema_info[table_name] = table_info
+        
+        return jsonify({
+            'success': True,
+            'tables': schema_info,
+            'table_count': len(table_names)
+        })
+    except Exception as e:
+        logger.error(f"Error getting database schema: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @admin_routes_bp.route('/dashboard/stats', methods=['GET'])
 @jwt_required
 @role_required('admin')

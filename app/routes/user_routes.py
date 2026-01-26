@@ -105,6 +105,8 @@ def user_objects_list(current_user):
     # Apply sorting
     if sort_by == 'price':
         order_by = Object.price.desc() if sort_order == 'desc' else Object.price.asc()
+    elif sort_by == 'rooms_type':
+        order_by = Object.rooms_type.desc() if sort_order == 'desc' else Object.rooms_type.asc()
     elif sort_by == 'publication_date':
         order_by = Object.publication_date.desc() if sort_order == 'desc' else Object.publication_date.asc()
     else:  # creation_date
@@ -477,6 +479,23 @@ def user_settings_page(current_user):
     return render_template('user/settings.html', user=current_user)
 
 
+@user_routes_bp.route('/dashboard/districts', methods=['GET'])
+@jwt_required
+def get_user_districts(current_user):
+    """Get all districts for user forms"""
+    from app.models.system_setting import SystemSetting
+    
+    districts_setting = SystemSetting.query.filter_by(key='districts_config').first()
+    districts_config = districts_setting.value_json if districts_setting else {}
+    
+    # Convert dict to list of district names
+    districts_list = list(districts_config.keys()) if isinstance(districts_config, dict) else []
+    
+    return jsonify({
+        'districts': districts_list
+    })
+
+
 @user_routes_bp.route('/dashboard/settings/data', methods=['GET'])
 @jwt_required
 def get_user_settings(current_user):
@@ -495,8 +514,19 @@ def update_user_settings(current_user):
     """Update user settings"""
     data = request.get_json()
     
-    if 'phone' in data:
-        current_user.phone = data['phone'] or None
+    # Validate phone number format if provided
+    if 'phone' in data and data['phone']:
+        phone = data['phone'].strip()
+        import re
+        phone_pattern = re.compile(r'^8\d{10}$')
+        if not phone_pattern.match(phone):
+            return jsonify({
+                'error': 'Некорректный номер телефона',
+                'details': 'Номер должен быть в формате 89693386969 (11 цифр, начинается с 8)'
+            }), 400
+        current_user.phone = phone
+    elif 'phone' in data:
+        current_user.phone = None
     
     if not current_user.settings_json:
         current_user.settings_json = {}

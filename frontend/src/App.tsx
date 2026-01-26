@@ -8,6 +8,7 @@ import AdminBotChats from './pages/admin/BotChats'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminLogs from './pages/admin/Logs'
 import AdminUsers from './pages/admin/Users'
+import AdminDatabaseSchema from './pages/admin/DatabaseSchema'
 import UserCreateObject from './pages/user/CreateObject'
 import UserDashboard from './pages/user/Dashboard'
 import UserEditObject from './pages/user/EditObject'
@@ -55,6 +56,14 @@ export default function App(): JSX.Element {
               element={
                 <ProtectedRoute requireAdmin>
                   <AdminUsers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard/database-schema"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminDatabaseSchema />
                 </ProtectedRoute>
               }
             />

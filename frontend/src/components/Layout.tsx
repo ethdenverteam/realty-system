@@ -109,6 +109,16 @@ export default function Layout({
               </svg>
               <span>Логи</span>
             </Link>
+            <Link
+              to="/admin/dashboard/database-schema"
+              className={`top-nav-item ${location.pathname.includes('/database-schema') ? 'active' : ''}`}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M4 4H16V16H4V4Z" stroke="currentColor" strokeWidth="2" />
+                <path d="M4 8H16M4 12H16" stroke="currentColor" strokeWidth="2" />
+              </svg>
+              <span>База данных</span>
+            </Link>
             <Link to="/user/dashboard" className="top-nav-item">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <path

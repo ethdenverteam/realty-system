@@ -70,7 +70,15 @@ async def my_objects_command(update: Update, context: ContextTypes.DEFAULT_TYPE,
             button_text += f" | {districts[0]}"
         button_text += f" | {obj.object_id}"
         
+        # Add row with object button and action buttons
         keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_object_from_list_{obj.object_id}")])
+        # Add action buttons: view, publish, delete
+        action_buttons = [
+            InlineKeyboardButton("👁️ Просмотр", callback_data=f"edit_object_from_list_{obj.object_id}"),
+            InlineKeyboardButton("📢 Опубликовать", callback_data=f"publish_immediate_{obj.object_id}"),
+            InlineKeyboardButton("🗑️ Удалить", callback_data=f"delete_object_{obj.object_id}")
+        ]
+        keyboard.append(action_buttons)
     
     # Navigation buttons
     nav_buttons = []
