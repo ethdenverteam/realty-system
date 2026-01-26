@@ -11,17 +11,21 @@ cd ~/realty-system
 # Get updates
 echo "📥 Getting updates from git..."
 
-# Handle untracked files that might conflict with git pull
-# Remove untracked files that would be overwritten by merge
-echo "🧹 Cleaning up untracked files that might conflict..."
-git clean -fd frontend/ || true
+# Fetch latest changes from remote
+echo "📡 Fetching latest changes from remote..."
+git fetch origin
 
-# Reset any local changes to tracked files (to avoid conflicts)
-echo "🔄 Resetting local changes..."
-git reset --hard HEAD
+# Get current branch name
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+REMOTE_BRANCH="origin/$CURRENT_BRANCH"
 
-# Now pull updates
-git pull
+# Force reset to remote branch (ignores all local changes)
+echo "🔄 Resetting to remote branch (ignoring local changes)..."
+git reset --hard "$REMOTE_BRANCH"
+
+# Clean untracked files that might conflict
+echo "🧹 Cleaning untracked files..."
+git clean -fd || true
 
 # Check if there were changes in the frontend
 FRONTEND_CHANGED=$(git diff HEAD@{1} HEAD --name-only | grep -E "^frontend/" | wc -l)
