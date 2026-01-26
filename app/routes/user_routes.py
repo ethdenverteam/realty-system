@@ -463,11 +463,18 @@ def update_user_settings(current_user):
     if not current_user.settings_json:
         current_user.settings_json = {}
     
+    # Создаем новый словарь для отслеживания изменений SQLAlchemy
+    settings = dict(current_user.settings_json) if current_user.settings_json else {}
+    
     if 'contact_name' in data:
-        current_user.settings_json['contact_name'] = data['contact_name'] or ''
+        settings['contact_name'] = data['contact_name'] or ''
     
     if 'default_show_username' in data:
-        current_user.settings_json['default_show_username'] = bool(data['default_show_username'])
+        settings['default_show_username'] = bool(data['default_show_username'])
+    
+    current_user.settings_json = settings
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(current_user, 'settings_json')
     
     try:
         db.session.commit()
@@ -480,10 +487,14 @@ def update_user_settings(current_user):
             }
         )
         
+        # Перезагружаем пользователя для получения актуальных данных
+        db.session.refresh(current_user)
+        settings = current_user.settings_json or {}
+        
         return jsonify({
             'phone': current_user.phone or '',
-            'contact_name': current_user.settings_json.get('contact_name', ''),
-            'default_show_username': current_user.settings_json.get('default_show_username', False)
+            'contact_name': settings.get('contact_name', ''),
+            'default_show_username': settings.get('default_show_username', False)
         })
     except Exception as e:
         db.session.rollback()

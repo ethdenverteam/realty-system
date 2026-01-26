@@ -231,6 +231,11 @@ def main():
             ],
             OBJECT_WAITING_CONTACTS: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, contacts_input),
+                CallbackQueryHandler(phone_from_settings_handler, pattern="^phone_from_settings_"),
+                CallbackQueryHandler(phone_custom_handler, pattern="^phone_custom_"),
+                CallbackQueryHandler(set_contact_name_handler, pattern="^set_contact_name_"),
+                CallbackQueryHandler(toggle_username_handler, pattern="^toggle_username_"),
+                CallbackQueryHandler(back_to_preview_handler, pattern="^back_to_preview$"),
             ],
             OBJECT_WAITING_EDIT_ROOMS: [
                 CallbackQueryHandler(edit_rooms_selected, pattern="^rooms_")

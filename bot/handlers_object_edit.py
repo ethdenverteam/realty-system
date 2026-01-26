@@ -451,10 +451,25 @@ async def edit_contacts_handler(update: Update, context: ContextTypes.DEFAULT_TY
     if query:
         try:
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='HTML')
-        except:
-            await query.message.reply_text(text, reply_markup=reply_markup, parse_mode='HTML')
+        except Exception as e:
+            logger.error(f"Error editing message: {e}")
+            try:
+                await query.message.reply_text(text, reply_markup=reply_markup, parse_mode='HTML')
+            except:
+                pass
     elif update.message:
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='HTML')
+    else:
+        # Fallback - try to send to user
+        try:
+            await context.bot.send_message(
+                chat_id=user.id,
+                text=text,
+                reply_markup=reply_markup,
+                parse_mode='HTML'
+            )
+        except Exception as e:
+            logger.error(f"Error sending contacts menu: {e}")
     
     return OBJECT_WAITING_CONTACTS
 
@@ -782,10 +797,12 @@ async def contacts_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Failed to log action: {e}")
     else:
-        # Phone input
+        # Phone input - валидация формата 89693386969
         phone = text
-        if not phone or len(phone) < 10:
-            await update.message.reply_text("❌ Некорректный номер телефона. Попробуйте еще раз.")
+        import re
+        phone_pattern = re.compile(r'^8\d{10}$')
+        if not phone or not phone_pattern.match(phone):
+            await update.message.reply_text("❌ Некорректный номер телефона. Номер должен быть в формате 89693386969 (11 цифр, начинается с 8).")
             return OBJECT_WAITING_CONTACTS
         
         update_object(object_id, {"phone_number": phone})
@@ -847,8 +864,6 @@ async def contact_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         logger.error(f"Failed to log action: {e}")
     
     # Show contacts menu again with updated values
-    await edit_contacts_handler(update, context)
-    return OBJECT_WAITING_CONTACTS
     await edit_contacts_handler(update, context)
     return OBJECT_WAITING_CONTACTS
 

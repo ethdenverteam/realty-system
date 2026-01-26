@@ -165,28 +165,6 @@ export default function Layout({
               </svg>
               <span>Создать</span>
             </Link>
-            <Link
-              to="/user/dashboard/settings"
-              className={`top-nav-item ${location.pathname.includes('/settings') ? 'active' : ''}`}
-            >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path
-                  d="M10 12.5C11.3807 12.5 12.5 11.3807 12.5 10C12.5 8.61929 11.3807 7.5 10 7.5C8.61929 7.5 7.5 8.61929 7.5 10C7.5 11.3807 8.61929 12.5 10 12.5Z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M16.25 10C16.25 10.4167 16.25 10.8333 16.25 11.25C16.25 12.5 15.8333 13.5833 15 14.4167C14.1667 15.25 13.0833 15.6667 11.8333 15.6667C10.5833 15.6667 9.5 15.25 8.66667 14.4167C7.83333 13.5833 7.41667 12.5 7.41667 11.25C7.41667 10.8333 7.41667 10.4167 7.41667 10C7.41667 9.58333 7.41667 9.16667 7.41667 8.75C7.41667 7.5 7.83333 6.41667 8.66667 5.58333C9.5 4.75 10.5833 4.33333 11.8333 4.33333C13.0833 4.33333 14.1667 4.75 15 5.58333C15.8333 6.41667 16.25 7.5 16.25 8.75C16.25 9.16667 16.25 9.58333 16.25 10Z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <span>Настройки</span>
-            </Link>
             {user?.web_role === 'admin' && (
               <Link to="/admin/dashboard" className="top-nav-item">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">

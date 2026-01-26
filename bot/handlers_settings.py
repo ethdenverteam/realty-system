@@ -78,11 +78,13 @@ async def settings_phone_input(update: Update, context: ContextTypes.DEFAULT_TYP
     user = update.effective_user
     phone = update.message.text.strip()
     
-    # Простая валидация номера
-    if not phone or len(phone) < 10:
+    # Валидация формата 89693386969 (11 цифр, начинается с 8)
+    import re
+    phone_pattern = re.compile(r'^8\d{10}$')
+    if not phone or not phone_pattern.match(phone):
         text = "❌ Некорректный номер телефона. Попробуйте еще раз.\n\n"
-        text += "Номер в формате:\n"
-        text += "89693386969"
+        text += "Номер должен быть в формате:\n"
+        text += "89693386969 (11 цифр, начинается с 8)"
         keyboard = [[InlineKeyboardButton("🏠 Назад", callback_data="settings")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(text, reply_markup=reply_markup)
@@ -164,7 +166,12 @@ async def settings_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE
         if user_obj:
             if not user_obj.settings_json:
                 user_obj.settings_json = {}
-            user_obj.settings_json['contact_name'] = name
+            # Создаем новый словарь для отслеживания изменений SQLAlchemy
+            settings = dict(user_obj.settings_json) if user_obj.settings_json else {}
+            settings['contact_name'] = name
+            user_obj.settings_json = settings
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(user_obj, 'settings_json')
             db.commit()
             
             # Log action
@@ -185,28 +192,8 @@ async def settings_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     await update.message.reply_text("✅ Имя сохранено!")
     
-    # Show settings menu again
-    user_obj = get_user(str(update.effective_user.id))
-    phone = user_obj.phone if user_obj else None
-    contact_name = user_obj.settings_json.get('contact_name', '') if user_obj and user_obj.settings_json else None
-    default_show_username = user_obj.settings_json.get('default_show_username', False) if user_obj and user_obj.settings_json else False
-    
-    text = "<b>⚙️ Настройки</b>\n\n"
-    text += "<b>Настройка контактов</b>\n\n"
-    text += f"Текущий номер: {phone if phone else 'Не указан'}\n"
-    text += f"Имя: {contact_name if contact_name else 'Не указано'}\n"
-    text += f"Указывать ник TG: {'Да' if default_show_username else 'Нет'}\n\n"
-    text += "Выберите действие:"
-    
-    keyboard = [
-        [InlineKeyboardButton("Использовать номер из настроек", callback_data="settings_use_phone")],
-        [InlineKeyboardButton("Указать другой номер", callback_data="settings_change_phone")],
-        [InlineKeyboardButton("Указать имя", callback_data="settings_set_name")],
-        [InlineKeyboardButton(f"Указывать ник TG: {'✅' if default_show_username else '❌'}", callback_data="settings_toggle_username")],
-        [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='HTML')
+    # Return to settings menu (will refresh with updated data)
+    await settings_handler(update, context)
     return SETTINGS_MENU
 
 
@@ -223,8 +210,13 @@ async def settings_toggle_username(update: Update, context: ContextTypes.DEFAULT
         if user_obj:
             if not user_obj.settings_json:
                 user_obj.settings_json = {}
-            current_value = user_obj.settings_json.get('default_show_username', False)
-            user_obj.settings_json['default_show_username'] = not current_value
+            # Создаем новый словарь для отслеживания изменений SQLAlchemy
+            settings = dict(user_obj.settings_json) if user_obj.settings_json else {}
+            current_value = settings.get('default_show_username', False)
+            settings['default_show_username'] = not current_value
+            user_obj.settings_json = settings
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(user_obj, 'settings_json')
             db.commit()
             
             # Log action
