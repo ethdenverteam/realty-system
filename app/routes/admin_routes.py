@@ -845,10 +845,23 @@ def admin_fetch_bot_chats(current_user):
         
         chats_dict = {}
         
-        # Get updates using Telegram API
+        # Get bot info to get bot user ID
+        bot_info_url = f'https://api.telegram.org/bot{BOT_TOKEN}/getMe'
+        bot_user_id = None
+        try:
+            bot_info_response = requests.get(bot_info_url, timeout=5)
+            bot_info_data = bot_info_response.json()
+            if bot_info_data.get('ok'):
+                bot_user_id = bot_info_data['result'].get('id')
+                logger.info(f"Bot user ID: {bot_user_id}")
+        except Exception as e:
+            logger.warning(f"Could not get bot info: {e}")
+        
+        # Get updates using Telegram API - get ALL updates from history
         url = f'https://api.telegram.org/bot{BOT_TOKEN}/getUpdates'
         offset = 0
-        max_iterations = 10  # Limit iterations to avoid infinite loops
+        max_iterations = 100  # Increased to get more history
+        processed_updates = 0
         
         logger.info(f"Starting to fetch chats, BOT_TOKEN length: {len(BOT_TOKEN)}")
         
@@ -911,11 +924,30 @@ def admin_fetch_bot_chats(current_user):
                 logger.info("No updates in this batch")
                 break
             
-            logger.info(f"Processing {len(updates)} updates")
+            logger.info(f"Processing {len(updates)} updates (total processed: {processed_updates})")
             
             for update in updates:
+                chat = None
+                chat_id = None
+                chat_type = None
+                
+                # Handle different update types
                 if 'message' in update:
                     chat = update['message'].get('chat', {})
+                elif 'callback_query' in update:
+                    chat = update['callback_query'].get('message', {}).get('chat', {})
+                elif 'edited_message' in update:
+                    chat = update['edited_message'].get('chat', {})
+                elif 'channel_post' in update:
+                    chat = update['channel_post'].get('chat', {})
+                elif 'edited_channel_post' in update:
+                    chat = update['edited_channel_post'].get('chat', {})
+                elif 'my_chat_member' in update:
+                    chat = update['my_chat_member'].get('chat', {})
+                elif 'chat_member' in update:
+                    chat = update['chat_member'].get('chat', {})
+                
+                if chat:
                     chat_id = str(chat.get('id'))
                     chat_type = chat.get('type')
                     
@@ -925,7 +957,7 @@ def admin_fetch_bot_chats(current_user):
                     else:
                         first_name = chat.get('first_name', '')
                         last_name = chat.get('last_name', '')
-                        title = f"{first_name} {last_name}".strip() or chat.get('username', '')
+                        title = f"{first_name} {last_name}".strip() or chat.get('username', '') or f'User {chat_id}'
                     
                     username = chat.get('username', '')
                     
@@ -934,15 +966,79 @@ def admin_fetch_bot_chats(current_user):
                             'id': chat_id,
                             'title': title or f'Chat {chat_id}',
                             'type': chat_type,
-                            'username': username
+                            'username': username,
+                            'is_admin': None  # Will be checked later for groups
                         }
                         logger.debug(f"Added chat: {chat_id} ({title})")
                 
                 offset = max(offset, update.get('update_id', 0) + 1)
+                processed_updates += 1
             
             if len(updates) < 100:  # Last batch
                 logger.info("Last batch of updates processed")
                 break
+        
+        logger.info(f"Total updates processed: {processed_updates}, unique chats found: {len(chats_dict)}")
+        
+        # For groups/supergroups/channels, check if bot is admin or can read messages
+        # This is important to filter only chats where bot can actually see messages
+        groups_to_check = [c for c in chats_dict.values() if c['type'] in ['group', 'supergroup', 'channel']]
+        logger.info(f"Checking admin status for {len(groups_to_check)} groups/supergroups/channels")
+        
+        get_chat_member_url = f'https://api.telegram.org/bot{BOT_TOKEN}/getChatMember'
+        checked_count = 0
+        for chat_data in groups_to_check:
+            try:
+                # Check bot's member status in the chat
+                params = {'chat_id': chat_data['id'], 'user_id': bot_user_id if bot_user_id else BOT_TOKEN.split(':')[0]}
+                response = requests.get(get_chat_member_url, params=params, timeout=5)
+                if response.status_code == 200:
+                    member_data = response.json()
+                    if member_data.get('ok'):
+                        status = member_data['result'].get('status', '')
+                        # Bot can see messages if it's admin, creator, or member (for groups)
+                        # For channels, bot needs to be admin or member
+                        can_see_messages = status in ['administrator', 'creator', 'member']
+                        if chat_data['type'] == 'channel':
+                            # For channels, bot needs to be admin to post
+                            can_see_messages = status in ['administrator', 'creator']
+                        chat_data['is_admin'] = status in ['administrator', 'creator']
+                        chat_data['can_see_messages'] = can_see_messages
+                        
+                        if not can_see_messages:
+                            logger.debug(f"Bot cannot see messages in chat {chat_data['id']} ({chat_data['title']}), status: {status}")
+                    else:
+                        # If we can't get member info, assume bot can't see messages
+                        chat_data['can_see_messages'] = False
+                        logger.debug(f"Cannot get member info for chat {chat_data['id']}: {member_data.get('description', 'Unknown')}")
+                else:
+                    chat_data['can_see_messages'] = False
+                    logger.debug(f"Error checking chat {chat_data['id']}: HTTP {response.status_code}")
+                
+                checked_count += 1
+                # Rate limiting: sleep every 20 requests
+                if checked_count % 20 == 0:
+                    import time
+                    time.sleep(1)
+            except Exception as e:
+                logger.warning(f"Error checking admin status for chat {chat_data['id']}: {e}")
+                chat_data['can_see_messages'] = False
+        
+        # Filter chats: keep private chats (bot received messages) and groups where bot can see messages
+        filtered_chats = []
+        for chat_id, chat_data in chats_dict.items():
+            if chat_data['type'] == 'private':
+                # All private chats where bot received messages are included
+                filtered_chats.append(chat_data)
+            elif chat_data['type'] in ['group', 'supergroup', 'channel']:
+                # Only include groups where bot can see messages
+                if chat_data.get('can_see_messages', False):
+                    filtered_chats.append(chat_data)
+                else:
+                    logger.debug(f"Excluding chat {chat_id} ({chat_data['title']}) - bot cannot see messages")
+        
+        chats = filtered_chats
+        logger.info(f"After filtering: {len(chats)} chats where bot can see messages (from {len(chats_dict)} total)")
         
         # Convert to list
         chats = list(chats_dict.values())

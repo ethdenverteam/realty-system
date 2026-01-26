@@ -10,6 +10,17 @@ cd ~/realty-system
 
 # Get updates
 echo "📥 Getting updates from git..."
+
+# Handle untracked files that might conflict with git pull
+# Remove untracked files that would be overwritten by merge
+echo "🧹 Cleaning up untracked files that might conflict..."
+git clean -fd frontend/ || true
+
+# Reset any local changes to tracked files (to avoid conflicts)
+echo "🔄 Resetting local changes..."
+git reset --hard HEAD
+
+# Now pull updates
 git pull
 
 # Check if there were changes in the frontend
