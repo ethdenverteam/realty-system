@@ -1,14 +1,34 @@
+import axios from 'axios'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import api from '../../utils/api'
 import './CreateObject.css'
 
-export default function UserCreateObject() {
+interface CreateObjectFormData {
+  rooms_type: string
+  price: string
+  area: string
+  floor: string
+  districts: string
+  comment: string
+  address: string
+  renovation: string
+  contact_name: string
+  phone_number: string
+  show_username: boolean
+}
+
+interface CreateObjectResponse {
+  success?: boolean
+  object_id?: number | string
+}
+
+export default function UserCreateObject(): JSX.Element {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<CreateObjectFormData>({
     rooms_type: '',
     price: '',
     area: '',
@@ -19,10 +39,10 @@ export default function UserCreateObject() {
     renovation: '',
     contact_name: '',
     phone_number: '',
-    show_username: false
+    show_username: false,
   })
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
     setLoading(true)
@@ -30,10 +50,10 @@ export default function UserCreateObject() {
     try {
       const districts = formData.districts
         .split(',')
-        .map(d => d.trim())
-        .filter(d => d)
+        .map((d) => d.trim())
+        .filter((d) => d)
 
-      const response = await api.post('/objects/', {
+      const response = await api.post<CreateObjectResponse>('/objects/', {
         rooms_type: formData.rooms_type,
         price: parseFloat(formData.price),
         area: formData.area ? parseFloat(formData.area) : null,
@@ -44,7 +64,7 @@ export default function UserCreateObject() {
         renovation: formData.renovation,
         contact_name: formData.contact_name,
         phone_number: formData.phone_number,
-        show_username: formData.show_username
+        show_username: formData.show_username,
       })
 
       if (response.data.success || response.data.object_id) {
@@ -52,8 +72,11 @@ export default function UserCreateObject() {
       } else {
         setError('Ошибка при создании объекта')
       }
-    } catch (err) {
-      setError(err.response?.data?.error || 'Ошибка при создании объекта')
+    } catch (err: unknown) {
+      const message = axios.isAxiosError(err)
+        ? (err.response?.data as any)?.error || 'Ошибка при создании объекта'
+        : 'Ошибка при создании объекта'
+      setError(String(message))
     } finally {
       setLoading(false)
     }
@@ -73,7 +96,7 @@ export default function UserCreateObject() {
                 <select
                   className="form-input"
                   value={formData.rooms_type}
-                  onChange={(e) => setFormData({...formData, rooms_type: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, rooms_type: e.target.value })}
                   required
                 >
                   <option value="">Выберите тип</option>
@@ -94,7 +117,7 @@ export default function UserCreateObject() {
                   type="number"
                   className="form-input"
                   value={formData.price}
-                  onChange={(e) => setFormData({...formData, price: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                   step="0.01"
                   min="0"
                   required
@@ -108,7 +131,7 @@ export default function UserCreateObject() {
                   type="number"
                   className="form-input"
                   value={formData.area}
-                  onChange={(e) => setFormData({...formData, area: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, area: e.target.value })}
                   step="0.01"
                   min="0"
                   required
@@ -120,7 +143,7 @@ export default function UserCreateObject() {
                   type="text"
                   className="form-input"
                   value={formData.floor}
-                  onChange={(e) => setFormData({...formData, floor: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, floor: e.target.value })}
                   placeholder="например: 5/9"
                 />
               </div>
@@ -131,7 +154,7 @@ export default function UserCreateObject() {
                 type="text"
                 className="form-input"
                 value={formData.districts}
-                onChange={(e) => setFormData({...formData, districts: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, districts: e.target.value })}
                 placeholder="Введите районы через запятую"
               />
               <small className="form-hint">Например: ККБ, Музыкальный</small>
@@ -144,9 +167,9 @@ export default function UserCreateObject() {
               <label className="form-label">Комментарий</label>
               <textarea
                 className="form-input"
-                rows="4"
+                rows={4}
                 value={formData.comment}
-                onChange={(e) => setFormData({...formData, comment: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
                 placeholder="Опишите квартиру и условия покупки"
               />
             </div>
@@ -156,7 +179,7 @@ export default function UserCreateObject() {
                 type="text"
                 className="form-input"
                 value={formData.address}
-                onChange={(e) => setFormData({...formData, address: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 placeholder="Улица и номер дома"
               />
             </div>
@@ -165,7 +188,7 @@ export default function UserCreateObject() {
               <select
                 className="form-input"
                 value={formData.renovation}
-                onChange={(e) => setFormData({...formData, renovation: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, renovation: e.target.value })}
               >
                 <option value="">Не указано</option>
                 <option value="Черновая">Черновая</option>
@@ -186,7 +209,7 @@ export default function UserCreateObject() {
                   type="text"
                   className="form-input"
                   value={formData.contact_name}
-                  onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
                 />
               </div>
               <div className="form-group">
@@ -195,7 +218,7 @@ export default function UserCreateObject() {
                   type="tel"
                   className="form-input"
                   value={formData.phone_number}
-                  onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
                   placeholder="+79991234567"
                 />
               </div>
@@ -205,7 +228,7 @@ export default function UserCreateObject() {
                 <input
                   type="checkbox"
                   checked={formData.show_username}
-                  onChange={(e) => setFormData({...formData, show_username: e.target.checked})}
+                  onChange={(e) => setFormData({ ...formData, show_username: e.target.checked })}
                 />
                 <span>Показывать username Telegram</span>
               </label>
@@ -216,8 +239,8 @@ export default function UserCreateObject() {
             <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
               {loading ? 'Создание...' : 'Создать объект'}
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="btn btn-secondary btn-block"
               onClick={() => navigate('/user/dashboard/objects')}
             >
@@ -229,4 +252,5 @@ export default function UserCreateObject() {
     </Layout>
   )
 }
+
 

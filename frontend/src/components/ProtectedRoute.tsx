@@ -1,7 +1,14 @@
 import { Navigate } from 'react-router-dom'
+import type { ReactElement } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
-export default function ProtectedRoute({ children, requireAdmin = false }) {
+export default function ProtectedRoute({
+  children,
+  requireAdmin = false,
+}: {
+  children: ReactElement
+  requireAdmin?: boolean
+}): JSX.Element {
   const { isAuthenticated, isAdmin, loading } = useAuth()
 
   if (loading) {
@@ -18,4 +25,5 @@ export default function ProtectedRoute({ children, requireAdmin = false }) {
 
   return children
 }
+
 

@@ -8,13 +8,14 @@ export default defineConfig({
     proxy: {
       '/system': {
         target: 'http://localhost:5000',
-        changeOrigin: true
-      }
-    }
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     outDir: '../static',
-    emptyOutDir: true
-  }
+    emptyOutDir: true,
+  },
 })
+
 

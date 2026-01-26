@@ -1,28 +1,27 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
-import api from '../../utils/api'
 import './Logs.css'
 
-export default function AdminLogs() {
-  const [logs, setLogs] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [isStreaming, setIsStreaming] = useState(false)
-  const [logType, setLogType] = useState('app')
-  const [error, setError] = useState('')
-  const eventSourceRef = useRef(null)
-  const logContainerRef = useRef(null)
+type LogType = 'app' | 'errors' | 'bot' | 'bot_errors'
 
-  const logTypes = [
+export default function AdminLogs(): JSX.Element {
+  const [logs, setLogs] = useState<string[]>([])
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [logType, setLogType] = useState<LogType>('app')
+  const [error, setError] = useState('')
+  const eventSourceRef = useRef<EventSource | null>(null)
+  const logContainerRef = useRef<HTMLDivElement | null>(null)
+
+  const logTypes: Array<{ value: LogType; label: string }> = [
     { value: 'app', label: 'Приложение (app.log)' },
     { value: 'errors', label: 'Ошибки (errors.log)' },
     { value: 'bot', label: 'Бот (bot.log)' },
-    { value: 'bot_errors', label: 'Ошибки бота (bot_errors.log)' }
+    { value: 'bot_errors', label: 'Ошибки бота (bot_errors.log)' },
   ]
 
   useEffect(() => {
     return () => {
-      // Cleanup on unmount
       if (eventSourceRef.current) {
         eventSourceRef.current.close()
       }
@@ -30,7 +29,6 @@ export default function AdminLogs() {
   }, [])
 
   useEffect(() => {
-    // Auto-scroll to bottom when new logs arrive
     if (logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight
     }
@@ -45,24 +43,21 @@ export default function AdminLogs() {
     setLogs([])
     setIsStreaming(true)
 
-    // Create EventSource for Server-Sent Events
-    // Get auth token from localStorage
     const token = localStorage.getItem('jwt_token')
     const eventSource = new EventSource(
-      `/api/logs/stream?type=${logType}&lines=100&token=${encodeURIComponent(token || '')}`
+      `/api/logs/stream?type=${logType}&lines=100&token=${encodeURIComponent(token || '')}`,
     )
 
-    eventSource.onmessage = (event) => {
+    eventSource.onmessage = (event: MessageEvent<string>) => {
       try {
-        const data = JSON.parse(event.data)
+        const data = JSON.parse(event.data) as { error?: string; line?: string }
         if (data.error) {
           setError(data.error)
           setIsStreaming(false)
           eventSource.close()
         } else if (data.line) {
-          setLogs(prev => {
-            const newLogs = [...prev, data.line]
-            // Keep only last 1000 lines to prevent memory issues
+          setLogs((prev) => {
+            const newLogs = [...prev, data.line!]
             return newLogs.slice(-1000)
           })
         }
@@ -94,7 +89,7 @@ export default function AdminLogs() {
     setError('')
   }
 
-  const handleLogTypeChange = (newType) => {
+  const handleLogTypeChange = (newType: LogType) => {
     if (isStreaming) {
       stopStreaming()
     }
@@ -105,22 +100,15 @@ export default function AdminLogs() {
   const handleDownloadLogs = async () => {
     try {
       setError('')
-      // Get auth token
       const token = localStorage.getItem('jwt_token')
-      
-      // Create download link
       const downloadUrl = `/api/logs/download?token=${encodeURIComponent(token || '')}`
-      
-      // Create temporary link and trigger download
+
       const link = document.createElement('a')
       link.href = downloadUrl
       link.download = `realty_logs_${new Date().toISOString().slice(0, 10)}.zip`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      
-      // Show success message (optional - you can add a success state)
-      console.log('Логи скачиваются...')
     } catch (err) {
       console.error('Error downloading logs:', err)
       setError('Ошибка при скачивании логов')
@@ -128,8 +116,8 @@ export default function AdminLogs() {
   }
 
   return (
-    <Layout 
-      title="Просмотр логов" 
+    <Layout
+      title="Просмотр логов"
       isAdmin
       headerActions={
         <Link to="/admin/dashboard" className="btn btn-secondary">
@@ -145,38 +133,28 @@ export default function AdminLogs() {
               <select
                 className="form-input"
                 value={logType}
-                onChange={(e) => handleLogTypeChange(e.target.value)}
+                onChange={(e) => handleLogTypeChange(e.target.value as LogType)}
                 disabled={isStreaming}
               >
-                {logTypes.map(type => (
+                {logTypes.map((type) => (
                   <option key={type.value} value={type.value}>
                     {type.label}
                   </option>
                 ))}
               </select>
               {!isStreaming ? (
-                <button 
-                  className="btn btn-primary"
-                  onClick={startStreaming}
-                >
+                <button className="btn btn-primary" onClick={startStreaming}>
                   ▶ Начать просмотр
                 </button>
               ) : (
-                <button 
-                  className="btn btn-danger"
-                  onClick={stopStreaming}
-                >
+                <button className="btn btn-danger" onClick={stopStreaming}>
                   ⏸ Остановить
                 </button>
               )}
-              <button 
-                className="btn btn-secondary"
-                onClick={clearLogs}
-                disabled={isStreaming}
-              >
+              <button className="btn btn-secondary" onClick={clearLogs} disabled={isStreaming}>
                 🗑 Очистить
               </button>
-              <button 
+              <button
                 className="btn btn-primary"
                 onClick={handleDownloadLogs}
                 title="Скачать все логи в ZIP архив"
@@ -185,10 +163,8 @@ export default function AdminLogs() {
               </button>
             </div>
           </div>
-          
-          {error && (
-            <div className="alert alert-error">{error}</div>
-          )}
+
+          {error && <div className="alert alert-error">{error}</div>}
 
           <div className="log-terminal-container" ref={logContainerRef}>
             {logs.length === 0 && !isStreaming && !error && (
@@ -196,11 +172,7 @@ export default function AdminLogs() {
                 Выберите тип лога и нажмите "Начать просмотр" для отображения последних 100 строк
               </div>
             )}
-            {isStreaming && logs.length === 0 && (
-              <div className="log-placeholder">
-                Загрузка логов...
-              </div>
-            )}
+            {isStreaming && logs.length === 0 && <div className="log-placeholder">Загрузка логов...</div>}
             <div className="log-terminal">
               {logs.map((log, index) => (
                 <div key={index} className="log-line">
@@ -211,9 +183,7 @@ export default function AdminLogs() {
           </div>
 
           <div className="log-footer">
-            <span className="log-stats">
-              Строк: {logs.length} {isStreaming && '| Реал-тайм активен'}
-            </span>
+            <span className="log-stats">Строк: {logs.length} {isStreaming && '| Реал-тайм активен'}</span>
             <button
               className="btn btn-sm btn-secondary"
               onClick={() => {
@@ -230,3 +200,5 @@ export default function AdminLogs() {
     </Layout>
   )
 }
+
+

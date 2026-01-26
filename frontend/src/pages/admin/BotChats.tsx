@@ -1,36 +1,58 @@
-import { useState, useEffect } from 'react'
+import axios from 'axios'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import api from '../../utils/api'
+import type {
+  BotChatFilters,
+  BotChatListItem,
+  BotChatsConfig,
+  FetchedChat,
+  FetchedChatsResponse,
+} from '../../types/models'
 import './BotChats.css'
 
-export default function AdminBotChats() {
-  const [chats, setChats] = useState([])
-  const [config, setConfig] = useState(null)
-  const [districts, setDistricts] = useState({})
+interface DistrictsResponse {
+  districts?: Record<string, unknown>
+}
+
+interface BotChatsFormData {
+  chat_id: string
+  chat_title: string
+  filter_type: '' | 'rooms' | 'district' | 'price'
+  rooms_types: string[]
+  districts: string[]
+  price_min: string
+  price_max: string
+}
+
+export default function AdminBotChats(): JSX.Element {
+  const [chats, setChats] = useState<BotChatListItem[]>([])
+  const [config, setConfig] = useState<BotChatsConfig | null>(null)
+  const [districts, setDistricts] = useState<Record<string, unknown>>({})
   const [showAddModal, setShowAddModal] = useState(false)
   const [showFetchModal, setShowFetchModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [fetchedChats, setFetchedChats] = useState({ groups: [], users: [] })
-  const [chatFilter, setChatFilter] = useState('all') // all, groups, users
+  const [fetchedChats, setFetchedChats] = useState<FetchedChatsResponse>({ groups: [], users: [] })
+  const [chatFilter, setChatFilter] = useState<'all' | 'groups' | 'users'>('all')
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<BotChatsFormData>({
     chat_id: '',
     chat_title: '',
     filter_type: '',
     rooms_types: [],
     districts: [],
     price_min: '',
-    price_max: ''
+    price_max: '',
   })
 
   const [newDistrict, setNewDistrict] = useState('')
 
   useEffect(() => {
-    loadData()
+    void loadData()
   }, [])
 
   const loadData = async () => {
@@ -38,22 +60,24 @@ export default function AdminBotChats() {
       setLoading(true)
       setError('')
       const [chatsRes, configRes, districtsRes] = await Promise.all([
-        api.get('/admin/dashboard/bot-chats/list'),
-        api.get('/admin/dashboard/bot-chats/config'),
-        api.get('/admin/dashboard/bot-chats/districts')
+        api.get<BotChatListItem[]>('/admin/dashboard/bot-chats/list'),
+        api.get<BotChatsConfig | null>('/admin/dashboard/bot-chats/config'),
+        api.get<DistrictsResponse>('/admin/dashboard/bot-chats/districts'),
       ])
       setChats(chatsRes.data)
       setConfig(configRes.data)
-      // Ensure districts is an object, not null or undefined
+
       const districtsData = districtsRes.data.districts || {}
       setDistricts(districtsData)
-      // Also update config districts if config exists
       if (configRes.data) {
         setConfig({ ...configRes.data, districts: districtsData })
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error loading data:', err)
-      setError(err.response?.data?.error || 'Ошибка загрузки данных')
+      const message = axios.isAxiosError(err)
+        ? ((err.response?.data as any)?.error as string) || 'Ошибка загрузки данных'
+        : 'Ошибка загрузки данных'
+      setError(message)
     } finally {
       setLoading(false)
     }
@@ -61,7 +85,7 @@ export default function AdminBotChats() {
 
   const loadDistricts = async () => {
     try {
-      const districtsRes = await api.get('/admin/dashboard/bot-chats/districts')
+      const districtsRes = await api.get<DistrictsResponse>('/admin/dashboard/bot-chats/districts')
       setDistricts(districtsRes.data.districts || {})
     } catch (err) {
       console.error('Error loading districts:', err)
@@ -72,40 +96,49 @@ export default function AdminBotChats() {
     try {
       setFetching(true)
       setError('')
-      setChatFilter('all') // Reset to 'all' when fetching
-      const response = await api.post('/admin/dashboard/bot-chats/fetch', { stop_bot: true }, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
+      setChatFilter('all')
+      const response = await api.post<FetchedChatsResponse>(
+        '/admin/dashboard/bot-chats/fetch',
+        { stop_bot: true },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      )
       setFetchedChats(response.data)
       setShowFetchModal(true)
       if (response.data.warning) {
         setError(response.data.warning)
       }
-    } catch (err) {
-      setError(err.response?.data?.error || err.response?.data?.details || 'Ошибка при получении чатов')
+    } catch (err: unknown) {
+      const message = axios.isAxiosError(err)
+        ? ((err.response?.data as any)?.error as string) ||
+          ((err.response?.data as any)?.details as string) ||
+          'Ошибка при получении чатов'
+        : 'Ошибка при получении чатов'
+      setError(message)
     } finally {
       setFetching(false)
     }
   }
 
-  const handleSelectChat = (chat) => {
+  const handleSelectChat = (chat: FetchedChat) => {
     setFormData({
       ...formData,
-      chat_id: chat.id,
-      chat_title: chat.title
+      chat_id: String(chat.id),
+      chat_title: chat.title,
     })
     setShowFetchModal(false)
     setShowAddModal(true)
   }
 
-  const handleAddChat = async (e) => {
+  const handleAddChat = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
     setSuccess('')
 
-    let filters = {}
+    const filters: BotChatFilters = {}
     if (formData.filter_type === 'rooms') {
       filters.rooms_types = formData.rooms_types
     } else if (formData.filter_type === 'district') {
@@ -116,12 +149,11 @@ export default function AdminBotChats() {
     }
 
     try {
-      // Use chat_id as-is - it can be ID, username, or link
       const chatLink = formData.chat_id.trim()
-      
+
       await api.post('/admin/dashboard/bot-chats', {
         chat_link: chatLink,
-        filters
+        filters,
       })
       setSuccess('Чат успешно добавлен')
       setShowAddModal(false)
@@ -132,90 +164,100 @@ export default function AdminBotChats() {
         rooms_types: [],
         districts: [],
         price_min: '',
-        price_max: ''
+        price_max: '',
       })
-      loadData()
-    } catch (err) {
-      setError(err.response?.data?.error || 'Ошибка при добавлении чата')
+      void loadData()
+    } catch (err: unknown) {
+      const message = axios.isAxiosError(err)
+        ? ((err.response?.data as any)?.error as string) || 'Ошибка при добавлении чата'
+        : 'Ошибка при добавлении чата'
+      setError(message)
     }
   }
 
-  const handleAddDistrict = async (e) => {
+  const handleAddDistrict = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!newDistrict.trim()) return
 
     try {
       setError('')
-      const response = await api.post('/admin/dashboard/bot-chats/districts', {
-        name: newDistrict.trim()
+      const response = await api.post<DistrictsResponse>('/admin/dashboard/bot-chats/districts', {
+        name: newDistrict.trim(),
       })
       setSuccess('Район успешно добавлен')
       setNewDistrict('')
-      // Обновляем список районов из ответа
       const districtsData = response.data.districts || {}
       setDistricts(districtsData)
-      // Также обновляем конфиг для формы
       if (config) {
         setConfig({ ...config, districts: districtsData })
       }
-      // Перезагружаем данные для уверенности
       await loadDistricts()
-    } catch (err) {
-      setError(err.response?.data?.error || 'Ошибка при добавлении района')
+    } catch (err: unknown) {
+      const message = axios.isAxiosError(err)
+        ? ((err.response?.data as any)?.error as string) || 'Ошибка при добавлении района'
+        : 'Ошибка при добавлении района'
+      setError(message)
     }
   }
 
-  const handleDeleteDistrict = async (districtName) => {
-    if (!confirm(`Удалить район "${districtName}"?`)) return
+  const handleDeleteDistrict = async (districtName: string) => {
+    if (!window.confirm(`Удалить район "${districtName}"?`)) return
 
     try {
       setError('')
-      const response = await api.delete(`/admin/dashboard/bot-chats/districts/${encodeURIComponent(districtName)}`)
+      const response = await api.delete<DistrictsResponse>(
+        `/admin/dashboard/bot-chats/districts/${encodeURIComponent(districtName)}`,
+      )
       setSuccess('Район успешно удален')
-      // Обновляем список районов из ответа
       const districtsData = response.data.districts || {}
       setDistricts(districtsData)
-      // Также обновляем конфиг для формы
       if (config) {
         setConfig({ ...config, districts: districtsData })
       }
-      // Перезагружаем данные для уверенности
       await loadDistricts()
-    } catch (err) {
-      setError(err.response?.data?.error || 'Ошибка при удалении района')
+    } catch (err: unknown) {
+      const message = axios.isAxiosError(err)
+        ? ((err.response?.data as any)?.error as string) || 'Ошибка при удалении района'
+        : 'Ошибка при удалении района'
+      setError(message)
     }
   }
 
-  const handleTestPublish = async (chatId) => {
-    if (!confirm('Отправить тестовое сообщение в этот чат?')) return
+  const handleTestPublish = async (chatId: BotChatListItem['chat_id']) => {
+    if (!window.confirm('Отправить тестовое сообщение в этот чат?')) return
 
     try {
       setError('')
       setSuccess('')
-      const response = await api.post(`/admin/dashboard/bot-chats/${chatId}/test-publish`)
+      await api.post(`/admin/dashboard/bot-chats/${chatId}/test-publish`)
       setSuccess('Тестовое сообщение отправлено успешно')
-    } catch (err) {
-      setError(err.response?.data?.error || err.response?.data?.details || 'Ошибка при отправке тестового сообщения')
+    } catch (err: unknown) {
+      const message = axios.isAxiosError(err)
+        ? ((err.response?.data as any)?.error as string) ||
+          ((err.response?.data as any)?.details as string) ||
+          'Ошибка при отправке тестового сообщения'
+        : 'Ошибка при отправке тестового сообщения'
+      setError(message)
     }
   }
 
-  const handleDelete = async (chatId) => {
-    if (!confirm('Удалить этот чат?')) return
+  const handleDelete = async (chatId: BotChatListItem['chat_id']) => {
+    if (!window.confirm('Удалить этот чат?')) return
 
     try {
       await api.delete(`/admin/dashboard/bot-chats/${chatId}`)
       setSuccess('Чат удален')
-      loadData()
+      void loadData()
     } catch (err) {
+      console.error(err)
       setError('Ошибка при удалении')
     }
   }
 
-  const getFiltersText = (chat) => {
+  const getFiltersText = (chat: BotChatListItem) => {
     const filters = chat.filters_json || {}
-    const parts = []
-    
-    // Show filter type and values
+    const parts: string[] = []
+
     if (filters.rooms_types?.length) {
       parts.push(`Комнаты: ${filters.rooms_types.join(', ')}`)
     }
@@ -225,10 +267,8 @@ export default function AdminBotChats() {
     if (filters.price_min || filters.price_max) {
       parts.push(`Цена: ${filters.price_min || 0} - ${filters.price_max || '∞'} тыс. руб.`)
     }
-    
-    // If no filters_json but has category (legacy)
+
     if (parts.length === 0 && chat.category) {
-      // Parse legacy category format
       if (chat.category.startsWith('rooms_')) {
         parts.push(`Комнаты: ${chat.category.replace('rooms_', '')}`)
       } else if (chat.category.startsWith('district_')) {
@@ -242,29 +282,30 @@ export default function AdminBotChats() {
         parts.push(chat.category)
       }
     }
-    
+
     return parts.length ? parts.join(' | ') : 'Нет фильтров'
   }
-  
-  const getChatTypeLabel = (type) => {
-    const typeMap = {
-      'group': 'Группа',
-      'supergroup': 'Супергруппа',
-      'channel': 'Канал',
-      'private': 'Личный'
+
+  const getChatTypeLabel = (type: string) => {
+    const typeMap: Record<string, string> = {
+      group: 'Группа',
+      supergroup: 'Супергруппа',
+      channel: 'Канал',
+      private: 'Личный',
     }
     return typeMap[type] || type
   }
 
-  const filteredChats = chatFilter === 'all' 
-    ? chats 
-    : chatFilter === 'groups' 
-    ? chats.filter(c => ['group', 'supergroup', 'channel'].includes(c.type))
-    : chats.filter(c => c.type === 'private')
+  const filteredChats =
+    chatFilter === 'all'
+      ? chats
+      : chatFilter === 'groups'
+        ? chats.filter((c) => ['group', 'supergroup', 'channel'].includes(c.type))
+        : chats.filter((c) => c.type === 'private')
 
   return (
-    <Layout 
-      title="Управление чатами и районами бота" 
+    <Layout
+      title="Управление чатами и районами бота"
       isAdmin
       headerActions={
         <Link to="/admin/dashboard" className="btn btn-secondary">
@@ -276,29 +317,33 @@ export default function AdminBotChats() {
         {error && <div className="alert alert-error">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
 
-        {/* Fetch Chats Modal */}
         {showFetchModal && (
           <div className="modal-overlay" onClick={() => setShowFetchModal(false)}>
             <div className="modal modal-large" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>Выберите чат для добавления</h2>
-                <button className="modal-close" onClick={() => setShowFetchModal(false)}>×</button>
+                <button className="modal-close" onClick={() => setShowFetchModal(false)}>
+                  ×
+                </button>
               </div>
               <div className="modal-content">
                 <div className="chat-filter-tabs">
-                  <button 
+                  <button
                     className={`tab ${chatFilter === 'all' ? 'active' : ''}`}
                     onClick={() => setChatFilter('all')}
                   >
-                    Все ({(fetchedChats.all || []).length || (fetchedChats.groups || []).length + (fetchedChats.users || []).length})
+                    Все (
+                    {(fetchedChats.all || []).length ||
+                      (fetchedChats.groups || []).length + (fetchedChats.users || []).length}
+                    )
                   </button>
-                  <button 
+                  <button
                     className={`tab ${chatFilter === 'groups' ? 'active' : ''}`}
                     onClick={() => setChatFilter('groups')}
                   >
                     Группы ({(fetchedChats.groups || []).length})
                   </button>
-                  <button 
+                  <button
                     className={`tab ${chatFilter === 'users' ? 'active' : ''}`}
                     onClick={() => setChatFilter('users')}
                   >
@@ -307,20 +352,17 @@ export default function AdminBotChats() {
                 </div>
                 <div className="chat-list">
                   {(() => {
-                    let chatsToShow = []
+                    let chatsToShow: FetchedChat[] = []
                     if (chatFilter === 'all') {
-                      chatsToShow = fetchedChats.all || [...(fetchedChats.groups || []), ...(fetchedChats.users || [])]
+                      chatsToShow =
+                        fetchedChats.all || [...(fetchedChats.groups || []), ...(fetchedChats.users || [])]
                     } else if (chatFilter === 'groups') {
                       chatsToShow = fetchedChats.groups || []
                     } else {
                       chatsToShow = fetchedChats.users || []
                     }
-                    return chatsToShow.map(chat => (
-                      <div 
-                        key={chat.id} 
-                        className="chat-item"
-                        onClick={() => handleSelectChat(chat)}
-                      >
+                    return chatsToShow.map((chat) => (
+                      <div key={chat.id} className="chat-item" onClick={() => handleSelectChat(chat)}>
                         <div className="chat-item-title">{chat.title}</div>
                         <div className="chat-item-meta">
                           <span className="chat-item-type">{getChatTypeLabel(chat.type)}</span>
@@ -335,13 +377,14 @@ export default function AdminBotChats() {
           </div>
         )}
 
-        {/* Add Chat Modal */}
         {showAddModal && (
           <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
             <div className="modal" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2>Добавить чат</h2>
-                <button className="modal-close" onClick={() => setShowAddModal(false)}>×</button>
+                <button className="modal-close" onClick={() => setShowAddModal(false)}>
+                  ×
+                </button>
               </div>
               <form onSubmit={handleAddChat} className="modal-form">
                 {formData.chat_title && (
@@ -361,16 +404,16 @@ export default function AdminBotChats() {
                       type="text"
                       className="form-input"
                       value={formData.chat_id}
-                      onChange={(e) => setFormData({...formData, chat_id: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, chat_id: e.target.value })}
                       placeholder="https://t.me/chatname, @chatname или ID чата (например: -1002632748579)"
                       required
                     />
-                    <button 
+                    <button
                       type="button"
                       className="btn btn-secondary btn-sm"
                       onClick={() => {
                         setShowAddModal(false)
-                        handleFetchChats()
+                        void handleFetchChats()
                       }}
                     >
                       Получить чаты
@@ -383,7 +426,9 @@ export default function AdminBotChats() {
                   <select
                     className="form-input"
                     value={formData.filter_type}
-                    onChange={(e) => setFormData({...formData, filter_type: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, filter_type: e.target.value as BotChatsFormData['filter_type'] })
+                    }
                     required
                   >
                     <option value="">Выберите тип</option>
@@ -397,16 +442,19 @@ export default function AdminBotChats() {
                   <div className="form-group">
                     <label className="form-label">Типы комнат</label>
                     <div className="checkbox-group">
-                      {config.rooms_types.map(rt => (
+                      {config.rooms_types.map((rt) => (
                         <label key={rt} className="checkbox-label">
                           <input
                             type="checkbox"
                             checked={formData.rooms_types.includes(rt)}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setFormData({...formData, rooms_types: [...formData.rooms_types, rt]})
+                                setFormData({ ...formData, rooms_types: [...formData.rooms_types, rt] })
                               } else {
-                                setFormData({...formData, rooms_types: formData.rooms_types.filter(x => x !== rt)})
+                                setFormData({
+                                  ...formData,
+                                  rooms_types: formData.rooms_types.filter((x) => x !== rt),
+                                })
                               }
                             }}
                           />
@@ -424,14 +472,16 @@ export default function AdminBotChats() {
                       className="form-input"
                       multiple
                       value={formData.districts}
-                      onChange={(e) => {
-                        const selected = Array.from(e.target.selectedOptions, opt => opt.value)
-                        setFormData({...formData, districts: selected})
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                        const selected = Array.from(e.target.selectedOptions).map((opt) => opt.value)
+                        setFormData({ ...formData, districts: selected })
                       }}
                       required
                     >
-                      {Object.keys(districts).map(d => (
-                        <option key={d} value={d}>{d}</option>
+                      {Object.keys(districts).map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
                       ))}
                     </select>
                     <small className="form-hint">Удерживайте Ctrl для выбора нескольких</small>
@@ -446,7 +496,7 @@ export default function AdminBotChats() {
                         type="number"
                         className="form-input"
                         value={formData.price_min}
-                        onChange={(e) => setFormData({...formData, price_min: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, price_min: e.target.value })}
                         min="0"
                         step="100"
                         required
@@ -458,7 +508,7 @@ export default function AdminBotChats() {
                         type="number"
                         className="form-input"
                         value={formData.price_max}
-                        onChange={(e) => setFormData({...formData, price_max: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, price_max: e.target.value })}
                         min="0"
                         step="100"
                         required
@@ -468,15 +518,18 @@ export default function AdminBotChats() {
                 )}
 
                 <div className="modal-actions">
-                  <button type="submit" className="btn btn-primary">Добавить</button>
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Отмена</button>
+                  <button type="submit" className="btn btn-primary">
+                    Добавить
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
+                    Отмена
+                  </button>
                 </div>
               </form>
             </div>
           </div>
         )}
 
-        {/* Districts Management Card - Always visible */}
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">Управление районами</h2>
@@ -490,20 +543,19 @@ export default function AdminBotChats() {
                 onChange={(e) => setNewDistrict(e.target.value)}
                 placeholder="Название района"
               />
-              <button type="submit" className="btn btn-primary">Добавить район</button>
+              <button type="submit" className="btn btn-primary">
+                Добавить район
+              </button>
             </form>
             <div className="districts-list">
               {Object.keys(districts).length === 0 ? (
                 <div className="empty-state">Нет районов. Добавьте первый район.</div>
               ) : (
                 <div className="districts-grid">
-                  {Object.keys(districts).map(district => (
+                  {Object.keys(districts).map((district) => (
                     <div key={district} className="district-item">
                       <span>{district}</span>
-                      <button 
-                        className="btn btn-sm btn-danger"
-                        onClick={() => handleDeleteDistrict(district)}
-                      >
+                      <button className="btn btn-sm btn-danger" onClick={() => void handleDeleteDistrict(district)}>
                         Удалить
                       </button>
                     </div>
@@ -514,45 +566,34 @@ export default function AdminBotChats() {
           </div>
         </div>
 
-        {/* Chats List Card */}
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">Список чатов</h2>
             <div className="card-actions">
-              <button 
-                className="btn btn-secondary"
-                onClick={handleFetchChats}
-                disabled={fetching}
-              >
+              <button className="btn btn-secondary" onClick={() => void handleFetchChats()} disabled={fetching}>
                 {fetching ? 'Загрузка...' : 'Получить чаты'}
               </button>
-              <button 
-                className="btn btn-primary"
-                onClick={() => setShowAddModal(true)}
-              >
+              <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
                 Добавить чат
               </button>
             </div>
           </div>
           <div className="card-content">
             <div className="chat-filter-tabs">
-              <button 
-                className={`tab ${chatFilter === 'all' ? 'active' : ''}`}
-                onClick={() => setChatFilter('all')}
-              >
+              <button className={`tab ${chatFilter === 'all' ? 'active' : ''}`} onClick={() => setChatFilter('all')}>
                 Все ({chats.length})
               </button>
-              <button 
+              <button
                 className={`tab ${chatFilter === 'groups' ? 'active' : ''}`}
                 onClick={() => setChatFilter('groups')}
               >
-                Группы ({chats.filter(c => ['group', 'supergroup', 'channel'].includes(c.type)).length})
+                Группы ({chats.filter((c) => ['group', 'supergroup', 'channel'].includes(c.type)).length})
               </button>
-              <button 
+              <button
                 className={`tab ${chatFilter === 'users' ? 'active' : ''}`}
                 onClick={() => setChatFilter('users')}
               >
-                Пользователи ({chats.filter(c => c.type === 'private').length})
+                Пользователи ({chats.filter((c) => c.type === 'private').length})
               </button>
             </div>
             {loading ? (
@@ -571,7 +612,7 @@ export default function AdminBotChats() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredChats.map(chat => (
+                    {filteredChats.map((chat) => (
                       <tr key={chat.chat_id}>
                         <td>
                           <strong>{chat.title}</strong>
@@ -588,17 +629,14 @@ export default function AdminBotChats() {
                         </td>
                         <td>
                           <div className="btn-group">
-                            <button 
+                            <button
                               className="btn btn-sm btn-secondary"
-                              onClick={() => handleTestPublish(chat.chat_id)}
+                              onClick={() => void handleTestPublish(chat.chat_id)}
                               title="Отправить тестовое сообщение в чат"
                             >
                               Тест
                             </button>
-                            <button 
-                              className="btn btn-sm btn-danger"
-                              onClick={() => handleDelete(chat.chat_id)}
-                            >
+                            <button className="btn btn-sm btn-danger" onClick={() => void handleDelete(chat.chat_id)}>
                               Удалить
                             </button>
                           </div>
@@ -615,3 +653,5 @@ export default function AdminBotChats() {
     </Layout>
   )
 }
+
+

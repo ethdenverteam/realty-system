@@ -1,38 +1,49 @@
-import { useState, useEffect } from 'react'
+import axios from 'axios'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import api from '../../utils/api'
+import type { RealtyObjectListItem } from '../../types/models'
 import './Objects.css'
 
-export default function UserObjects() {
-  const [objects, setObjects] = useState([])
+interface ObjectsResponse {
+  objects?: RealtyObjectListItem[]
+}
+
+export default function UserObjects(): JSX.Element {
+  const [objects, setObjects] = useState<RealtyObjectListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
 
   useEffect(() => {
-    loadObjects()
+    void loadObjects()
   }, [statusFilter])
 
   const loadObjects = async () => {
     try {
       setLoading(true)
-      const params = statusFilter ? { status: statusFilter } : {}
-      const res = await api.get('/user/dashboard/objects/list', { params })
+      const params: { status?: string } = {}
+      if (statusFilter) params.status = statusFilter
+      const res = await api.get<ObjectsResponse>('/user/dashboard/objects/list', { params })
       setObjects(res.data.objects || [])
-    } catch (err) {
-      console.error('Error loading objects:', err)
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        console.error('Error loading objects:', err.response?.data || err.message)
+      } else {
+        console.error('Error loading objects:', err)
+      }
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Layout 
+    <Layout
       title="Мои объекты"
       headerActions={
         <Link to="/user/dashboard/objects/create" className="header-icon-btn">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </Link>
       }
@@ -41,7 +52,7 @@ export default function UserObjects() {
         <div className="card">
           <div className="card-header-row">
             <h2 className="card-title">Список объектов</h2>
-            <select 
+            <select
               className="form-input form-input-sm"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -58,31 +69,57 @@ export default function UserObjects() {
             <div className="loading">Загрузка...</div>
           ) : objects.length === 0 ? (
             <div className="empty-state">
-              У вас пока нет объектов.{' '}
-              <Link to="/user/dashboard/objects/create">Создайте первый объект</Link>
+              У вас пока нет объектов. <Link to="/user/dashboard/objects/create">Создайте первый объект</Link>
             </div>
           ) : (
             <div className="objects-list">
-              {objects.map(obj => (
+              {objects.map((obj) => (
                 <div key={obj.object_id} className="object-card">
                   <div className="object-header">
                     <h3 className="object-id">{obj.object_id}</h3>
-                    <span className={`badge badge-${obj.status === 'опубликовано' ? 'success' : obj.status === 'черновик' ? 'warning' : 'secondary'}`}>
+                    <span
+                      className={`badge badge-${
+                        obj.status === 'опубликовано'
+                          ? 'success'
+                          : obj.status === 'черновик'
+                            ? 'warning'
+                            : 'secondary'
+                      }`}
+                    >
                       {obj.status}
                     </span>
                   </div>
                   <div className="object-details">
-                    {obj.rooms_type && <div><strong>Тип:</strong> {obj.rooms_type}</div>}
-                    {obj.price > 0 && <div><strong>Цена:</strong> {obj.price} тыс. руб.</div>}
-                    {obj.area && <div><strong>Площадь:</strong> {obj.area} м²</div>}
-                    {obj.floor && <div><strong>Этаж:</strong> {obj.floor}</div>}
-                    {obj.districts_json?.length > 0 && (
-                      <div><strong>Районы:</strong> {obj.districts_json.join(', ')}</div>
+                    {obj.rooms_type && (
+                      <div>
+                        <strong>Тип:</strong> {obj.rooms_type}
+                      </div>
+                    )}
+                    {obj.price > 0 && (
+                      <div>
+                        <strong>Цена:</strong> {obj.price} тыс. руб.
+                      </div>
+                    )}
+                    {obj.area && (
+                      <div>
+                        <strong>Площадь:</strong> {obj.area} м²
+                      </div>
+                    )}
+                    {obj.floor && (
+                      <div>
+                        <strong>Этаж:</strong> {obj.floor}
+                      </div>
+                    )}
+                    {(obj.districts_json?.length || 0) > 0 && (
+                      <div>
+                        <strong>Районы:</strong> {(obj.districts_json || []).join(', ')}
+                      </div>
                     )}
                   </div>
                   {obj.comment && (
                     <div className="object-comment">
-                      {obj.comment.substring(0, 100)}{obj.comment.length > 100 ? '...' : ''}
+                      {obj.comment.substring(0, 100)}
+                      {obj.comment.length > 100 ? '...' : ''}
                     </div>
                   )}
                   <div className="object-actions">
@@ -99,4 +136,5 @@ export default function UserObjects() {
     </Layout>
   )
 }
+
 
