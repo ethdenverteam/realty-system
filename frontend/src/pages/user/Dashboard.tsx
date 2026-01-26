@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../contexts/AuthContext'
 import api from '../../utils/api'
-import type { UserStats } from '../../types/models'
+import type { UserStats, ApiErrorResponse } from '../../types/models'
 import './Dashboard.css'
 
 export default function UserDashboard(): JSX.Element {
@@ -17,13 +17,13 @@ export default function UserDashboard(): JSX.Element {
     void loadStats()
   }, [])
 
-  const loadStats = async () => {
+  const loadStats = async (): Promise<void> => {
     try {
       const res = await api.get<UserStats>('/user/dashboard/stats')
       setStats(res.data)
     } catch (err: unknown) {
       setError('Ошибка загрузки данных')
-      if (axios.isAxiosError(err)) {
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
         console.error(err.response?.data || err.message)
       } else {
         console.error(err)

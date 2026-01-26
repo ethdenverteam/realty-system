@@ -2,12 +2,8 @@ import axios from 'axios'
 import { useEffect, useState } from 'react'
 import Layout from '../../components/Layout'
 import api from '../../utils/api'
-import type { ActionLogItem, AdminStats } from '../../types/models'
+import type { ActionLogItem, AdminStats, LogsResponse, ApiErrorResponse } from '../../types/models'
 import './Dashboard.css'
-
-interface LogsResponse {
-  logs?: ActionLogItem[]
-}
 
 export default function AdminDashboard(): JSX.Element {
   const [stats, setStats] = useState<AdminStats | null>(null)
@@ -19,7 +15,7 @@ export default function AdminDashboard(): JSX.Element {
     void loadData()
   }, [])
 
-  const loadData = async () => {
+  const loadData = async (): Promise<void> => {
     try {
       setLoading(true)
       const [statsRes, logsRes] = await Promise.all([
@@ -31,7 +27,7 @@ export default function AdminDashboard(): JSX.Element {
       setRecentActions(logsRes.data.logs || [])
     } catch (err: unknown) {
       setError('Ошибка загрузки данных')
-      if (axios.isAxiosError(err)) {
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
         console.error(err.response?.data || err.message)
       } else {
         console.error(err)

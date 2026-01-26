@@ -3,26 +3,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import api from '../../utils/api'
+import type { RealtyObject, PublishObjectRequest, PublishObjectResponse, ApiErrorResponse } from '../../types/models'
 import './ViewObject.css'
-
-interface RealtyObject {
-  object_id: string
-  status: string
-  rooms_type?: string | null
-  price: number
-  area?: number | null
-  floor?: string | null
-  districts_json?: string[] | null
-  comment?: string | null
-  address?: string | null
-  renovation?: string | null
-  contact_name?: string | null
-  phone_number?: string | null
-  show_username?: boolean
-  photos_json?: string[] | null
-  creation_date?: string
-  publication_date?: string
-}
 
 export default function ViewObject(): JSX.Element {
   const { objectId } = useParams<{ objectId: string }>()
@@ -57,7 +39,7 @@ export default function ViewObject(): JSX.Element {
     void loadObject()
   }, [loadObject])
 
-  const handlePublish = async () => {
+  const handlePublish = async (): Promise<void> => {
     if (!objectId) return
 
     if (!confirm('Вы уверены, что хотите опубликовать этот объект через бота?')) {
@@ -69,9 +51,11 @@ export default function ViewObject(): JSX.Element {
       setPublishError('')
       setPublishSuccess(false)
 
-      const res = await api.post('/user/dashboard/objects/publish', {
-        object_id: objectId
-      })
+      const requestData: PublishObjectRequest = {
+        object_id: objectId,
+      }
+
+      const res = await api.post<PublishObjectResponse>('/user/dashboard/objects/publish', requestData)
 
       if (res.data.success) {
         setPublishSuccess(true)
@@ -81,11 +65,11 @@ export default function ViewObject(): JSX.Element {
         setPublishError(res.data.error || 'Ошибка публикации')
       }
     } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        setPublishError(err.response?.data?.error || 'Ошибка публикации')
-      } else {
-        setPublishError('Ошибка публикации')
+      let message = 'Ошибка публикации'
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+        message = err.response?.data?.error || err.message || message
       }
+      setPublishError(message)
     } finally {
       setPublishing(false)
     }

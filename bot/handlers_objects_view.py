@@ -137,12 +137,14 @@ async def edit_object_from_list(update: Update, context: ContextTypes.DEFAULT_TY
     obj = get_object(object_id)
     if not obj:
         await query.answer("Объект не найден.", show_alert=True)
-        return
+        from telegram.ext import ConversationHandler
+        return ConversationHandler.END
     
     user_obj = get_user(str(user.id))
     if not user_obj or obj.user_id != user_obj.user_id:
         await query.answer("Этот объект вам не принадлежит.", show_alert=True)
-        return
+        from telegram.ext import ConversationHandler
+        return ConversationHandler.END
     
     # Initialize user_data for editing
     if user.id not in user_data:
@@ -152,5 +154,7 @@ async def edit_object_from_list(update: Update, context: ContextTypes.DEFAULT_TY
     
     # Show preview with menu
     from bot.handlers_object import show_object_preview_with_menu
+    from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
     await show_object_preview_with_menu(update, context, object_id)
+    return OBJECT_PREVIEW_MENU
 

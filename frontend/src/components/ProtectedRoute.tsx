@@ -2,13 +2,15 @@ import { Navigate } from 'react-router-dom'
 import type { ReactElement } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
+interface ProtectedRouteProps {
+  children: ReactElement
+  requireAdmin?: boolean
+}
+
 export default function ProtectedRoute({
   children,
   requireAdmin = false,
-}: {
-  children: ReactElement
-  requireAdmin?: boolean
-}): JSX.Element {
+}: ProtectedRouteProps): JSX.Element {
   const { isAuthenticated, isAdmin, loading } = useAuth()
 
   if (loading) {

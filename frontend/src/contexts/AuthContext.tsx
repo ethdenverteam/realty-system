@@ -1,16 +1,11 @@
 import axios from 'axios'
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import api from '../utils/api'
-import type { User } from '../types/models'
+import type { User, LoginResponse, ApiErrorResponse } from '../types/models'
 
 type LoginResult =
   | { success: true; user: User }
   | { success: false; error: string }
-
-interface LoginResponse {
-  token: string
-  user: User
-}
 
 interface AuthContextValue {
   user: User | null
@@ -54,10 +49,11 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 
       return { success: true, user: userData }
     } catch (error: unknown) {
-      const message = axios.isAxiosError(error)
-        ? (error.response?.data as any)?.error || 'Ошибка входа'
-        : 'Ошибка входа'
-      return { success: false, error: String(message) }
+      let message = 'Ошибка входа'
+      if (axios.isAxiosError<ApiErrorResponse>(error)) {
+        message = error.response?.data?.error || error.message || message
+      }
+      return { success: false, error: message }
     }
   }
 

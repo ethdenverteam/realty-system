@@ -193,29 +193,11 @@ def main():
     logger.info("Registering object editing handlers...")
     from telegram.ext import ConversationHandler as ConvHandler
     
-    # Edit handlers - callback queries
-    application.add_handler(CallbackQueryHandler(edit_price_handler, pattern="^edit_price_"))
-    application.add_handler(CallbackQueryHandler(edit_area_handler, pattern="^edit_area_"))
-    application.add_handler(CallbackQueryHandler(edit_floor_handler, pattern="^edit_floor_"))
-    application.add_handler(CallbackQueryHandler(edit_comment_handler, pattern="^edit_comment_"))
-    application.add_handler(CallbackQueryHandler(edit_renovation_handler, pattern="^edit_renovation_"))
-    application.add_handler(CallbackQueryHandler(edit_address_handler, pattern="^edit_address_"))
-    application.add_handler(CallbackQueryHandler(edit_contacts_handler, pattern="^edit_contacts_"))
-    application.add_handler(CallbackQueryHandler(edit_rooms_handler, pattern="^edit_rooms_"))
-    application.add_handler(CallbackQueryHandler(edit_district_handler, pattern="^edit_district_"))
-    application.add_handler(CallbackQueryHandler(add_district_handler, pattern="^add_district_"))
-    application.add_handler(CallbackQueryHandler(add_media_handler, pattern="^add_media_"))
-    application.add_handler(CallbackQueryHandler(back_to_preview_handler, pattern="^back_to_preview$"))
-    application.add_handler(CallbackQueryHandler(phone_from_settings_handler, pattern="^phone_from_settings_"))
-    application.add_handler(CallbackQueryHandler(phone_custom_handler, pattern="^phone_custom_"))
-    application.add_handler(CallbackQueryHandler(set_contact_name_handler, pattern="^set_contact_name_"))
-    application.add_handler(CallbackQueryHandler(toggle_username_handler, pattern="^toggle_username_"))
-    application.add_handler(CallbackQueryHandler(publish_immediate_handler, pattern="^publish_immediate_"))
-    application.add_handler(CallbackQueryHandler(confirm_publish_handler, pattern="^confirm_publish_"))
-    
     # Edit conversation handler for editing states
+    # NOTE: All edit handlers must be inside ConversationHandler to properly handle states
     edit_conversation = ConvHandler(
         entry_points=[
+            CallbackQueryHandler(edit_object_from_list, pattern="^edit_object_from_list_"),
             CallbackQueryHandler(edit_price_handler, pattern="^edit_price_"),
             CallbackQueryHandler(edit_area_handler, pattern="^edit_area_"),
             CallbackQueryHandler(edit_floor_handler, pattern="^edit_floor_"),

@@ -1,6 +1,10 @@
 #!/bin/bash
 # Script for automatic deployment after git pull
 
+# Ensure script is executable (fixes issue after git reset --hard)
+# This allows the script to set its own permissions
+chmod +x "$0" 2>/dev/null || true
+
 set -e  # Stop on error
 
 echo "🚀 Starting deployment..."

@@ -9,6 +9,7 @@ import AdminDashboard from './pages/admin/Dashboard'
 import AdminLogs from './pages/admin/Logs'
 import UserCreateObject from './pages/user/CreateObject'
 import UserDashboard from './pages/user/Dashboard'
+import UserEditObject from './pages/user/EditObject'
 import UserObjects from './pages/user/Objects'
 import UserViewObject from './pages/user/ViewObject'
 import './App.css'
@@ -70,6 +71,14 @@ export default function App(): JSX.Element {
               element={
                 <ProtectedRoute>
                   <UserCreateObject />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/dashboard/objects/:objectId/edit"
+              element={
+                <ProtectedRoute>
+                  <UserEditObject />
                 </ProtectedRoute>
               }
             />

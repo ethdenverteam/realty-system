@@ -72,4 +72,137 @@ export interface FetchedChatsResponse {
   warning?: string;
 }
 
+// Realty Object types
+export interface RealtyObject {
+  object_id: string;
+  status: string;
+  rooms_type?: string | null;
+  price: number;
+  area?: number | null;
+  floor?: string | null;
+  districts_json?: string[] | null;
+  comment?: string | null;
+  address?: string | null;
+  renovation?: string | null;
+  contact_name?: string | null;
+  phone_number?: string | null;
+  show_username?: boolean;
+  photos_json?: string[] | null;
+  creation_date?: string;
+  publication_date?: string;
+  user_id?: number | string;
+}
+
+export interface ObjectFormData {
+  rooms_type: string;
+  price: string;
+  area: string;
+  floor: string;
+  districts: string;
+  comment: string;
+  address: string;
+  renovation: string;
+  contact_name: string;
+  phone_number: string;
+  show_username: boolean;
+}
+
+export interface CreateObjectRequest {
+  rooms_type: string;
+  price: number;
+  area?: number | null;
+  floor?: string | null;
+  districts_json: string[];
+  comment?: string | null;
+  address?: string | null;
+  renovation?: string | null;
+  contact_name?: string | null;
+  phone_number?: string | null;
+  show_username: boolean;
+}
+
+export interface UpdateObjectRequest {
+  rooms_type?: string | null;
+  price: number;
+  area?: number | null;
+  floor?: string | null;
+  districts_json: string[];
+  comment?: string | null;
+  address?: string | null;
+  renovation?: string | null;
+  contact_name?: string | null;
+  phone_number?: string | null;
+  show_username: boolean;
+}
+
+export interface CreateObjectResponse {
+  success?: boolean;
+  object_id?: number | string;
+  error?: string;
+}
+
+export interface ApiErrorResponse {
+  error: string;
+  message?: string;
+}
+
+// Rooms types
+export type RoomsType = 
+  | 'Студия'
+  | '1к'
+  | '2к'
+  | '3к'
+  | '4+к'
+  | 'Дом'
+  | 'евро1к'
+  | 'евро2к'
+  | 'евро3к';
+
+// Renovation types
+export type RenovationType = 
+  | 'Черновая'
+  | 'ПЧО'
+  | 'Ремонт требует освежения'
+  | 'Хороший ремонт'
+  | 'Инстаграмный';
+
+// Object status types
+export type ObjectStatus = 'черновик' | 'опубликовано' | 'архив';
+
+// API Response types
+export interface ObjectsListResponse {
+  objects: RealtyObjectListItem[];
+  total?: number;
+  page?: number;
+  per_page?: number;
+}
+
+export interface PublishObjectRequest {
+  object_id: string;
+}
+
+export interface PublishObjectResponse {
+  success: boolean;
+  error?: string;
+  message?: string;
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: User;
+  success?: boolean;
+  error?: string;
+}
+
+export interface LogsResponse {
+  logs?: ActionLogItem[];
+  total?: number;
+  page?: number;
+  per_page?: number;
+}
 

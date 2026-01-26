@@ -21,7 +21,7 @@ export default function Layout({
   const { theme, toggleTheme } = useTheme()
   const location = useLocation()
 
-  const handleLogout = () => {
+  const handleLogout = (): void => {
     void logout()
   }
 

@@ -3,12 +3,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import api from '../../utils/api'
-import type { RealtyObjectListItem } from '../../types/models'
+import type { RealtyObjectListItem, ObjectsListResponse, ApiErrorResponse } from '../../types/models'
 import './Objects.css'
-
-interface ObjectsResponse {
-  objects?: RealtyObjectListItem[]
-}
 
 export default function UserObjects(): JSX.Element {
   const [objects, setObjects] = useState<RealtyObjectListItem[]>([])
@@ -19,15 +15,15 @@ export default function UserObjects(): JSX.Element {
     void loadObjects()
   }, [statusFilter])
 
-  const loadObjects = async () => {
+  const loadObjects = async (): Promise<void> => {
     try {
       setLoading(true)
       const params: { status?: string } = {}
       if (statusFilter) params.status = statusFilter
-      const res = await api.get<ObjectsResponse>('/user/dashboard/objects/list', { params })
+      const res = await api.get<ObjectsListResponse>('/user/dashboard/objects/list', { params })
       setObjects(res.data.objects || [])
     } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
         console.error('Error loading objects:', err.response?.data || err.message)
       } else {
         console.error('Error loading objects:', err)

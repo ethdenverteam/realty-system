@@ -278,11 +278,12 @@ def admin_bot_chats_list(current_user):
         try:
             # Use raw SQL even if column exists to avoid issues
             # Try to include filters_json if column exists
+            # Use CAST to ensure type compatibility
             sql = text("""
                 SELECT chat_id, telegram_chat_id, title, type, category, 
                        owner_type, owner_account_id, is_active, members_count,
                        added_date, last_publication, total_publications,
-                       COALESCE(filters_json, '{}'::jsonb) as filters_json
+                       COALESCE(filters_json::text, '{}')::json as filters_json
                 FROM chats
                 WHERE owner_type = :owner_type AND is_active = true
             """)
