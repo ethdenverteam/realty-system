@@ -163,7 +163,15 @@ def main():
     # Add error handler first
     async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
         """Log errors"""
-        logger.error(f"Exception while handling an update: {context.error}", exc_info=context.error)
+        error = context.error
+        # Skip logging for Conflict errors (multiple bot instances)
+        if error and hasattr(error, '__class__'):
+            error_name = error.__class__.__name__
+            error_msg = str(error)
+            if 'Conflict' in error_name or 'Conflict' in error_msg or 'getUpdates' in error_msg:
+                logger.debug(f"Bot conflict detected (non-critical): {error_msg}")
+                return
+        logger.error(f"Exception while handling an update: {error}", exc_info=error)
     
     application.add_error_handler(error_handler)
     

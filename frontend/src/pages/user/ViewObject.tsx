@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import api from '../../utils/api'
@@ -34,13 +34,8 @@ export default function ViewObject(): JSX.Element {
   const [publishError, setPublishError] = useState('')
   const [publishSuccess, setPublishSuccess] = useState(false)
 
-  useEffect(() => {
-    if (objectId) {
-      void loadObject()
-    }
-  }, [objectId])
-
-  const loadObject = async () => {
+  const loadObject = useCallback(async () => {
+    if (!objectId) return
     try {
       setLoading(true)
       setError('')
@@ -56,7 +51,11 @@ export default function ViewObject(): JSX.Element {
     } finally {
       setLoading(false)
     }
-  }
+  }, [objectId])
+
+  useEffect(() => {
+    void loadObject()
+  }, [loadObject])
 
   const handlePublish = async () => {
     if (!objectId) return
@@ -102,11 +101,24 @@ export default function ViewObject(): JSX.Element {
     )
   }
 
-  if (error || !object) {
+  if (error) {
     return (
       <Layout title="Ошибка">
         <div className="view-object-page">
-          <div className="alert alert-error">{error || 'Объект не найден'}</div>
+          <div className="alert alert-error">{error}</div>
+          <Link to="/user/dashboard/objects" className="btn btn-primary">
+            Вернуться к списку
+          </Link>
+        </div>
+      </Layout>
+    )
+  }
+
+  if (!object) {
+    return (
+      <Layout title="Объект не найден">
+        <div className="view-object-page">
+          <div className="alert alert-error">Объект не найден</div>
           <Link to="/user/dashboard/objects" className="btn btn-primary">
             Вернуться к списку
           </Link>

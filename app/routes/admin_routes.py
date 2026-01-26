@@ -1028,8 +1028,11 @@ def admin_fetch_bot_chats(current_user):
         chats_from_updates = list(chats_dict.values())
         logger.info(f"Chats from getUpdates: {len(chats_from_updates)}")
         
+        # Initialize chats list and add chats from updates
+        chats = chats_from_updates.copy() if chats_from_updates else []
+        
         # Save found chats to database (if any found)
-        if len(chats) > 0:
+        if len(chats_from_updates) > 0:
             try:
                 saved_count = 0
                 updated_count = 0
@@ -1077,10 +1080,6 @@ def admin_fetch_bot_chats(current_user):
             db_chats = Chat.query.filter_by(owner_type='bot').all()
             if db_chats:
                 logger.info(f"Found {len(db_chats)} chats in database")
-                
-                # Initialize chats list if empty
-                if 'chats' not in locals() or not chats:
-                    chats = []
                 
                 # Merge with chats from getUpdates if any
                 existing_chat_ids = {c['id'] for c in chats}
