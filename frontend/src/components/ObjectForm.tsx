@@ -191,8 +191,11 @@ export default function ObjectForm({
                 className="form-input"
                 value={formData.phone_number}
                 onChange={handleInputChange('phone_number')}
-                placeholder="+79991234567"
+                placeholder="89693386969"
+                pattern="^8\d{10}$"
+                title="Номер должен быть в формате 89693386969 (11 цифр, начинается с 8)"
               />
+              <small className="form-hint">Формат: 89693386969 (11 цифр, начинается с 8)</small>
             </div>
           </div>
           <div className="form-group">

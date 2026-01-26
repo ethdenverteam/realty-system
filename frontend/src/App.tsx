@@ -7,6 +7,7 @@ import Login from './pages/Login'
 import AdminBotChats from './pages/admin/BotChats'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminLogs from './pages/admin/Logs'
+import AdminUsers from './pages/admin/Users'
 import UserCreateObject from './pages/user/CreateObject'
 import UserDashboard from './pages/user/Dashboard'
 import UserEditObject from './pages/user/EditObject'
@@ -46,6 +47,14 @@ export default function App(): JSX.Element {
               element={
                 <ProtectedRoute requireAdmin>
                   <AdminLogs />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard/users"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminUsers />
                 </ProtectedRoute>
               }
             />

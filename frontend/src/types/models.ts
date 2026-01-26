@@ -35,6 +35,8 @@ export interface RealtyObjectListItem {
   floor?: string | null;
   districts_json?: string[] | null;
   comment?: string | null;
+  can_publish?: boolean;
+  last_publication?: string;
 }
 
 export interface BotChatFilters {
@@ -91,6 +93,8 @@ export interface RealtyObject {
   creation_date?: string;
   publication_date?: string;
   user_id?: number | string;
+  can_publish?: boolean;
+  last_publication?: string;
 }
 
 export interface ObjectFormData {

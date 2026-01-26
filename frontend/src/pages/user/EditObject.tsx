@@ -79,6 +79,16 @@ export default function EditObject(): JSX.Element {
     if (!objectId) return
 
     setError('')
+    
+    // Validate phone number if provided
+    if (formData.phone_number && formData.phone_number.trim()) {
+      const phonePattern = /^8\d{10}$/
+      if (!phonePattern.test(formData.phone_number.trim())) {
+        setError('Номер телефона должен быть в формате 89693386969 (11 цифр, начинается с 8)')
+        return
+      }
+    }
+    
     setSaving(true)
 
     try {
@@ -97,7 +107,7 @@ export default function EditObject(): JSX.Element {
         address: formData.address || null,
         renovation: formData.renovation || null,
         contact_name: formData.contact_name || null,
-        phone_number: formData.phone_number || null,
+        phone_number: formData.phone_number?.trim() || null,
         show_username: formData.show_username,
       }
 

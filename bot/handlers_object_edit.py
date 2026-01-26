@@ -869,7 +869,7 @@ async def contact_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def phone_from_settings_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Использовать номер из настроек"""
+    """Использовать номер, имя и ник из настроек"""
     query = update.callback_query
     await query.answer()
     
@@ -883,8 +883,23 @@ async def phone_from_settings_handler(update: Update, context: ContextTypes.DEFA
     user_obj = get_user(str(user.id))
     phone = user_obj.phone if user_obj else None
     
+    # Get name and username settings from user settings
+    contact_name = None
+    show_username = False
+    if user_obj and user_obj.settings_json:
+        contact_name = user_obj.settings_json.get('contact_name')
+        show_username = user_obj.settings_json.get('default_show_username', False)
+    
+    # Update object with all settings
+    update_data = {}
     if phone:
-        update_object(object_id, {"phone_number": phone})
+        update_data["phone_number"] = phone
+    if contact_name:
+        update_data["contact_name"] = contact_name
+    update_data["show_username"] = show_username
+    
+    if update_data:
+        update_object(object_id, update_data)
         
         # Log action
         try:
@@ -893,8 +908,8 @@ async def phone_from_settings_handler(update: Update, context: ContextTypes.DEFA
                 if user_obj:
                     action_log = ActionLog(
                         user_id=user_obj.user_id,
-                        action='bot_object_phone_set_from_settings',
-                        details_json={'object_id': object_id, 'phone': phone},
+                        action='bot_object_contacts_set_from_settings',
+                        details_json={'object_id': object_id, **update_data},
                         created_at=datetime.utcnow()
                     )
                     db.add(action_log)

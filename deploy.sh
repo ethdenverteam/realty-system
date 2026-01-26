@@ -1,8 +1,13 @@
 #!/bin/bash
 # Script for automatic deployment after git pull
+#
+# IMPORTANT: If you get "Permission denied" error, run:
+#   chmod +x deploy.sh
+# Or run with: bash deploy.sh
 
 # Ensure script is executable (fixes issue after git reset --hard)
 # This allows the script to set its own permissions
+# Note: This only works if script is already executable or run with bash
 chmod +x "$0" 2>/dev/null || true
 
 set -e  # Stop on error

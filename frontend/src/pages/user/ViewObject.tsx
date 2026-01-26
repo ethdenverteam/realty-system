@@ -267,15 +267,18 @@ export default function ViewObject(): JSX.Element {
             >
               Редактировать
             </Link>
-            {object.status !== 'опубликовано' && (
-              <button
-                onClick={handlePublish}
-                disabled={publishing}
-                className="btn btn-primary"
-              >
-                {publishing ? 'Публикация...' : 'Опубликовать через бота'}
-              </button>
-            )}
+            <button
+              onClick={handlePublish}
+              disabled={publishing || !object.can_publish}
+              className="btn btn-primary"
+              title={!object.can_publish && object.last_publication ? 
+                `Объект был опубликован менее 24 часов назад. Последняя публикация: ${new Date(object.last_publication).toLocaleString('ru-RU')}` : 
+                undefined}
+            >
+              {publishing ? 'Публикация...' : 
+               !object.can_publish ? 'Опубликовать (нельзя - прошло менее 24 часов)' :
+               'Опубликовать через бота'}
+            </button>
           </div>
         </div>
       </div>

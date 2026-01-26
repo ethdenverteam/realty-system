@@ -115,8 +115,27 @@ def user_objects_list(current_user):
     # Paginate
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     
+    # Add can_publish info for each object
+    from datetime import timedelta
+    yesterday = datetime.utcnow() - timedelta(days=1)
+    objects_list = []
+    for obj in pagination.items:
+        obj_dict = obj.to_dict()
+        # Check if can publish (not published within last 24 hours)
+        recent_publications = PublicationHistory.query.filter(
+            PublicationHistory.object_id == obj.object_id,
+            PublicationHistory.published_at >= yesterday,
+            PublicationHistory.deleted == False
+        ).all()
+        
+        obj_dict['can_publish'] = len(recent_publications) == 0
+        if recent_publications:
+            last_pub = max(recent_publications, key=lambda p: p.published_at)
+            obj_dict['last_publication'] = last_pub.published_at.isoformat()
+        objects_list.append(obj_dict)
+    
     return jsonify({
-        'objects': [obj.to_dict() for obj in pagination.items],
+        'objects': objects_list,
         'total': pagination.total,
         'page': page,
         'per_page': per_page,
@@ -140,7 +159,26 @@ def user_get_object(object_id, current_user):
     if not obj:
         return jsonify({'error': 'Object not found'}), 404
     
-    return jsonify(obj.to_dict())
+    # Check if can publish (not published within last 24 hours)
+    from datetime import timedelta
+    yesterday = datetime.utcnow() - timedelta(days=1)
+    recent_publications = PublicationHistory.query.filter(
+        PublicationHistory.object_id == object_id,
+        PublicationHistory.published_at >= yesterday,
+        PublicationHistory.deleted == False
+    ).all()
+    
+    can_publish = len(recent_publications) == 0
+    last_publication = None
+    if recent_publications:
+        last_pub = max(recent_publications, key=lambda p: p.published_at)
+        last_publication = last_pub.published_at.isoformat()
+    
+    obj_dict = obj.to_dict()
+    obj_dict['can_publish'] = can_publish
+    obj_dict['last_publication'] = last_publication
+    
+    return jsonify(obj_dict)
 
 
 @user_routes_bp.route('/dashboard/objects/publish', methods=['POST'])

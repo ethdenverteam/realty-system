@@ -122,6 +122,43 @@ export default function UserObjects(): JSX.Element {
                     <Link to={`/user/dashboard/objects/${obj.object_id}`} className="btn btn-sm btn-primary">
                       Просмотр
                     </Link>
+                    <button
+                      onClick={async () => {
+                        if (!obj.can_publish) {
+                          alert(obj.last_publication ? 
+                            `Объект был опубликован менее 24 часов назад. Последняя публикация: ${new Date(obj.last_publication).toLocaleString('ru-RU')}` :
+                            'Объект нельзя опубликовать сейчас')
+                          return
+                        }
+                        if (!confirm('Вы уверены, что хотите опубликовать этот объект через бота?')) {
+                          return
+                        }
+                        try {
+                          const res = await api.post('/user/dashboard/objects/publish', {
+                            object_id: obj.object_id,
+                          })
+                          if (res.data.success) {
+                            alert('Объект успешно опубликован!')
+                            await loadObjects()
+                          } else {
+                            alert(res.data.error || 'Ошибка публикации')
+                          }
+                        } catch (err: unknown) {
+                          let message = 'Ошибка публикации'
+                          if (axios.isAxiosError<ApiErrorResponse>(err)) {
+                            message = err.response?.data?.error || err.message || message
+                          }
+                          alert(message)
+                        }
+                      }}
+                      className="btn btn-sm btn-secondary"
+                      title={!obj.can_publish && obj.last_publication ? 
+                        `Объект был опубликован менее 24 часов назад. Последняя публикация: ${new Date(obj.last_publication).toLocaleString('ru-RU')}` : 
+                        undefined}
+                      disabled={!obj.can_publish}
+                    >
+                      {!obj.can_publish ? 'Опубликовать (нельзя)' : 'Опубликовать'}
+                    </button>
                   </div>
                 </div>
               ))}
