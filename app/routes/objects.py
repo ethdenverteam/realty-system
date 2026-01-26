@@ -297,6 +297,8 @@ def update_object(object_id, current_user):
 @jwt_required
 def delete_object(object_id, current_user):
     """Delete object"""
+    from app.models.publication_history import PublicationHistory
+    
     obj = Object.query.filter_by(object_id=object_id, user_id=current_user.user_id).first()
     
     if not obj:
@@ -311,6 +313,11 @@ def delete_object(object_id, current_user):
             'status': obj.status
         }
         
+        # First, delete all related publication_history records
+        # This prevents NOT NULL constraint violation
+        PublicationHistory.query.filter_by(object_id=object_id).delete()
+        
+        # Now delete the object
         db.session.delete(obj)
         db.session.commit()
         

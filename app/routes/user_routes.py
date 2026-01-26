@@ -81,6 +81,7 @@ def user_objects_list(current_user):
     per_page = request.args.get('per_page', 20, type=int)
     status = request.args.get('status')
     rooms_type = request.args.get('rooms_type')
+    district = request.args.get('district')
     search = request.args.get('search')
     sort_by = request.args.get('sort_by', 'creation_date')
     sort_order = request.args.get('sort_order', 'desc')
@@ -93,6 +94,10 @@ def user_objects_list(current_user):
         query = query.filter(Object.status == status)
     if rooms_type:
         query = query.filter(Object.rooms_type == rooms_type)
+    if district:
+        # Filter by district in districts_json array (PostgreSQL JSONB)
+        # Use JSONB contains operator for array filtering
+        query = query.filter(Object.districts_json.contains([district]))
     if search:
         from sqlalchemy import or_
         search_filter = or_(
@@ -105,11 +110,11 @@ def user_objects_list(current_user):
     # Apply sorting
     if sort_by == 'price':
         order_by = Object.price.desc() if sort_order == 'desc' else Object.price.asc()
-    elif sort_by == 'rooms_type':
-        order_by = Object.rooms_type.desc() if sort_order == 'desc' else Object.rooms_type.asc()
+    elif sort_by == 'creation_date':
+        order_by = Object.creation_date.desc() if sort_order == 'desc' else Object.creation_date.asc()
     elif sort_by == 'publication_date':
         order_by = Object.publication_date.desc() if sort_order == 'desc' else Object.publication_date.asc()
-    else:  # creation_date
+    else:  # default to creation_date
         order_by = Object.creation_date.desc() if sort_order == 'desc' else Object.creation_date.asc()
     
     query = query.order_by(order_by)
@@ -462,7 +467,8 @@ def user_publish_object_via_bot(current_user):
             'success': True,
             'published_count': published_count,
             'total_chats': len(target_chats),
-            'errors': errors if errors else None
+            'errors': errors if errors else None,
+            'message': f'Объект успешно опубликован в {published_count} из {len(target_chats)} чатов'
         }), 200
         
     except Exception as e:

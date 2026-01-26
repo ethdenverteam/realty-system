@@ -80,6 +80,18 @@ export default function UserObjects(): JSX.Element {
               </select>
               <select
                 className="form-input form-input-sm"
+                value={districtFilter}
+                onChange={(e) => setDistrictFilter(e.target.value)}
+              >
+                <option value="">Все районы</option>
+                {districts.map((district) => (
+                  <option key={district} value={district}>
+                    {district}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="form-input form-input-sm"
                 value={`${sortBy}_${sortOrder}`}
                 onChange={(e) => {
                   const [by, order] = e.target.value.split('_')
@@ -91,8 +103,6 @@ export default function UserObjects(): JSX.Element {
                 <option value="creation_date_asc">Старые сначала</option>
                 <option value="price_desc">Цена: дороже</option>
                 <option value="price_asc">Цена: дешевле</option>
-                <option value="rooms_type_asc">Тип комнат: А-Я</option>
-                <option value="rooms_type_desc">Тип комнат: Я-А</option>
               </select>
             </div>
           </div>
@@ -174,7 +184,8 @@ export default function UserObjects(): JSX.Element {
                             object_id: obj.object_id,
                           })
                           if (res.data.success) {
-                            alert('Объект успешно опубликован!')
+                            const message = res.data.message || `Объект успешно опубликован в ${res.data.published_count || 0} чатов!`
+                            alert(message)
                             await loadObjects()
                           } else {
                             alert(res.data.error || 'Ошибка публикации')
@@ -182,7 +193,7 @@ export default function UserObjects(): JSX.Element {
                         } catch (err: unknown) {
                           let message = 'Ошибка публикации'
                           if (axios.isAxiosError<ApiErrorResponse>(err)) {
-                            message = err.response?.data?.error || err.message || message
+                            message = err.response?.data?.error || err.response?.data?.details || err.message || message
                           }
                           alert(message)
                         }
@@ -194,27 +205,6 @@ export default function UserObjects(): JSX.Element {
                       disabled={!obj.can_publish}
                     >
                       {!obj.can_publish ? 'Опубликовать (нельзя)' : 'Опубликовать'}
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (!confirm(`Вы уверены, что хотите удалить объект ${obj.object_id}? Это действие нельзя отменить!`)) {
-                          return
-                        }
-                        try {
-                          await api.delete(`/objects/${obj.object_id}`)
-                          alert('Объект успешно удален!')
-                          await loadObjects()
-                        } catch (err: unknown) {
-                          let message = 'Ошибка удаления объекта'
-                          if (axios.isAxiosError<ApiErrorResponse>(err)) {
-                            message = err.response?.data?.error || err.message || message
-                          }
-                          alert(message)
-                        }
-                      }}
-                      className="btn btn-sm btn-danger"
-                    >
-                      Удалить
                     </button>
                   </div>
                 </div>

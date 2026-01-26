@@ -10,6 +10,7 @@ from bot.utils import (
 )
 from bot.database import get_db
 from bot.models import Object, ActionLog
+from app.models.publication_history import PublicationHistory
 from bot.handlers_object import (
     user_data, show_object_preview_with_menu, OBJECT_WAITING_AREA, OBJECT_WAITING_FLOOR,
     OBJECT_WAITING_COMMENT, OBJECT_WAITING_RENOVATION, OBJECT_WAITING_ADDRESS,
@@ -1142,6 +1143,12 @@ async def confirm_delete_object_handler(update: Update, context: ContextTypes.DE
     # Delete object
     db = get_db()
     try:
+        # First, delete all related publication_history records
+        # This prevents NOT NULL constraint violation
+        # Use db.query() instead of Model.query for proper session handling
+        db.query(PublicationHistory).filter_by(object_id=object_id).delete(synchronize_session=False)
+        db.commit()
+        
         # Log action before deletion
         try:
             action_log = ActionLog(

@@ -114,6 +114,25 @@ export default function AdminDashboard(): JSX.Element {
               </svg>
               <span>Управление пользователями</span>
             </a>
+            <a href="/admin/dashboard/database-schema" className="action-card">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M4 4H20V20H4V4Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M4 8H20M4 12H20M4 16H20"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Структура базы данных</span>
+            </a>
             <a href="/user/dashboard" className="action-card">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                 <path
