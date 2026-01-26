@@ -1,14 +1,32 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import api from '../utils/api'
 import './Login.css'
 
 export default function Login(): JSX.Element | null {
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [botLink, setBotLink] = useState('https://t.me/your_bot_username?start=getcode')
   const { login, isAuthenticated } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    void loadBotInfo()
+  }, [])
+
+  const loadBotInfo = async (): Promise<void> => {
+    try {
+      const res = await api.get<{ username?: string }>('/auth/bot-info')
+      if (res.data.username) {
+        setBotLink(`https://t.me/${res.data.username}?start=getcode`)
+      }
+    } catch (err) {
+      // Silently fail - use default link
+      console.error('Failed to load bot info:', err)
+    }
+  }
 
   if (isAuthenticated) {
     return <Navigate to="/user/dashboard" replace />
@@ -62,7 +80,16 @@ export default function Login(): JSX.Element | null {
             />
           </svg>
           <span>
-            Получите 6-значный код, отправив команду <strong>/getcode</strong> в Telegram боту
+            Получите 6-значный код, отправив команду{' '}
+            <a
+              href={botLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="login-bot-link"
+            >
+              <strong>/getcode</strong>
+            </a>{' '}
+            в Telegram боту
           </span>
         </div>
 

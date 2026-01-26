@@ -71,9 +71,11 @@ export default function UserCreateObject(): JSX.Element {
 
     try {
       const districts = formData.districts
-        .split(',')
-        .map((d) => d.trim())
-        .filter((d) => d.length > 0)
+        ? formData.districts
+            .split(',')
+            .map((d) => d.trim())
+            .filter((d) => d.length > 0)
+        : []
 
       const requestData: CreateObjectRequest = {
         rooms_type: formData.rooms_type,

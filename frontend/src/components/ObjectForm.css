@@ -3,3 +3,12 @@
   width: 100%;
 }
 
+.form-input-multiple {
+  min-height: 120px;
+  padding: var(--spacing-sm);
+}
+
+.form-input-multiple option {
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+

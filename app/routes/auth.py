@@ -120,6 +120,33 @@ def get_current_user():
     return _get_user()
 
 
+@auth_bp.route('/bot-info', methods=['GET'])
+def get_bot_info():
+    """Get bot information (username)"""
+    try:
+        from bot.config import BOT_TOKEN
+        import requests
+        
+        if not BOT_TOKEN:
+            return jsonify({'username': None}), 200
+        
+        # Get bot info from Telegram API
+        bot_info_url = f'https://api.telegram.org/bot{BOT_TOKEN}/getMe'
+        try:
+            response = requests.get(bot_info_url, timeout=5)
+            data = response.json()
+            if data.get('ok') and data.get('result'):
+                username = data['result'].get('username')
+                return jsonify({'username': username})
+        except Exception as e:
+            logger.error(f"Error getting bot info: {e}")
+        
+        return jsonify({'username': None}), 200
+    except Exception as e:
+        logger.error(f"Error in get_bot_info: {e}")
+        return jsonify({'username': None}), 200
+
+
 @auth_bp.route('/login', methods=['GET'])
 def login_page():
     """Login page"""

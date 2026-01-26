@@ -13,19 +13,37 @@ export default function UserObjects(): JSX.Element {
   const [sortBy, setSortBy] = useState('creation_date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [roomsTypeFilter, setRoomsTypeFilter] = useState('')
+  const [districtFilter, setDistrictFilter] = useState('')
+  const [districts, setDistricts] = useState<string[]>([])
+
+  useEffect(() => {
+    void loadDistricts()
+  }, [])
 
   useEffect(() => {
     void loadObjects()
-  }, [statusFilter, sortBy, sortOrder, roomsTypeFilter])
+  }, [statusFilter, sortBy, sortOrder, roomsTypeFilter, districtFilter])
+
+  const loadDistricts = async (): Promise<void> => {
+    try {
+      const res = await api.get<{ districts: string[] }>('/user/dashboard/districts')
+      setDistricts(res.data.districts || [])
+    } catch (err: unknown) {
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+        console.error('Error loading districts:', err.response?.data || err.message)
+      }
+    }
+  }
 
   const loadObjects = async (): Promise<void> => {
     try {
       setLoading(true)
-      const params: { status?: string; sort_by?: string; sort_order?: string; rooms_type?: string } = {}
+      const params: { status?: string; sort_by?: string; sort_order?: string; rooms_type?: string; district?: string } = {}
       if (statusFilter) params.status = statusFilter
       if (sortBy) params.sort_by = sortBy
       if (sortOrder) params.sort_order = sortOrder
       if (roomsTypeFilter) params.rooms_type = roomsTypeFilter
+      if (districtFilter) params.district = districtFilter
       const res = await api.get<ObjectsListResponse>('/user/dashboard/objects/list', { params })
       setObjects(res.data.objects || [])
     } catch (err: unknown) {

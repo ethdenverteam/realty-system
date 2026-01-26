@@ -132,3 +132,13 @@
   width: 100%;
 }
 
+.login-bot-link {
+  color: var(--color-accent);
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.login-bot-link:hover {
+  color: var(--color-text);
+}
+

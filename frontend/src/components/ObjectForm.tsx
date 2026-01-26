@@ -1,5 +1,6 @@
-import { type ChangeEvent, type FormEvent } from 'react'
+import { type ChangeEvent, type FormEvent, useState, useEffect } from 'react'
 import type { ObjectFormData, RoomsType, RenovationType } from '../types/models'
+import api from '../utils/api'
 import './ObjectForm.css'
 
 interface ObjectFormProps {
@@ -43,6 +44,44 @@ export default function ObjectForm({
   onCancel,
   error,
 }: ObjectFormProps): JSX.Element {
+  const [districts, setDistricts] = useState<string[]>([])
+  const [selectedDistricts, setSelectedDistricts] = useState<string[]>([])
+
+  useEffect(() => {
+    void loadDistricts()
+  }, [])
+
+  useEffect(() => {
+    // Parse districts from formData (comma-separated string) when formData changes
+    if (formData.districts) {
+      const parsed = formData.districts.split(',').map(d => d.trim()).filter(d => d.length > 0)
+      if (JSON.stringify(parsed.sort()) !== JSON.stringify(selectedDistricts.sort())) {
+        setSelectedDistricts(parsed)
+      }
+    } else if (selectedDistricts.length > 0) {
+      setSelectedDistricts([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.districts])
+
+  useEffect(() => {
+    // Update formData when selectedDistricts changes
+    const districtsString = selectedDistricts.join(', ')
+    if (districtsString !== formData.districts) {
+      handleChange('districts', districtsString)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDistricts])
+
+  const loadDistricts = async (): Promise<void> => {
+    try {
+      const res = await api.get<{ districts: string[] }>('/user/dashboard/districts')
+      setDistricts(res.data.districts || [])
+    } catch (err) {
+      console.error('Error loading districts:', err)
+    }
+  }
+
   const handleChange = (field: keyof ObjectFormData, value: string | boolean): void => {
     onChange({
       ...formData,
@@ -57,6 +96,11 @@ export default function ObjectForm({
       ? (e.target as HTMLInputElement).checked 
       : e.target.value
     handleChange(field, value)
+  }
+
+  const handleDistrictsChange = (e: ChangeEvent<HTMLSelectElement>): void => {
+    const selected = Array.from(e.target.selectedOptions, option => option.value)
+    setSelectedDistricts(selected)
   }
 
   return (
@@ -122,18 +166,22 @@ export default function ObjectForm({
           </div>
           <div className="form-group">
             <label className="form-label">Районы</label>
-            <input
-              type="text"
-              className="form-input"
-              value={formData.districts}
-              onChange={handleInputChange('districts')}
-              placeholder="Введите районы через запятую или выберите из списка"
-              list="districts-list"
-            />
-            <datalist id="districts-list">
-              {/* Districts will be loaded from API and populated here */}
-            </datalist>
-            <small className="form-hint">Начните вводить название района или выберите из списка</small>
+            <select
+              multiple
+              className="form-input form-input-multiple"
+              value={selectedDistricts}
+              onChange={handleDistrictsChange}
+              size={Math.min(districts.length + 1, 8)}
+            >
+              {districts.map((district) => (
+                <option key={district} value={district}>
+                  {district}
+                </option>
+              ))}
+            </select>
+            <small className="form-hint">
+              Удерживайте Ctrl (или Cmd на Mac) для выбора нескольких районов. Выбрано: {selectedDistricts.length}
+            </small>
           </div>
         </div>
 

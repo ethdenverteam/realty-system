@@ -77,7 +77,8 @@ async def getcode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         code = generate_web_code(user_id)
-        text = f"Ваш код для входа в веб-интерфейс:\n\n<b>{code}</b>\n\nКод действителен 10 минут."
+        # Use monospace font for code (HTML <code> tag)
+        text = f"Ваш код для входа в веб-интерфейс:\n\n<code>{code}</code>\n\nКод действителен 10 минут.\n\nНажмите на код, чтобы скопировать."
         
         # Log action
         try:
