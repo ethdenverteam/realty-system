@@ -406,9 +406,15 @@ async def edit_address_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 async def edit_contacts_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик кнопки редактирования контактов"""
     query = update.callback_query
-    await query.answer()
-    
-    object_id = query.data.replace("edit_contacts_", "")
+    if query:
+        await query.answer()
+        object_id = query.data.replace("edit_contacts_", "")
+    else:
+        # Called from message handler - get object_id from user_data
+        user = update.effective_user
+        if user.id not in user_data or "object_id" not in user_data[user.id]:
+            return
+        object_id = user_data[user.id]["object_id"]
     
     user = update.effective_user
     if user.id not in user_data:
@@ -442,7 +448,14 @@ async def edit_contacts_handler(update: Update, context: ContextTypes.DEFAULT_TY
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.message.reply_text(text, reply_markup=reply_markup, parse_mode='HTML')
+    if query:
+        try:
+            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='HTML')
+        except:
+            await query.message.reply_text(text, reply_markup=reply_markup, parse_mode='HTML')
+    elif update.message:
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='HTML')
+    
     return OBJECT_WAITING_CONTACTS
 
 
@@ -796,8 +809,9 @@ async def contacts_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Failed to log action: {e}")
     
-    await show_object_preview_with_menu(update, context, object_id)
-    return OBJECT_PREVIEW_MENU
+    # Show contacts menu again with updated values
+    await edit_contacts_handler(update, context)
+    return OBJECT_WAITING_CONTACTS
 
 
 async def contact_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -832,8 +846,11 @@ async def contact_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
     
-    await show_object_preview_with_menu(update, context, object_id)
-    return OBJECT_PREVIEW_MENU
+    # Show contacts menu again with updated values
+    await edit_contacts_handler(update, context)
+    return OBJECT_WAITING_CONTACTS
+    await edit_contacts_handler(update, context)
+    return OBJECT_WAITING_CONTACTS
 
 
 async def phone_from_settings_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -872,8 +889,9 @@ async def phone_from_settings_handler(update: Update, context: ContextTypes.DEFA
         except Exception as e:
             logger.error(f"Failed to log action: {e}")
     
-    await show_object_preview_with_menu(update, context, object_id)
-    return OBJECT_PREVIEW_MENU
+    # Show contacts menu again with updated values
+    await edit_contacts_handler(update, context)
+    return OBJECT_WAITING_CONTACTS
 
 
 async def phone_custom_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -958,6 +976,7 @@ async def toggle_username_handler(update: Update, context: ContextTypes.DEFAULT_
         except Exception as e:
             logger.error(f"Failed to log action: {e}")
     
-    await show_object_preview_with_menu(update, context, object_id)
-    return OBJECT_PREVIEW_MENU
+    # Show contacts menu again with updated values
+    await edit_contacts_handler(update, context)
+    return OBJECT_WAITING_CONTACTS
 

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import ObjectForm from '../../components/ObjectForm'
@@ -21,11 +21,38 @@ const initialFormData: ObjectFormData = {
   show_username: false,
 }
 
+interface UserSettings {
+  phone: string
+  contact_name: string
+  default_show_username: boolean
+}
+
 export default function UserCreateObject(): JSX.Element {
   const navigate = useNavigate()
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string>('')
   const [formData, setFormData] = useState<ObjectFormData>(initialFormData)
+
+  useEffect(() => {
+    void loadUserSettings()
+  }, [])
+
+  const loadUserSettings = async (): Promise<void> => {
+    try {
+      const response = await api.get<UserSettings>('/user/dashboard/settings/data')
+      setFormData((prev) => ({
+        ...prev,
+        phone_number: response.data.phone || '',
+        contact_name: response.data.contact_name || '',
+        show_username: response.data.default_show_username || false,
+      }))
+    } catch (err: unknown) {
+      // Silently fail - settings are optional
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+        console.error('Failed to load user settings:', err.response?.data || err.message)
+      }
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault()

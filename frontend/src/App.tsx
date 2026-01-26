@@ -11,6 +11,7 @@ import UserCreateObject from './pages/user/CreateObject'
 import UserDashboard from './pages/user/Dashboard'
 import UserEditObject from './pages/user/EditObject'
 import UserObjects from './pages/user/Objects'
+import UserSettings from './pages/user/Settings'
 import UserViewObject from './pages/user/ViewObject'
 import './App.css'
 
@@ -87,6 +88,14 @@ export default function App(): JSX.Element {
               element={
                 <ProtectedRoute>
                   <UserViewObject />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/dashboard/settings"
+              element={
+                <ProtectedRoute>
+                  <UserSettings />
                 </ProtectedRoute>
               }
             />

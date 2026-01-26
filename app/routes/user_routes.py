@@ -430,3 +430,62 @@ def user_publish_object_via_bot(current_user):
         logger.error(f"Error publishing object via bot: {e}", exc_info=True)
         log_error(e, 'web_object_publish_via_bot_failed', current_user.user_id, {'object_id': object_id})
         return jsonify({'error': str(e)}), 500
+
+
+@user_routes_bp.route('/dashboard/settings', methods=['GET'])
+@jwt_required
+def user_settings_page(current_user):
+    """User settings page"""
+    return render_template('user/settings.html', user=current_user)
+
+
+@user_routes_bp.route('/dashboard/settings/data', methods=['GET'])
+@jwt_required
+def get_user_settings(current_user):
+    """Get user settings"""
+    settings = current_user.settings_json or {}
+    return jsonify({
+        'phone': current_user.phone or '',
+        'contact_name': settings.get('contact_name', ''),
+        'default_show_username': settings.get('default_show_username', False)
+    })
+
+
+@user_routes_bp.route('/dashboard/settings/data', methods=['PUT'])
+@jwt_required
+def update_user_settings(current_user):
+    """Update user settings"""
+    data = request.get_json()
+    
+    if 'phone' in data:
+        current_user.phone = data['phone'] or None
+    
+    if not current_user.settings_json:
+        current_user.settings_json = {}
+    
+    if 'contact_name' in data:
+        current_user.settings_json['contact_name'] = data['contact_name'] or ''
+    
+    if 'default_show_username' in data:
+        current_user.settings_json['default_show_username'] = bool(data['default_show_username'])
+    
+    try:
+        db.session.commit()
+        
+        log_action(
+            action='user_settings_updated',
+            user_id=current_user.user_id,
+            details={
+                'updated_fields': list(data.keys())
+            }
+        )
+        
+        return jsonify({
+            'phone': current_user.phone or '',
+            'contact_name': current_user.settings_json.get('contact_name', ''),
+            'default_show_username': current_user.settings_json.get('default_show_username', False)
+        })
+    except Exception as e:
+        db.session.rollback()
+        log_error(e, 'user_settings_update_failed', current_user.user_id, {})
+        return jsonify({'error': str(e)}), 500

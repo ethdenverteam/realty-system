@@ -71,6 +71,141 @@ export default function Layout({
         </div>
       </header>
 
+      {/* Top navigation for desktop */}
+      <nav className="top-nav">
+        {isAdmin ? (
+          <>
+            <Link
+              to="/admin/dashboard"
+              className={`top-nav-item ${location.pathname === '/admin/dashboard' ? 'active' : ''}`}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M3 10L9 4L9 9L17 9L17 11L9 11L9 16L3 10Z" fill="currentColor" />
+              </svg>
+              <span>Главная</span>
+            </Link>
+            <Link
+              to="/admin/dashboard/bot-chats"
+              className={`top-nav-item ${location.pathname.includes('/bot-chats') ? 'active' : ''}`}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M2 5L10 9L18 5M2 15L10 19L18 15M2 10L10 14L18 10"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Чаты</span>
+            </Link>
+            <Link
+              to="/admin/dashboard/logs"
+              className={`top-nav-item ${location.pathname.includes('/logs') ? 'active' : ''}`}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M4 4H16V16H4V4Z" stroke="currentColor" strokeWidth="2" />
+                <path d="M4 8H16M4 12H12" stroke="currentColor" strokeWidth="2" />
+              </svg>
+              <span>Логи</span>
+            </Link>
+            <Link to="/user/dashboard" className="top-nav-item">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M10 10C12.7614 10 15 7.76142 15 5C15 2.23858 12.7614 0 10 0C7.23858 0 5 2.23858 5 5C5 7.76142 7.23858 10 10 10Z"
+                  fill="currentColor"
+                />
+                <path
+                  d="M10 12C5.58172 12 2 14.2386 2 17V20H18V17C18 14.2386 14.4183 12 10 12Z"
+                  fill="currentColor"
+                />
+              </svg>
+              <span>Пользователь</span>
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link
+              to="/user/dashboard"
+              className={`top-nav-item ${location.pathname === '/user/dashboard' ? 'active' : ''}`}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M3 10L9 4L9 9L17 9L17 11L9 11L9 16L3 10Z" fill="currentColor" />
+              </svg>
+              <span>Главная</span>
+            </Link>
+            <Link
+              to="/user/dashboard/objects"
+              className={`top-nav-item ${
+                location.pathname.includes('/objects') && !location.pathname.includes('/create') ? 'active' : ''
+              }`}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M2 5L10 9L18 5M2 15L10 19L18 15M2 10L10 14L18 10"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Объекты</span>
+            </Link>
+            <Link
+              to="/user/dashboard/objects/create"
+              className={`top-nav-item ${location.pathname.includes('/create') ? 'active' : ''}`}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M10 4V16M4 10H16"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <span>Создать</span>
+            </Link>
+            <Link
+              to="/user/dashboard/settings"
+              className={`top-nav-item ${location.pathname.includes('/settings') ? 'active' : ''}`}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M10 12.5C11.3807 12.5 12.5 11.3807 12.5 10C12.5 8.61929 11.3807 7.5 10 7.5C8.61929 7.5 7.5 8.61929 7.5 10C7.5 11.3807 8.61929 12.5 10 12.5Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M16.25 10C16.25 10.4167 16.25 10.8333 16.25 11.25C16.25 12.5 15.8333 13.5833 15 14.4167C14.1667 15.25 13.0833 15.6667 11.8333 15.6667C10.5833 15.6667 9.5 15.25 8.66667 14.4167C7.83333 13.5833 7.41667 12.5 7.41667 11.25C7.41667 10.8333 7.41667 10.4167 7.41667 10C7.41667 9.58333 7.41667 9.16667 7.41667 8.75C7.41667 7.5 7.83333 6.41667 8.66667 5.58333C9.5 4.75 10.5833 4.33333 11.8333 4.33333C13.0833 4.33333 14.1667 4.75 15 5.58333C15.8333 6.41667 16.25 7.5 16.25 8.75C16.25 9.16667 16.25 9.58333 16.25 10Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Настройки</span>
+            </Link>
+            {user?.web_role === 'admin' && (
+              <Link to="/admin/dashboard" className="top-nav-item">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M10 2L2 7L10 12L18 7L10 2Z" fill="currentColor" />
+                  <path
+                    d="M2 13L10 18L18 13M2 10L10 15L18 10"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span>Админ</span>
+              </Link>
+            )}
+          </>
+        )}
+      </nav>
+
       <main className="app-main">{children}</main>
 
       <nav className="bottom-nav">
