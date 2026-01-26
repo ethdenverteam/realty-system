@@ -1024,32 +1024,16 @@ def admin_fetch_bot_chats(current_user):
                 logger.warning(f"Error checking admin status for chat {chat_data['id']}: {e}")
                 chat_data['can_see_messages'] = False
         
-        # Filter chats: keep private chats (bot received messages) and groups where bot can see messages
-        filtered_chats = []
-        for chat_id, chat_data in chats_dict.items():
-            if chat_data['type'] == 'private':
-                # All private chats where bot received messages are included
-                filtered_chats.append(chat_data)
-            elif chat_data['type'] in ['group', 'supergroup', 'channel']:
-                # Only include groups where bot can see messages
-                if chat_data.get('can_see_messages', False):
-                    filtered_chats.append(chat_data)
-                else:
-                    logger.debug(f"Excluding chat {chat_id} ({chat_data['title']}) - bot cannot see messages")
-        
-        chats = filtered_chats
-        logger.info(f"After filtering: {len(chats)} chats where bot can see messages (from {len(chats_dict)} total)")
-        
-        # Convert to list
-        chats = list(chats_dict.values())
-        logger.info(f"Total chats found: {len(chats)}")
+        # Convert chats_dict to list first
+        chats_from_updates = list(chats_dict.values())
+        logger.info(f"Chats from getUpdates: {len(chats_from_updates)}")
         
         # Save found chats to database (if any found)
         if len(chats) > 0:
             try:
                 saved_count = 0
                 updated_count = 0
-                for chat_data in chats:
+                for chat_data in chats_from_updates:
                     chat_id_str = str(chat_data['id'])
                     existing_chat = Chat.query.filter_by(telegram_chat_id=chat_id_str, owner_type='bot').first()
                     
@@ -1086,29 +1070,90 @@ def admin_fetch_bot_chats(current_user):
                 logger.error(f"Error saving chats to database: {save_error}", exc_info=True)
                 db.session.rollback()
         
-        # If no chats found from getUpdates, try to get from database
-        if len(chats) == 0:
-            logger.warning("No chats found from getUpdates - trying to get from database")
-            try:
-                db_chats = Chat.query.filter_by(owner_type='bot').all()
-                if db_chats:
-                    logger.info(f"Found {len(db_chats)} chats in database")
+        # Always use database as primary source (chats are saved automatically by bot)
+        # getUpdates only works when bot is stopped, so we rely on database
+        logger.info("Getting chats from database (bot saves chats automatically)")
+        try:
+            db_chats = Chat.query.filter_by(owner_type='bot').all()
+            if db_chats:
+                logger.info(f"Found {len(db_chats)} chats in database")
+                
+                # Initialize chats list if empty
+                if 'chats' not in locals() or not chats:
                     chats = []
-                    for db_chat in db_chats:
-                        username = ''
-                        if db_chat.filters_json and isinstance(db_chat.filters_json, dict):
-                            username = db_chat.filters_json.get('username', '')
-                        
-                        chats.append({
-                            'id': db_chat.telegram_chat_id,
-                            'title': db_chat.title,
-                            'type': db_chat.type,
-                            'username': username
-                        })
+                
+                # Merge with chats from getUpdates if any
+                existing_chat_ids = {c['id'] for c in chats}
+                
+                for db_chat in db_chats:
+                    chat_id_str = str(db_chat.telegram_chat_id)
+                    
+                    # Skip if already in chats from getUpdates
+                    if chat_id_str in existing_chat_ids:
+                        continue
+                    
+                    username = ''
+                    if db_chat.filters_json and isinstance(db_chat.filters_json, dict):
+                        username = db_chat.filters_json.get('username', '')
+                    
+                    chat_data = {
+                        'id': chat_id_str,
+                        'title': db_chat.title,
+                        'type': db_chat.type,
+                        'username': username,
+                        'is_admin': None,
+                        'can_see_messages': None
+                    }
+                    
+                    # For groups, check admin status
+                    if db_chat.type in ['group', 'supergroup', 'channel']:
+                        try:
+                            params = {'chat_id': chat_id_str, 'user_id': bot_user_id if bot_user_id else BOT_TOKEN.split(':')[0]}
+                            response = requests.get(get_chat_member_url, params=params, timeout=5)
+                            if response.status_code == 200:
+                                member_data = response.json()
+                                if member_data.get('ok'):
+                                    status = member_data['result'].get('status', '')
+                                    can_see_messages = status in ['administrator', 'creator', 'member']
+                                    if db_chat.type == 'channel':
+                                        can_see_messages = status in ['administrator', 'creator']
+                                    chat_data['is_admin'] = status in ['administrator', 'creator']
+                                    chat_data['can_see_messages'] = can_see_messages
+                                else:
+                                    chat_data['can_see_messages'] = False
+                            else:
+                                chat_data['can_see_messages'] = False
+                        except Exception as e:
+                            logger.debug(f"Error checking admin status for chat {chat_id_str}: {e}")
+                            chat_data['can_see_messages'] = False
+                    else:
+                        # Private chats - bot can always see messages
+                        chat_data['can_see_messages'] = True
+                    
+                    chats.append(chat_data)
+            else:
+                logger.warning("No chats found in database - bot may not have received any messages yet")
+        except Exception as db_error:
+            logger.warning(f"Error getting chats from database: {db_error}")
+        
+        # Filter chats: keep private chats (bot received messages) and groups where bot can see messages
+        filtered_chats = []
+        for chat_data in chats:
+            if chat_data['type'] == 'private':
+                # All private chats where bot received messages are included
+                filtered_chats.append(chat_data)
+            elif chat_data['type'] in ['group', 'supergroup', 'channel']:
+                # Only include groups where bot can see messages
+                if chat_data.get('can_see_messages', False):
+                    filtered_chats.append(chat_data)
                 else:
-                    logger.warning("No chats found in database either")
-            except Exception as db_error:
-                logger.warning(f"Error getting chats from database: {db_error}")
+                    logger.debug(f"Excluding chat {chat_data['id']} ({chat_data['title']}) - bot cannot see messages")
+            else:
+                # Unknown type, include it
+                filtered_chats.append(chat_data)
+        
+        chats = filtered_chats
+        logger.info(f"After filtering: {len(chats)} chats where bot can see messages")
         
         # Separate groups and users
         groups = [c for c in chats if c['type'] in ['group', 'supergroup', 'channel']]

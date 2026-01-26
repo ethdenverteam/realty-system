@@ -9,6 +9,7 @@ from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, MessageHandler,
     ContextTypes, filters
 )
+from telegram import Update
 
 from bot.handlers import (
     start_command, show_main_menu,
@@ -282,6 +283,19 @@ def main():
         name="edit_object_handler"
     )
     application.add_handler(edit_conversation)
+    
+    # Save chats from updates to database
+    async def save_chat_from_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Save chat from update to database"""
+        from bot.utils_chat import save_chat_from_update as save_chat
+        try:
+            save_chat(update)
+        except Exception as e:
+            logger.error(f"Error saving chat from update: {e}", exc_info=True)
+    
+    # Add chat saver handler - should run for all updates
+    application.add_handler(MessageHandler(filters.ALL, save_chat_from_update), group=0)
+    application.add_handler(CallbackQueryHandler(save_chat_from_update), group=0)
     
     # Log all updates (for debugging) - only non-command messages to avoid duplication
     # NOTE: This handler should be added AFTER conversation handlers to avoid intercepting messages
