@@ -47,7 +47,7 @@
   box-shadow: var(--shadow-lg, 0 4px 6px rgba(0, 0, 0, 0.1));
   min-width: 200px;
   max-width: calc(100vw - var(--spacing-lg, 16px) * 2);
-  z-index: 1000;
+  z-index: 10000; /* Увеличено для отображения поверх всех элементов */
   overflow: hidden;
   animation: slideUp 0.2s ease-out;
   /* Стили как у select на странице объектов */
