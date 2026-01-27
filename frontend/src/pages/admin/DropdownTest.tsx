@@ -22,6 +22,7 @@ function DropdownTest(): JSX.Element {
   const [log, setLog] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [buttonStatusFilter, setButtonStatusFilter] = useState<string>('')
+  const [menuChoice, setMenuChoice] = useState<string>('')
 
   // Тестовые данные для объектов
   const testObjects: RealtyObjectListItem[] = [
@@ -264,6 +265,43 @@ const loadObjects = async (): Promise<void> => {
                 <option value="архив">Архив</option>
               </select>
             </GlassButton>
+          </div>
+        </div>
+
+        <div className="test-section">
+          <h2>Меню в кнопке (Liquid Glass)</h2>
+          <p>Кнопка всегда показывает текст «меню», а список внутри — как у навигации.</p>
+          <div className="test-controls">
+            <GlassButton className="glass-select-button">
+              меню
+              <select
+                className="glass-select-native"
+                value={menuChoice}
+                onChange={(e) => {
+                  const value = e.target.value
+                  setMenuChoice(value)
+                  addLog(`Меню: ${value || 'не выбрано'}`)
+                  if (value) {
+                    navigate(value)
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }
+                }}
+              >
+                <option value="">Выберите...</option>
+                {navOptions.map((opt) => (
+                  <option key={String(opt.value)} value={String(opt.value)}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </GlassButton>
+          </div>
+        </div>
+
+        <div className="test-section">
+          <h2>Последний выбор (меню)</h2>
+          <div className="selected-value">
+            Выбрано: <strong>{menuChoice || 'Ничего'}</strong>
           </div>
         </div>
 

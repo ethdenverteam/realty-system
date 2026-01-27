@@ -97,6 +97,7 @@ body {
   background-color: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  position: relative;
 }
 
 [data-theme="dark"] body {
@@ -111,12 +112,19 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: -1;
+  z-index: 0; /* важно: не уводим слой "под html" */
   opacity: 0; /* по умолчанию выключено */
   background-image:
     linear-gradient(115deg, rgba(0, 0, 0, 0.08) 1px, transparent 1px),
     linear-gradient(235deg, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
   background-size: 160px 160px, 220px 220px;
+}
+
+/* Контент всегда поверх фона */
+#root,
+.app-layout {
+  position: relative;
+  z-index: 1;
 }
 
 /* Светлая тема с линиями */
@@ -141,6 +149,16 @@ body::before {
   background-image:
     linear-gradient(115deg, rgba(120, 120, 255, 0.4) 1px, transparent 1px),
     linear-gradient(235deg, rgba(255, 120, 200, 0.4) 1px, transparent 1px);
+}
+
+/* Тестовый фон (всегда виден) — если даже его не видно, значит фон перекрывается где-то ещё */
+[data-theme="dark-lines"] body {
+  background:
+    radial-gradient(circle at 20% 10%, rgba(255, 0, 120, 0.22), transparent 55%),
+    radial-gradient(circle at 80% 30%, rgba(0, 170, 255, 0.20), transparent 60%),
+    radial-gradient(circle at 50% 90%, rgba(120, 255, 120, 0.14), transparent 55%),
+    #000000;
+  background-attachment: fixed;
 }
 
 /* Mobile-first base styles */
