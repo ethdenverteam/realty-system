@@ -1,22 +1,6 @@
+/* MobileDropdownMenu теперь использует BottomNavDropdown */
 .mobile-dropdown-menu {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-}
-
-.mobile-dropdown-objects {
-  flex: 1;
-}
-
-.mobile-dropdown-wrapper {
-  position: absolute;
-  bottom: 100%;
-  right: 0;
-  margin-bottom: var(--spacing-sm);
-  z-index: 1000;
-  min-width: 200px;
+  /* Стили перенесены в BottomNavDropdown */
 }
 
 .mobile-menu-button {

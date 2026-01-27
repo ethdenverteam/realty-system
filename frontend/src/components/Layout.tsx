@@ -277,8 +277,8 @@ export default function Layout({
               />
             </svg>
           </Link>
-          <MobileDropdownMenu objects={objects as unknown as Array<{ object_id: string | number; [key: string]: unknown }>} type="objects" />
-          <MobileDropdownMenu objects={objects as unknown as Array<{ object_id: string | number; [key: string]: unknown }>} type="menu" />
+          <MobileDropdownMenu objects={objects} type="objects" />
+          <MobileDropdownMenu objects={objects} type="menu" />
         </nav>
       )}
       {isAdmin && (
