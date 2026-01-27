@@ -22,6 +22,7 @@ export default function UserObjects(): JSX.Element {
 
   useEffect(() => {
     void loadObjects()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, sortBy, sortOrder, roomsTypeFilter, districtFilter])
 
   const loadDistricts = async (): Promise<void> => {
@@ -112,9 +113,17 @@ export default function UserObjects(): JSX.Element {
                 className="form-input form-input-sm"
                 value={`${sortBy}_${sortOrder}`}
                 onChange={(e) => {
-                  const [by, order] = e.target.value.split('_')
-                  setSortBy(by)
-                  setSortOrder(order as 'asc' | 'desc')
+                  const value = e.target.value
+                  const parts = value.split('_')
+                  if (parts.length === 2) {
+                    const newSortBy = parts[0]
+                    const newSortOrder = parts[1] as 'asc' | 'desc'
+                    // Update both values separately to ensure React sees the change
+                    if (newSortBy !== sortBy || newSortOrder !== sortOrder) {
+                      setSortBy(newSortBy)
+                      setSortOrder(newSortOrder)
+                    }
+                  }
                 }}
               >
                 <option value="creation_date_desc">Новые сначала</option>

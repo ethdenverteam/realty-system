@@ -24,8 +24,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Update user activity
         update_user_activity(str(user.id), user.username)
         
-        # Show main menu
-        await show_main_menu(update, context)
+        # Check if start parameter is 'getcode'
+        if context.args and len(context.args) > 0 and context.args[0] == 'getcode':
+            # If start parameter is 'getcode', directly call getcode_command
+            logger.info(f"Start parameter 'getcode' detected for user {user.id}")
+            await getcode_command(update, context)
+        else:
+            # Show main menu
+            await show_main_menu(update, context)
         logger.info(f"Successfully processed /start for user {user.id}")
         sys.stdout.flush()
     except Exception as e:
