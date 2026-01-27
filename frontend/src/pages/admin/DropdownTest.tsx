@@ -246,23 +246,23 @@ const loadObjects = async (): Promise<void> => {
           <h2>Фильтр статуса в кнопке (Liquid Glass)</h2>
           <p>Тот же фильтр, но выбранное значение отображается в стеклянной кнопке.</p>
           <div className="test-controls">
-            <select
-              className="form-input form-input-sm"
-              value={buttonStatusFilter}
-              onChange={(e) => {
-                const value = e.target.value
-                setButtonStatusFilter(value)
-                addLog(`Выбран статус (кнопка): ${value || 'Все статусы'}`)
-              }}
-            >
-              <option value="">Все статусы</option>
-              <option value="черновик">Черновики</option>
-              <option value="опубликовано">Опубликованные</option>
-              <option value="запланировано">Запланированные</option>
-              <option value="архив">Архив</option>
-            </select>
-            <GlassButton>
+            <GlassButton className="glass-select-button">
               Статус: {buttonStatusFilter || 'Все статусы'}
+              <select
+                className="glass-select-native"
+                value={buttonStatusFilter}
+                onChange={(e) => {
+                  const value = e.target.value
+                  setButtonStatusFilter(value)
+                  addLog(`Выбран статус (кнопка): ${value || 'Все статусы'}`)
+                }}
+              >
+                <option value="">Все статусы</option>
+                <option value="черновик">Черновики</option>
+                <option value="опубликовано">Опубликованные</option>
+                <option value="запланировано">Запланированные</option>
+                <option value="архив">Архив</option>
+              </select>
             </GlassButton>
           </div>
         </div>
