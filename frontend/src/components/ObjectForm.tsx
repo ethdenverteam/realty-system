@@ -1,6 +1,7 @@
 import { type ChangeEvent, type FormEvent, useState, useEffect } from 'react'
 import type { ObjectFormData, RoomsType, RenovationType } from '../types/models'
 import api from '../utils/api'
+import Dropdown, { type DropdownOption } from './Dropdown'
 import './ObjectForm.css'
 
 interface ObjectFormProps {
@@ -32,6 +33,20 @@ const RENOVATION_OPTIONS: RenovationType[] = [
   'Ремонт требует освежения',
   'Хороший ремонт',
   'Инстаграмный',
+]
+
+// Преобразование в формат для Dropdown
+const ROOMS_DROPDOWN_OPTIONS: DropdownOption[] = ROOMS_OPTIONS.map((option) => ({
+  label: option,
+  value: option,
+}))
+
+const RENOVATION_DROPDOWN_OPTIONS: DropdownOption[] = [
+  { label: 'Не указано', value: '' },
+  ...RENOVATION_OPTIONS.map((option) => ({
+    label: option,
+    value: option,
+  })),
 ]
 
 export default function ObjectForm({
@@ -113,19 +128,15 @@ export default function ObjectForm({
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Тип комнат *</label>
-              <select
-                className="form-input"
+              <Dropdown
+                options={ROOMS_DROPDOWN_OPTIONS}
+                defaultText="Выберите тип"
+                onChange={(value) => handleChange('rooms_type', String(value))}
                 value={formData.rooms_type}
-                onChange={handleInputChange('rooms_type')}
                 required
-              >
-                <option value="">Выберите тип</option>
-                {ROOMS_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
+                variant="form"
+                className="form-input-dropdown"
+              />
             </div>
             <div className="form-group">
               <label className="form-label">Цена (тыс. руб.) *</label>
@@ -209,18 +220,14 @@ export default function ObjectForm({
           </div>
           <div className="form-group">
             <label className="form-label">Состояние ремонта</label>
-            <select
-              className="form-input"
+            <Dropdown
+              options={RENOVATION_DROPDOWN_OPTIONS}
+              defaultText="Не указано"
+              onChange={(value) => handleChange('renovation', String(value))}
               value={formData.renovation}
-              onChange={handleInputChange('renovation')}
-            >
-              <option value="">Не указано</option>
-              {RENOVATION_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+              variant="form"
+              className="form-input-dropdown"
+            />
           </div>
         </div>
 

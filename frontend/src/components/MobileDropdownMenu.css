@@ -10,6 +10,15 @@
   flex: 1;
 }
 
+.mobile-dropdown-wrapper {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: var(--spacing-sm);
+  z-index: 1000;
+  min-width: 200px;
+}
+
 .mobile-menu-button {
   display: flex;
   align-items: center;
