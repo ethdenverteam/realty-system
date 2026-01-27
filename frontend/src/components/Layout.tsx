@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import MobileDropdownMenu from './MobileDropdownMenu'
 import GlassMenuButton from './GlassMenuButton'
+import GlassObjectsButton from './GlassObjectsButton'
 import { useEffect, useState } from 'react'
 import api from '../utils/api'
 import type { RealtyObjectListItem, ObjectsListResponse } from '../types/models'
@@ -287,7 +288,9 @@ export default function Layout({
               />
             </svg>
           </Link>
-          <MobileDropdownMenu objects={objects} type="objects" />
+          <div className="bottom-nav-glass-menu">
+            <GlassObjectsButton objects={objects} />
+          </div>
           <div className="bottom-nav-glass-menu">
             <GlassMenuButton />
           </div>

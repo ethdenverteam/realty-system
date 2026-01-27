@@ -248,7 +248,7 @@ const loadObjects = async (): Promise<void> => {
           <p>Тот же фильтр, но выбранное значение отображается в стеклянной кнопке.</p>
           <div className="test-controls">
             <GlassButton className="glass-select-button">
-              Статус: {buttonStatusFilter || 'Все статусы'}
+              <span>Статус: {buttonStatusFilter || 'Все статусы'}</span>
               <select
                 className="glass-select-native"
                 value={buttonStatusFilter}

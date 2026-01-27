@@ -2,6 +2,7 @@
 .glass-select-button {
   position: relative;
   overflow: hidden;
+  pointer-events: auto;
 }
 
 .glass-select-button .glass-select-native {
@@ -9,6 +10,18 @@
   inset: 0;
   opacity: 0;
   cursor: pointer;
-  z-index: 1;
+  z-index: 10;
+  width: 100%;
+  height: 100%;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Предотвращаем клики на текст внутри кнопки */
+.glass-select-button > span {
+  pointer-events: none;
+  position: relative;
+  z-index: 0;
 }
 

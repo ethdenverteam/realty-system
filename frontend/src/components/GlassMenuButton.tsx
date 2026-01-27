@@ -24,7 +24,7 @@ function GlassMenuButton(): JSX.Element {
 
   return (
     <GlassButton className="glass-select-button">
-      меню
+      <span>меню</span>
       <select
         className="glass-select-native"
         value={uiStore.menuChoice}

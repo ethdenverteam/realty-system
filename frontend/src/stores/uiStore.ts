@@ -16,6 +16,9 @@ class UIStore {
   // Выбранный пункт меню навигации (для стеклянной кнопки "меню")
   menuChoice = ''
 
+  // Выбранный ID объекта (для стеклянной кнопки "объекты")
+  selectedObjectId = ''
+
   constructor() {
     makeAutoObservable(this)
   }
@@ -34,6 +37,10 @@ class UIStore {
 
   setMenuChoice(value: string): void {
     this.menuChoice = value
+  }
+
+  setSelectedObjectId(value: string): void {
+    this.selectedObjectId = value
   }
 }
 
