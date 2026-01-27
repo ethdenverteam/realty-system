@@ -91,11 +91,18 @@ export default function UserObjects(): JSX.Element {
                 onChange={(e) => setRoomsTypeFilter(e.target.value)}
               >
                 <option value="">Все типы комнат</option>
+                <option value="Студия">Студия</option>
                 <option value="1к">1к</option>
                 <option value="2к">2к</option>
                 <option value="3к">3к</option>
-                <option value="4к">4к</option>
-                <option value="5к+">5к+</option>
+                <option value="4+к">4+к</option>
+                <option value="Дом">Дом</option>
+                <option value="1евро">1евро</option>
+                <option value="евро1к">евро1к</option>
+                <option value="2евро">2евро</option>
+                <option value="евро2к">евро2к</option>
+                <option value="3евро">3евро</option>
+                <option value="евро3к">евро3к</option>
               </select>
               <select
                 className="form-input form-input-sm"
@@ -221,7 +228,7 @@ export default function UserObjects(): JSX.Element {
                         } catch (err: unknown) {
                           let message = 'Ошибка публикации'
                           if (axios.isAxiosError<ApiErrorResponse>(err)) {
-                            message = err.response?.data?.error || err.response?.data?.details || err.message || message
+                            message = err.response?.data?.error || err.response?.data?.message || err.message || message
                           }
                           alert(message)
                         }

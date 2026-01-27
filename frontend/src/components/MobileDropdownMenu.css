@@ -1,6 +1,13 @@
 .mobile-dropdown-menu {
   position: relative;
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.mobile-dropdown-objects {
+  flex: 1;
 }
 
 .mobile-menu-button {

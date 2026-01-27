@@ -253,26 +253,17 @@
   /* Mobile bottom nav */
   .mobile-bottom-nav {
     display: flex;
-    justify-content: space-between;
+    justify-content: space-around;
     align-items: center;
-    padding: var(--spacing-sm) var(--spacing-md);
-  }
-
-  .bottom-nav-left {
-    flex: 1;
-  }
-
-  .bottom-nav-right {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) 0;
+    gap: var(--spacing-xs);
   }
 
   .bottom-nav-icon-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
+    flex: 1;
     height: 44px;
     border: none;
     background: transparent;
@@ -280,18 +271,26 @@
     border-radius: var(--radius-md);
     transition: background var(--transition-fast);
     text-decoration: none;
+    padding: 0;
   }
 
-  .bottom-nav-icon-btn:hover {
+  .bottom-nav-icon-btn:hover,
+  .bottom-nav-icon-btn.active {
     background: var(--color-bg-secondary);
   }
 
+  .bottom-nav-icon-btn img,
+  .bottom-nav-icon-btn svg {
+    width: 24px;
+    height: 24px;
+  }
+
   /* Icon colors for bottom nav */
-  [data-theme="dark"] .bottom-nav-icon-btn {
+  [data-theme="dark"] .bottom-nav-icon-btn svg {
     color: #ff1744;
   }
 
-  [data-theme="light"] .bottom-nav-icon-btn {
+  [data-theme="light"] .bottom-nav-icon-btn svg {
     color: #2196f3;
   }
 
@@ -301,6 +300,20 @@
 
   [data-theme="light"] .mobile-menu-button {
     color: #2196f3;
+  }
+
+  .mobile-menu-button {
+    width: 100%;
+    height: 44px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-menu-button img {
+    width: 24px;
+    height: 24px;
   }
 
   /* Main content - fit on screen with padding */

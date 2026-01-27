@@ -11,6 +11,7 @@ from app.models.action_log import ActionLog
 from app.models.statistics import Statistics
 from app.models.bot_web_code import BotWebCode
 from app.models.system_setting import SystemSetting
+from app.models.quick_access import QuickAccess
 
 __all__ = [
     'User',
@@ -23,5 +24,6 @@ __all__ = [
     'Statistics',
     'BotWebCode',
     'SystemSetting',
+    'QuickAccess',
 ]
 

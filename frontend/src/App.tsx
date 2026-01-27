@@ -15,6 +15,9 @@ import UserEditObject from './pages/user/EditObject'
 import UserObjects from './pages/user/Objects'
 import UserSettings from './pages/user/Settings'
 import UserViewObject from './pages/user/ViewObject'
+import Autopublish from './pages/user/Autopublish'
+import Chats from './pages/user/Chats'
+import TelegramAccounts from './pages/user/TelegramAccounts'
 import './App.css'
 
 export default function App(): JSX.Element {
@@ -114,6 +117,30 @@ export default function App(): JSX.Element {
               element={
                 <ProtectedRoute>
                   <UserSettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/dashboard/autopublish"
+              element={
+                <ProtectedRoute>
+                  <Autopublish />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/dashboard/chats"
+              element={
+                <ProtectedRoute>
+                  <Chats />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/dashboard/telegram-accounts"
+              element={
+                <ProtectedRoute>
+                  <TelegramAccounts />
                 </ProtectedRoute>
               }
             />

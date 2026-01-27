@@ -28,6 +28,7 @@ class User(db.Model):
     publication_queues = relationship('PublicationQueue', back_populates='user')
     action_logs = relationship('ActionLog', back_populates='user')
     bot_web_codes = relationship('BotWebCode', back_populates='user')
+    quick_access_items = relationship('QuickAccess', back_populates='user', cascade='all, delete-orphan')
     
     def __repr__(self):
         return f'<User {self.telegram_id} ({self.username})>'

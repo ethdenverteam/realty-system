@@ -1,16 +1,17 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTheme } from '../contexts/ThemeContext'
+import QuickAccessObjects from './QuickAccessObjects'
 import './MobileDropdownMenu.css'
 
 interface MobileDropdownMenuProps {
   objects?: Array<{ object_id: string | number; [key: string]: unknown }>
   onObjectSelect?: (objectId: string | number) => void
+  type?: 'objects' | 'menu'
 }
 
-export default function MobileDropdownMenu({ objects, onObjectSelect }: MobileDropdownMenuProps): JSX.Element {
+export default function MobileDropdownMenu({ objects, onObjectSelect, type = 'menu' }: MobileDropdownMenuProps): JSX.Element {
   const [isOpen, setIsOpen] = useState(false)
-  const [isObjectsMenuOpen, setIsObjectsMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const { theme } = useTheme()
@@ -19,36 +20,37 @@ export default function MobileDropdownMenu({ objects, onObjectSelect }: MobileDr
     const handleClickOutside = (event: MouseEvent): void => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsOpen(false)
-        setIsObjectsMenuOpen(false)
       }
     }
 
-    if (isOpen || isObjectsMenuOpen) {
+    if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside)
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [isOpen, isObjectsMenuOpen])
+  }, [isOpen])
 
   const handleMenuToggle = (): void => {
     setIsOpen(!isOpen)
-    setIsObjectsMenuOpen(false)
   }
 
-  const handleObjectsMenuToggle = (): void => {
-    setIsObjectsMenuOpen(!isObjectsMenuOpen)
-    setIsOpen(false)
-  }
-
-  const handleObjectClick = (objectId: string | number): void => {
-    if (onObjectSelect) {
-      onObjectSelect(objectId)
-    } else {
-      navigate(`/user/dashboard/objects/${objectId}`)
-    }
-    setIsObjectsMenuOpen(false)
+  if (type === 'objects') {
+    return (
+      <div className="mobile-dropdown-menu mobile-dropdown-objects" ref={menuRef}>
+        <button
+          className="mobile-menu-button"
+          onClick={handleMenuToggle}
+          aria-label="Быстрый доступ к объектам"
+        >
+          <img src="/SVG/objects_down.svg" alt="Объекты" width="24" height="24" style={{ filter: theme === 'dark' ? 'invert(1)' : 'none' }} />
+        </button>
+        {isOpen && (
+          <QuickAccessObjects objects={objects} onClose={() => setIsOpen(false)} />
+        )}
+      </div>
+    )
   }
 
   return (
@@ -56,7 +58,7 @@ export default function MobileDropdownMenu({ objects, onObjectSelect }: MobileDr
       <button
         className="mobile-menu-button"
         onClick={handleMenuToggle}
-        aria-label="Меню быстрых действий"
+        aria-label="Меню навигации"
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
           <path d="M3 12H21M3 6H21M3 18H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -91,9 +93,13 @@ export default function MobileDropdownMenu({ objects, onObjectSelect }: MobileDr
                 strokeLinecap="round"
               />
             </svg>
-            <span>Создать</span>
+            <span>Создать объект</span>
           </Link>
-          <div className="mobile-dropdown-item" onClick={handleObjectsMenuToggle}>
+          <Link
+            to="/user/dashboard/objects"
+            className="mobile-dropdown-item"
+            onClick={() => setIsOpen(false)}
+          >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path
                 d="M2 5L10 9L18 5M2 15L10 19L18 15M2 10L10 14L18 10"
@@ -103,25 +109,77 @@ export default function MobileDropdownMenu({ objects, onObjectSelect }: MobileDr
                 strokeLinejoin="round"
               />
             </svg>
-            <span>Объекты</span>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M6 12L10 8L6 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <span>Мои объекты</span>
+          </Link>
+          <Link
+            to="/user/dashboard/autopublish"
+            className="mobile-dropdown-item"
+            onClick={() => setIsOpen(false)}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M10 2L2 7L10 12L18 7L10 2Z"
+                fill="currentColor"
+              />
             </svg>
-          </div>
-        </div>
-      )}
-
-      {isObjectsMenuOpen && objects && objects.length > 0 && (
-        <div className="mobile-dropdown-content mobile-dropdown-nested">
-          {objects.map((obj) => (
-            <button
-              key={obj.object_id}
-              className="mobile-dropdown-item"
-              onClick={() => handleObjectClick(obj.object_id)}
-            >
-              <span>{obj.object_id}</span>
-            </button>
-          ))}
+            <span>Автопубликация</span>
+          </Link>
+          <Link
+            to="/user/dashboard/chats"
+            className="mobile-dropdown-item"
+            onClick={() => setIsOpen(false)}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M2 5L10 9L18 5M2 15L10 19L18 15M2 10L10 14L18 10"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>Чаты</span>
+          </Link>
+          <Link
+            to="/user/dashboard/telegram-accounts"
+            className="mobile-dropdown-item"
+            onClick={() => setIsOpen(false)}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M10 10C12.7614 10 15 7.76142 15 5C15 2.23858 12.7614 0 10 0C7.23858 0 5 2.23858 5 5C5 7.76142 7.23858 10 10 10Z"
+                fill="currentColor"
+              />
+              <path
+                d="M10 12C5.58172 12 2 14.2386 2 17V20H18V17C18 14.2386 14.4183 12 10 12Z"
+                fill="currentColor"
+              />
+            </svg>
+            <span>Тг аккаунт</span>
+          </Link>
+          <Link
+            to="/user/dashboard/settings"
+            className="mobile-dropdown-item"
+            onClick={() => setIsOpen(false)}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M10 12C11.1046 12 12 11.1046 12 10C12 8.89543 11.1046 8 10 8C8.89543 8 8 8.89543 8 10C8 11.1046 8.89543 12 10 12Z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M17.6569 10.6569C17.6569 10.6569 17.6569 10.6569 17.6569 10.6569C17.6569 10.6569 17.6569 10.6569 17.6569 10.6569C17.6569 10.6569 17.6569 10.6569 17.6569 10.6569C17.6569 10.6569 17.6569 10.6569 17.6569 10.6569"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>Настройки</span>
+          </Link>
         </div>
       )}
     </div>

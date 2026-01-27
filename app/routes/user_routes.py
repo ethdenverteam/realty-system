@@ -7,6 +7,7 @@ from app.models.object import Object
 from app.models.publication_queue import PublicationQueue
 from app.models.publication_history import PublicationHistory
 from app.models.telegram_account import TelegramAccount
+from app.models.quick_access import QuickAccess
 from app.utils.decorators import jwt_required
 from app.utils.logger import log_action, log_error
 from sqlalchemy import func
