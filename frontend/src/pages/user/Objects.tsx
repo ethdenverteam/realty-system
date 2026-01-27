@@ -114,10 +114,11 @@ export default function UserObjects(): JSX.Element {
                 value={`${sortBy}_${sortOrder}`}
                 onChange={(e) => {
                   const value = e.target.value
-                  const parts = value.split('_')
-                  if (parts.length === 2) {
-                    const newSortBy = parts[0]
-                    const newSortOrder = parts[1] as 'asc' | 'desc'
+                  // Split from the end to handle sort_by values that contain underscores (like 'creation_date')
+                  const lastUnderscoreIndex = value.lastIndexOf('_')
+                  if (lastUnderscoreIndex > 0 && lastUnderscoreIndex < value.length - 1) {
+                    const newSortBy = value.substring(0, lastUnderscoreIndex)
+                    const newSortOrder = value.substring(lastUnderscoreIndex + 1) as 'asc' | 'desc'
                     // Update both values separately to ensure React sees the change
                     if (newSortBy !== sortBy || newSortOrder !== sortOrder) {
                       setSortBy(newSortBy)
