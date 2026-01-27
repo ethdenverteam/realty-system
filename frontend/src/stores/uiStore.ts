@@ -13,6 +13,9 @@ class UIStore {
   // Счётчик нажатий на стеклянную кнопку
   glassButtonClicks = 0
 
+  // Выбранный пункт меню навигации (для стеклянной кнопки "меню")
+  menuChoice = ''
+
   constructor() {
     makeAutoObservable(this)
   }
@@ -27,6 +30,10 @@ class UIStore {
 
   incrementGlassButton(): void {
     this.glassButtonClicks += 1
+  }
+
+  setMenuChoice(value: string): void {
+    this.menuChoice = value
   }
 }
 

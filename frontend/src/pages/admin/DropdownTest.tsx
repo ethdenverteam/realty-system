@@ -6,6 +6,7 @@ import BottomNavDropdown, { createNavigationOptions, createObjectOptions } from 
 import Dropdown, { type DropdownOption } from '../../components/Dropdown'
 import { GlassCard } from '../../components/GlassCard'
 import { GlassButton } from '../../components/GlassButton'
+import GlassMenuButton from '../../components/GlassMenuButton'
 import { uiStore } from '../../stores/uiStore'
 import type { RealtyObjectListItem } from '../../types/models'
 import './DropdownTest.css'
@@ -22,7 +23,6 @@ function DropdownTest(): JSX.Element {
   const [log, setLog] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [buttonStatusFilter, setButtonStatusFilter] = useState<string>('')
-  const [menuChoice, setMenuChoice] = useState<string>('')
 
   // Тестовые данные для объектов
   const testObjects: RealtyObjectListItem[] = [
@@ -269,39 +269,17 @@ const loadObjects = async (): Promise<void> => {
         </div>
 
         <div className="test-section">
-          <h2>Меню в кнопке (Liquid Glass)</h2>
-          <p>Кнопка всегда показывает текст «меню», а список внутри — как у навигации.</p>
+          <h2>Меню в кнопке (Liquid Glass + MobX)</h2>
+          <p>Кнопка всегда показывает текст «меню», а список внутри — как у навигации. Состояние хранится в MobX store.</p>
           <div className="test-controls">
-            <GlassButton className="glass-select-button">
-              меню
-              <select
-                className="glass-select-native"
-                value={menuChoice}
-                onChange={(e) => {
-                  const value = e.target.value
-                  setMenuChoice(value)
-                  addLog(`Меню: ${value || 'не выбрано'}`)
-                  if (value) {
-                    navigate(value)
-                    window.scrollTo({ top: 0, behavior: 'smooth' })
-                  }
-                }}
-              >
-                <option value="">Выберите...</option>
-                {navOptions.map((opt) => (
-                  <option key={String(opt.value)} value={String(opt.value)}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </GlassButton>
+            <GlassMenuButton />
           </div>
         </div>
 
         <div className="test-section">
-          <h2>Последний выбор (меню)</h2>
+          <h2>Последний выбор (меню из MobX store)</h2>
           <div className="selected-value">
-            Выбрано: <strong>{menuChoice || 'Ничего'}</strong>
+            Выбрано: <strong>{uiStore.menuChoice || 'Ничего'}</strong>
           </div>
         </div>
 

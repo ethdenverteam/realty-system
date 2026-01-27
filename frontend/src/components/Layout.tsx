@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import MobileDropdownMenu from './MobileDropdownMenu'
+import GlassMenuButton from './GlassMenuButton'
 import { useEffect, useState } from 'react'
 import api from '../utils/api'
 import type { RealtyObjectListItem, ObjectsListResponse } from '../types/models'
@@ -287,7 +288,9 @@ export default function Layout({
             </svg>
           </Link>
           <MobileDropdownMenu objects={objects} type="objects" />
-          <MobileDropdownMenu objects={objects} type="menu" />
+          <div className="bottom-nav-glass-menu">
+            <GlassMenuButton />
+          </div>
         </nav>
       )}
       {isAdmin && (

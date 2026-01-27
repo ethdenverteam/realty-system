@@ -1,0 +1,14 @@
+/* Стили для стеклянной кнопки с select внутри */
+.glass-select-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-select-button .glass-select-native {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+

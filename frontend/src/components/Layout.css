@@ -316,6 +316,22 @@
     height: 24px;
   }
 
+  /* Стеклянная кнопка меню в нижней панели */
+  .bottom-nav-glass-menu {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px;
+  }
+
+  .bottom-nav-glass-menu .glass-select-button {
+    width: 100%;
+    max-width: 120px;
+    height: 36px;
+    font-size: var(--font-size-sm);
+  }
+
   /* Main content - fit on screen with padding */
   .app-main {
     padding: var(--spacing-md);
