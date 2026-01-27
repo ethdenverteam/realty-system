@@ -20,6 +20,7 @@ function DropdownTest(): JSX.Element {
   const [selectedValue2, setSelectedValue2] = useState<string | number>('')
   const [selectedValue3, setSelectedValue3] = useState<string | number>('')
   const [log, setLog] = useState<string[]>([])
+  const [statusFilter, setStatusFilter] = useState<string>('')
 
   // Тестовые данные для объектов
   const testObjects: RealtyObjectListItem[] = [
@@ -211,6 +212,31 @@ const loadObjects = async (): Promise<void> => {
                   </ul>
                 </div>
               </details>
+            </div>
+          </div>
+        </div>
+
+        <div className="test-section">
+          <h2>Фильтр статуса (как на странице &quot;Мои объекты&quot;)</h2>
+          <p>Обычный HTML select с теми же классами и опциями, что и в проде.</p>
+          <div className="test-controls">
+            <select
+              className="form-input form-input-sm"
+              value={statusFilter}
+              onChange={(e) => {
+                const value = e.target.value
+                setStatusFilter(value)
+                addLog(`Выбран статус: ${value || 'Все статусы'}`)
+              }}
+            >
+              <option value="">Все статусы</option>
+              <option value="черновик">Черновики</option>
+              <option value="опубликовано">Опубликованные</option>
+              <option value="запланировано">Запланированные</option>
+              <option value="архив">Архив</option>
+            </select>
+            <div className="selected-value">
+              Текущий статус: <strong>{statusFilter || 'Все статусы'}</strong>
             </div>
           </div>
         </div>
