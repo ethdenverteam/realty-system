@@ -36,6 +36,35 @@
   text-align: center;
 }
 
+.glass-demo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+  align-items: center;
+}
+
+.glass-card-disabled {
+  padding: var(--spacing-lg);
+  border-radius: 16px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.glass-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.glass-toggle input {
+  width: 16px;
+  height: 16px;
+}
+
 .test-section h2 {
   margin-top: 0;
   margin-bottom: var(--spacing-md);

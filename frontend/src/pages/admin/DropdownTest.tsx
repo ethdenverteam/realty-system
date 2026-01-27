@@ -1,8 +1,12 @@
 import { useState } from 'react'
+import { observer } from 'mobx-react-lite'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import BottomNavDropdown, { createNavigationOptions, createObjectOptions } from '../../components/BottomNavDropdown'
 import Dropdown, { type DropdownOption } from '../../components/Dropdown'
+import { GlassCard } from '../../components/GlassCard'
+import { GlassButton } from '../../components/GlassButton'
+import { uiStore } from '../../stores/uiStore'
 import type { RealtyObjectListItem } from '../../types/models'
 import './DropdownTest.css'
 
@@ -10,7 +14,7 @@ import './DropdownTest.css'
  * Тестовая страница для проверки работы выпадающих меню
  * Демонстрирует различные варианты использования компонентов Dropdown и BottomNavDropdown
  */
-export default function DropdownTest(): JSX.Element {
+function DropdownTest(): JSX.Element {
   const navigate = useNavigate()
   const [selectedValue1, setSelectedValue1] = useState<string | number>('')
   const [selectedValue2, setSelectedValue2] = useState<string | number>('')
@@ -212,13 +216,50 @@ const loadObjects = async (): Promise<void> => {
         </div>
 
         <div className="test-section">
+          <h2>MobX + стеклянный блок фильтра</h2>
+          <p>Этот блок показывает, как MobX-хранилище управляет стеклянной карточкой и кнопкой.</p>
+          <GlassCard>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <strong>Фильтр района (MobX store):</strong>
+              </div>
+              <Dropdown
+                options={simpleOptions}
+                defaultText="Выберите район"
+                onChange={(value) => uiStore.setDistrictFilter(String(value))}
+                value={uiStore.districtFilter}
+                variant="form"
+                className="test-dropdown"
+              />
+              <div>
+                Текущее значение фильтра:&nbsp;
+                <strong>{uiStore.districtFilter || 'Все районы'}</strong>
+              </div>
+
+              <div style={{ marginTop: '8px' }}>
+                <strong>Стеклянная кнопка (MobX + Liquid Glass):</strong>
+              </div>
+              <GlassButton
+                onClick={() => {
+                  uiStore.incrementGlassButton()
+                  uiStore.setGlassMode(uiStore.glassMode === 'default' ? 'highlighted' : 'default')
+                }}
+                className={uiStore.glassMode === 'highlighted' ? 'glass-button--highlighted' : ''}
+              >
+                Нажато {uiStore.glassButtonClicks} раз
+              </GlassButton>
+            </div>
+          </GlassCard>
+        </div>
+
+        <div className="test-section">
           <h2>Пример: Эффект стекла (glassmorphism)</h2>
           <p>Так можно оформить карточку или нижнюю панель в стиле iOS Liquid Glass.</p>
           <div className="glass-demo-wrapper">
-            <div className="glass-card">
+            <GlassCard>
               <h3>Glass Card</h3>
               <p>Это пример блока с эффектом «стекла».</p>
-            </div>
+            </GlassCard>
           </div>
           <pre className="code-block">
 {`.glass-card {
@@ -346,4 +387,6 @@ const loadObjects = async (): Promise<void> => {
     </Layout>
   )
 }
+
+export default observer(DropdownTest)
 
