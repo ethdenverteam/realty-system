@@ -17,6 +17,7 @@ export interface UserStats {
   total_publications: number;
   today_publications: number;
   accounts_count: number;
+  autopublish_objects_count?: number;
 }
 
 export interface ActionLogItem {

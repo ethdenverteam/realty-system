@@ -206,5 +206,143 @@
   .top-nav {
     display: none;
   }
+
+  /* Mobile header styles */
+  .header-title {
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+  }
+
+  .mobile-title-clickable {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .mobile-title-clickable:active {
+    opacity: 0.7;
+  }
+
+  .mobile-header-actions {
+    gap: var(--spacing-xs);
+  }
+
+  .mobile-header-actions .header-icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Icon colors - red in dark theme, blue in light theme */
+  [data-theme="dark"] .mobile-header-actions .header-icon-btn {
+    color: #ff1744;
+  }
+
+  [data-theme="light"] .mobile-header-actions .header-icon-btn {
+    color: #2196f3;
+  }
+
+  [data-theme="dark"] .mobile-header-actions .header-icon-btn:hover {
+    color: #ff5252;
+    background: var(--color-bg-secondary);
+  }
+
+  [data-theme="light"] .mobile-header-actions .header-icon-btn:hover {
+    color: #42a5f5;
+    background: var(--color-bg-secondary);
+  }
+
+  /* Mobile bottom nav */
+  .mobile-bottom-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .bottom-nav-left {
+    flex: 1;
+  }
+
+  .bottom-nav-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .bottom-nav-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    transition: background var(--transition-fast);
+    text-decoration: none;
+  }
+
+  .bottom-nav-icon-btn:hover {
+    background: var(--color-bg-secondary);
+  }
+
+  /* Icon colors for bottom nav */
+  [data-theme="dark"] .bottom-nav-icon-btn {
+    color: #ff1744;
+  }
+
+  [data-theme="light"] .bottom-nav-icon-btn {
+    color: #2196f3;
+  }
+
+  [data-theme="dark"] .mobile-menu-button {
+    color: #ff1744;
+  }
+
+  [data-theme="light"] .mobile-menu-button {
+    color: #2196f3;
+  }
+
+  /* Main content - fit on screen with padding */
+  .app-main {
+    padding: var(--spacing-md);
+    padding-bottom: 80px;
+    min-height: calc(100vh - 140px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Pages that should scroll */
+  .objects-page,
+  .app-main:has(.objects-page),
+  .app-main:has(.admin-page) {
+    min-height: auto;
+    height: auto;
+  }
+
+  /* Center headings */
+  .app-main h1,
+  .app-main h2,
+  .app-main h3 {
+    text-align: center;
+    font-size: var(--font-size-xl);
+  }
+
+  /* Large buttons and form elements */
+  .btn {
+    font-size: var(--font-size-lg);
+    padding: var(--spacing-md) var(--spacing-lg);
+    text-align: center;
+  }
+
+  .form-input,
+  .form-label {
+    font-size: var(--font-size-base);
+    text-align: center;
+  }
+
+  .form-input {
+    text-align: left;
+  }
 }
 

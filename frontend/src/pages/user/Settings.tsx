@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import Layout from '../../components/Layout'
 import api from '../../utils/api'
+import { useAuth } from '../../contexts/AuthContext'
 import type { ApiErrorResponse } from '../../types/models'
 import './Settings.css'
 
@@ -12,6 +13,7 @@ interface UserSettings {
 }
 
 export default function UserSettings(): JSX.Element {
+  const { logout } = useAuth()
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string>('')
   const [success, setSuccess] = useState<string>('')
@@ -20,6 +22,12 @@ export default function UserSettings(): JSX.Element {
     contact_name: '',
     default_show_username: false,
   })
+
+  const handleLogout = (): void => {
+    if (confirm('Вам придется заново зайти через код. Вы уверены, что хотите выйти?')) {
+      void logout()
+    }
+  }
 
   useEffect(() => {
     void loadSettings()
@@ -140,6 +148,20 @@ export default function UserSettings(): JSX.Element {
               </button>
             </div>
           </form>
+
+          <div className="settings-logout-section">
+            <h3 className="card-title">Выход</h3>
+            <p className="card-description">
+              Выйти из системы. Вам придется заново зайти через код.
+            </p>
+            <button
+              type="button"
+              className="btn btn-danger btn-block"
+              onClick={handleLogout}
+            >
+              Выйти
+            </button>
+          </div>
         </div>
       </div>
     </Layout>

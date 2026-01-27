@@ -1,0 +1,110 @@
+.mobile-dropdown-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.mobile-menu-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.mobile-menu-button:hover {
+  background: var(--color-bg-secondary);
+}
+
+.mobile-menu-button svg {
+  width: 24px;
+  height: 24px;
+}
+
+.mobile-dropdown-content {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: var(--spacing-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  min-width: 200px;
+  z-index: 1000;
+  overflow: hidden;
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mobile-dropdown-nested {
+  right: auto;
+  left: 100%;
+  margin-left: var(--spacing-sm);
+  margin-bottom: 0;
+}
+
+.mobile-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-md);
+  text-decoration: none;
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  text-align: left;
+  transition: background var(--transition-fast);
+  font-family: inherit;
+}
+
+.mobile-dropdown-item:hover {
+  background: var(--color-bg-secondary);
+}
+
+.mobile-dropdown-item svg {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.mobile-dropdown-item svg:last-child {
+  margin-left: auto;
+}
+
+/* Mobile specific */
+@media (max-width: 767px) {
+  .mobile-dropdown-content {
+    min-width: 180px;
+  }
+  
+  .mobile-dropdown-nested {
+    position: fixed;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    margin-left: 0;
+    max-width: calc(100vw - var(--spacing-lg) * 2);
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+}
+

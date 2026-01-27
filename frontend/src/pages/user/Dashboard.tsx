@@ -40,20 +40,12 @@ export default function UserDashboard(): JSX.Element {
 
         <div className="stats-grid">
           <div className="stat-card">
+            <div className="stat-value">{loading ? '-' : (stats?.autopublish_objects_count ?? 0)}</div>
+            <div className="stat-label">Объектов на автопубликации</div>
+          </div>
+          <div className="stat-card">
             <div className="stat-value">{loading ? '-' : (stats?.objects_count ?? '-')}</div>
-            <div className="stat-label">Мои объекты</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{loading ? '-' : (stats?.total_publications ?? '-')}</div>
-            <div className="stat-label">Публикаций</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{loading ? '-' : (stats?.today_publications ?? '-')}</div>
-            <div className="stat-label">Сегодня</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-value">{loading ? '-' : (stats?.accounts_count ?? '-')}</div>
-            <div className="stat-label">Аккаунтов</div>
+            <div className="stat-label">Объектов всего</div>
           </div>
         </div>
 

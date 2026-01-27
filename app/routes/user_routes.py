@@ -57,12 +57,20 @@ def user_stats(current_user):
         is_active=True
     ).count()
     
+    # Objects on autopublication (objects with pending/scheduled autopublish queue items)
+    autopublish_objects = db.session.query(func.count(func.distinct(PublicationQueue.object_id))).filter(
+        PublicationQueue.user_id == current_user.user_id,
+        PublicationQueue.mode == 'autopublish',
+        PublicationQueue.status.in_(['pending', 'scheduled'])
+    ).scalar() or 0
+    
     return jsonify({
         'objects_count': objects_count,
         'objects_by_status': dict(objects_by_status),
         'today_publications': today_publications,
         'total_publications': total_publications,
-        'accounts_count': accounts_count
+        'accounts_count': accounts_count,
+        'autopublish_objects_count': autopublish_objects
     })
 
 
