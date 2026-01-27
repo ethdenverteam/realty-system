@@ -50,6 +50,8 @@
   z-index: 1000;
   overflow: hidden;
   animation: slideUp 0.2s ease-out;
+  /* Стили как у select на странице объектов */
+  max-height: 60vh;
 }
 
 @keyframes slideUp {
@@ -82,9 +84,11 @@
   font-size: var(--font-size-base, 14px);
   text-align: left;
   cursor: pointer;
-  transition: background var(--transition-fast, 0.2s);
+  transition: all var(--transition-fast, 0.2s);
   font-family: inherit;
   border-bottom: 1px solid var(--color-border);
+  /* Немедленная реакция при наведении, как у select option */
+  user-select: none;
 }
 
 .bottom-nav-dropdown-item:last-child {
@@ -93,6 +97,12 @@
 
 .bottom-nav-dropdown-item:hover:not(.disabled) {
   background: var(--color-bg-secondary);
+  color: var(--color-text);
+}
+
+.bottom-nav-dropdown-item:active:not(.disabled) {
+  background: var(--color-bg-tertiary, rgba(0, 0, 0, 0.1));
+  transform: scale(0.98);
 }
 
 .bottom-nav-dropdown-item.disabled {

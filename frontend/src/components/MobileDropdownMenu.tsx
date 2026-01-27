@@ -18,14 +18,22 @@ export default function MobileDropdownMenu({ objects, onObjectSelect, type = 'me
   const objectOptions = createObjectOptions(objects || [])
 
   const handleNavigationSelect = (value: string | number): void => {
-    navigate(String(value))
+    // Немедленная навигация при выборе (как в onChange для select)
+    const path = String(value)
+    navigate(path)
+    // Прокручиваем к началу страницы
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleObjectSelect = (value: string | number): void => {
+    // Немедленное открытие объекта при выборе (как в onChange для select)
     if (onObjectSelect) {
       onObjectSelect(value)
     } else {
-      navigate(`/user/dashboard/objects/${value}`)
+      const path = `/user/dashboard/objects/${value}`
+      navigate(path)
+      // Прокручиваем к началу страницы
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
 

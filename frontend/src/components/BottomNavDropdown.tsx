@@ -45,7 +45,9 @@ export default function BottomNavDropdown({
   }, [isOpen])
 
   const handleSelect = (value: string | number): void => {
+    // Немедленно применяем действие при выборе
     onSelect(value)
+    // Закрываем меню после выбора
     setIsOpen(false)
   }
 
