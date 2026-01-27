@@ -21,6 +21,7 @@ function DropdownTest(): JSX.Element {
   const [selectedValue3, setSelectedValue3] = useState<string | number>('')
   const [log, setLog] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [buttonStatusFilter, setButtonStatusFilter] = useState<string>('')
 
   // Тестовые данные для объектов
   const testObjects: RealtyObjectListItem[] = [
@@ -238,6 +239,31 @@ const loadObjects = async (): Promise<void> => {
             <div className="selected-value">
               Текущий статус: <strong>{statusFilter || 'Все статусы'}</strong>
             </div>
+          </div>
+        </div>
+
+        <div className="test-section">
+          <h2>Фильтр статуса в кнопке (Liquid Glass)</h2>
+          <p>Тот же фильтр, но выбранное значение отображается в стеклянной кнопке.</p>
+          <div className="test-controls">
+            <select
+              className="form-input form-input-sm"
+              value={buttonStatusFilter}
+              onChange={(e) => {
+                const value = e.target.value
+                setButtonStatusFilter(value)
+                addLog(`Выбран статус (кнопка): ${value || 'Все статусы'}`)
+              }}
+            >
+              <option value="">Все статусы</option>
+              <option value="черновик">Черновики</option>
+              <option value="опубликовано">Опубликованные</option>
+              <option value="запланировано">Запланированные</option>
+              <option value="архив">Архив</option>
+            </select>
+            <GlassButton>
+              Статус: {buttonStatusFilter || 'Все статусы'}
+            </GlassButton>
           </div>
         </div>
 

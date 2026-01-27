@@ -100,9 +100,47 @@ body {
 }
 
 [data-theme="dark"] body {
-  background: linear-gradient(135deg, #0a0a0a 0%, #1a0f14 25%, #2a1a24 50%, #1a0f14 75%, #0a0a0a 100%);
+  background: #000000;
   background-attachment: fixed;
   min-height: 100vh;
+}
+
+/* Фоновая сеть линий для демонстрации стекла */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0; /* по умолчанию выключено */
+  background-image:
+    linear-gradient(115deg, rgba(0, 0, 0, 0.08) 1px, transparent 1px),
+    linear-gradient(235deg, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
+  background-size: 160px 160px, 220px 220px;
+}
+
+/* Светлая тема с линиями */
+[data-theme="light-lines"] body {
+  background-color: #ffffff;
+}
+
+[data-theme="light-lines"] body::before {
+  opacity: 1;
+  background-image:
+    linear-gradient(115deg, rgba(120, 120, 255, 0.25) 1px, transparent 1px),
+    linear-gradient(235deg, rgba(255, 120, 200, 0.25) 1px, transparent 1px);
+}
+
+/* Тёмная тема с линиями */
+[data-theme="dark-lines"] body {
+  background-color: #000000;
+}
+
+[data-theme="dark-lines"] body::before {
+  opacity: 1;
+  background-image:
+    linear-gradient(115deg, rgba(120, 120, 255, 0.4) 1px, transparent 1px),
+    linear-gradient(235deg, rgba(255, 120, 200, 0.4) 1px, transparent 1px);
 }
 
 /* Mobile-first base styles */
