@@ -1,0 +1,36 @@
+.test-page {
+  padding: var(--spacing-lg);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.test-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.test-section h2 {
+  margin-top: 0;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-text);
+  font-size: var(--font-size-xl);
+}
+
+.test-section p {
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-lg);
+}
+
+.test-card-wrapper {
+  max-width: 600px;
+}
+
+.test-list-wrapper {
+  max-width: 800px;
+}
+
+.test-buttons-wrapper {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+

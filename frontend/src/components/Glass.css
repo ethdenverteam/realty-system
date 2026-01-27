@@ -108,6 +108,58 @@
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
 }
 
+/* Эффект glow при нажатии на стеклянные элементы */
+.glass-button.glow-active {
+  animation: glass-glow-flash 0.4s ease-out;
+}
+
+.glass-card.glow-active {
+  animation: glass-glow-flash 0.4s ease-out;
+}
+
+@keyframes glass-glow-flash {
+  0% {
+    box-shadow: 
+      0 10px 30px rgba(0, 0, 0, 0.35),
+      0 0 0 0 var(--color-accent);
+  }
+  50% {
+    box-shadow: 
+      0 10px 30px rgba(0, 0, 0, 0.35),
+      0 0 30px 15px var(--color-accent),
+      inset 0 0 40px color-mix(in srgb, var(--color-accent) 40%, transparent);
+  }
+  100% {
+    box-shadow: 
+      0 10px 30px rgba(0, 0, 0, 0.35),
+      0 0 0 0 var(--color-accent);
+  }
+}
+
+/* Для glass-card отдельная анимация */
+@keyframes glass-card-glow-flash {
+  0% {
+    box-shadow: 
+      0 4px 30px rgba(0, 0, 0, 0.1),
+      0 0 0 0 var(--color-accent);
+  }
+  50% {
+    box-shadow: 
+      0 4px 30px rgba(0, 0, 0, 0.1),
+      0 0 30px 15px var(--color-accent),
+      inset 0 0 40px color-mix(in srgb, var(--color-accent) 40%, transparent);
+  }
+  100% {
+    box-shadow: 
+      0 4px 30px rgba(0, 0, 0, 0.1),
+      0 0 0 0 var(--color-accent);
+  }
+}
+
+.glass-card.glow-active {
+  animation: glass-card-glow-flash 0.4s ease-out;
+}
+
 .glass-button-icon {
   display: inline-flex;
   align-items: center;

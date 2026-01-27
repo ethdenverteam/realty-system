@@ -10,6 +10,7 @@ import AdminLogs from './pages/admin/Logs'
 import AdminUsers from './pages/admin/Users'
 import AdminDatabaseSchema from './pages/admin/DatabaseSchema'
 import AdminDropdownTest from './pages/admin/DropdownTest'
+import AdminTest from './pages/admin/test/Test'
 import UserCreateObject from './pages/user/CreateObject'
 import UserDashboard from './pages/user/Dashboard'
 import UserEditObject from './pages/user/EditObject'
@@ -76,6 +77,14 @@ export default function App(): JSX.Element {
               element={
                 <ProtectedRoute requireAdmin>
                   <AdminDropdownTest />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard/test"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminTest />
                 </ProtectedRoute>
               }
             />

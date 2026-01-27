@@ -151,7 +151,18 @@ export default function UserObjects(): JSX.Element {
           ) : (
             <div className="objects-list">
               {objects.map((obj) => (
-                <div key={obj.object_id} className="object-card">
+                <div 
+                  key={obj.object_id} 
+                  className="object-card"
+                  onClick={(e) => {
+                    // Добавляем glow эффект при клике на карточку
+                    const card = e.currentTarget
+                    card.classList.add('glow-active')
+                    setTimeout(() => {
+                      card.classList.remove('glow-active')
+                    }, 400)
+                  }}
+                >
                   <div className="object-header">
                     <h3 className="object-id">{obj.object_id}</h3>
                     <span
