@@ -2,30 +2,6 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import './Glass.css'
 
 interface GlassButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  leftIcon?: ReactNode
-  rightIcon?: ReactNode
-}
-
-export function GlassButton({
-  children,
-  leftIcon,
-  rightIcon,
-  className = '',
-  ...rest
-}: GlassButtonProps): JSX.Element {
-  return (
-    <button className={`glass-button ${className}`.trim()} type="button" {...rest}>
-      {leftIcon && <span>{leftIcon}</span>}
-      <span>{children}</span>
-      {rightIcon && <span>{rightIcon}</span>}
-    </button>
-  )
-}
-
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import './Glass.css'
-
-interface GlassButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: ReactNode
 }
 
