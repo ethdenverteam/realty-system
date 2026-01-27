@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { observer } from 'mobx-react-lite'
 import { GlassButton } from './GlassButton'
@@ -13,6 +14,15 @@ import './GlassMenuButton.css'
 function GlassMenuButton(): JSX.Element {
   const navigate = useNavigate()
   const navOptions = createNavigationOptions()
+  const selectRef = useRef<HTMLSelectElement>(null)
+
+  const handleButtonClick = (): void => {
+    // Программно открываем select при клике на кнопку
+    if (selectRef.current) {
+      selectRef.current.focus()
+      selectRef.current.click()
+    }
+  }
 
   const handleMenuSelect = (value: string): void => {
     uiStore.setMenuChoice(value)
@@ -23,9 +33,10 @@ function GlassMenuButton(): JSX.Element {
   }
 
   return (
-    <GlassButton className="glass-select-button">
-      <span>меню</span>
+    <GlassButton className="glass-select-button" onClick={handleButtonClick}>
+      меню
       <select
+        ref={selectRef}
         className="glass-select-native"
         value={uiStore.menuChoice}
         onChange={(e) => handleMenuSelect(e.target.value)}
