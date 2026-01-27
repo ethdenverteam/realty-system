@@ -212,6 +212,27 @@ const loadObjects = async (): Promise<void> => {
         </div>
 
         <div className="test-section">
+          <h2>Пример: Эффект стекла (glassmorphism)</h2>
+          <p>Так можно оформить карточку или нижнюю панель в стиле iOS Liquid Glass.</p>
+          <div className="glass-demo-wrapper">
+            <div className="glass-card">
+              <h3>Glass Card</h3>
+              <p>Это пример блока с эффектом «стекла».</p>
+            </div>
+          </div>
+          <pre className="code-block">
+{`.glass-card {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}`}
+          </pre>
+        </div>
+
+        <div className="test-section">
           <h2>Вариант 1: Простой выбор (как выбор района)</h2>
           <p>Имитирует выбор района - немедленная реакция при выборе</p>
           <div className="test-controls">
