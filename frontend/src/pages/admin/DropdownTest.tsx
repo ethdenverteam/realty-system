@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
@@ -23,7 +23,6 @@ function DropdownTest(): JSX.Element {
   const [log, setLog] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [buttonStatusFilter, setButtonStatusFilter] = useState<string>('')
-  const buttonStatusSelectRef = useRef<HTMLSelectElement>(null)
 
   // Тестовые данные для объектов
   const testObjects: RealtyObjectListItem[] = [
@@ -248,18 +247,11 @@ const loadObjects = async (): Promise<void> => {
           <h2>Фильтр статуса в кнопке (Liquid Glass)</h2>
           <p>Тот же фильтр, но выбранное значение отображается в стеклянной кнопке.</p>
           <div className="test-controls">
-            <GlassButton 
-              className="glass-select-button"
-              onClick={() => {
-                if (buttonStatusSelectRef.current) {
-                  buttonStatusSelectRef.current.focus()
-                  buttonStatusSelectRef.current.click()
-                }
-              }}
-            >
-              <span>Статус: {buttonStatusFilter || 'Все статусы'}</span>
+            <div className="glass-select-button-wrapper">
+              <GlassButton className="glass-select-button">
+                Статус: {buttonStatusFilter || 'Все статусы'}
+              </GlassButton>
               <select
-                ref={buttonStatusSelectRef}
                 className="glass-select-native"
                 value={buttonStatusFilter}
                 onChange={(e) => {
@@ -274,7 +266,7 @@ const loadObjects = async (): Promise<void> => {
                 <option value="запланировано">Запланированные</option>
                 <option value="архив">Архив</option>
               </select>
-            </GlassButton>
+            </div>
           </div>
         </div>
 

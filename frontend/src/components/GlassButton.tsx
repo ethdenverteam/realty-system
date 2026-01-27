@@ -8,12 +8,9 @@ interface GlassButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 /**
  * Стеклянная кнопка в духе Liquid Glass (плавающая, полупрозрачная).
  */
-export function GlassButton({ icon, children, className = '', onClick, ...rest }: GlassButtonProps): JSX.Element {
-  // Если это кнопка с select внутри, не добавляем onClick на саму кнопку
-  const handleClick = className.includes('glass-select-button') ? undefined : onClick
-
+export function GlassButton({ icon, children, className = '', ...rest }: GlassButtonProps): JSX.Element {
   return (
-    <button className={`glass-button ${className}`} type="button" onClick={handleClick} {...rest}>
+    <button className={`glass-button ${className}`} type="button" {...rest}>
       {icon && <span className="glass-button-icon">{icon}</span>}
       {children && <span className="glass-button-label">{children}</span>}
     </button>

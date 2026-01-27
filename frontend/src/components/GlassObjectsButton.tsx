@@ -1,4 +1,3 @@
-import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { observer } from 'mobx-react-lite'
 import { GlassButton } from './GlassButton'
@@ -17,15 +16,6 @@ interface GlassObjectsButtonProps {
  */
 function GlassObjectsButton({ objects }: GlassObjectsButtonProps): JSX.Element {
   const navigate = useNavigate()
-  const selectRef = useRef<HTMLSelectElement>(null)
-
-  const handleButtonClick = (): void => {
-    // Программно открываем select при клике на кнопку
-    if (selectRef.current) {
-      selectRef.current.focus()
-      selectRef.current.click()
-    }
-  }
 
   const handleObjectSelect = (value: string): void => {
     if (value) {
@@ -36,10 +26,11 @@ function GlassObjectsButton({ objects }: GlassObjectsButtonProps): JSX.Element {
   }
 
   return (
-    <GlassButton className="glass-select-button" onClick={handleButtonClick}>
-      объекты
+    <div className="glass-select-button-wrapper">
+      <GlassButton className="glass-select-button">
+        объекты
+      </GlassButton>
       <select
-        ref={selectRef}
         className="glass-select-native"
         value={uiStore.selectedObjectId || ''}
         onChange={(e) => handleObjectSelect(e.target.value)}
@@ -56,7 +47,7 @@ function GlassObjectsButton({ objects }: GlassObjectsButtonProps): JSX.Element {
           )
         })}
       </select>
-    </GlassButton>
+    </div>
   )
 }
 
