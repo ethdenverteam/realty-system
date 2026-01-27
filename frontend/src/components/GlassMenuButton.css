@@ -2,18 +2,22 @@
 .glass-select-button-wrapper {
   position: relative;
   display: inline-block;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 /* Стили для стеклянной кнопки с select внутри */
 .glass-select-button-wrapper .glass-select-button {
   position: relative;
   pointer-events: none; /* Кнопка не перехватывает клики */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .glass-select-button-wrapper .glass-select-native {
   position: absolute;
   inset: 0;
-  opacity: 0;
+  opacity: 0.001; /* Почти прозрачный, но не 0 - для iOS touch-событий */
   cursor: pointer;
   z-index: 10;
   width: 100%;
@@ -25,5 +29,10 @@
   appearance: none;
   margin: 0;
   padding: 0;
+  /* Критично для iOS: эти свойства позволяют touch-событиям работать */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  /* Убеждаемся, что select получает все события */
+  pointer-events: auto;
 }
 
