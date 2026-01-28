@@ -4,7 +4,7 @@ import Layout from '../../components/Layout'
 import api from '../../utils/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
-import GlassSelectKeyWithIcon, { type GlassSelectOption } from '../../components/GlassSelectKeyWithIcon'
+import Dropdown, { type DropdownOption } from '../../components/Dropdown'
 import type { ApiErrorResponse } from '../../types/models'
 import './Settings.css'
 
@@ -233,27 +233,16 @@ export default function UserSettings(): JSX.Element {
             <div className="form-group">
               <label className="form-label">Тема оформления</label>
               <div className="theme-selector-wrapper">
-                <GlassSelectKeyWithIcon
+                <Dropdown
                   options={availableThemes.map((t) => ({
                     value: t.value,
                     label: t.label,
-                  })) as GlassSelectOption[]}
+                  })) as DropdownOption[]}
                   value={theme}
                   onChange={(value) => {
                     setTheme(value as typeof theme)
                   }}
                   placeholder="Выберите тему..."
-                  icon={
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M12 3V1M12 23V21M21 12H23M1 12H3M18.364 5.636L19.778 4.222M4.222 19.778L5.636 18.364M18.364 18.364L19.778 19.778M4.222 4.222L5.636 5.636M17 12C17 14.7614 14.7614 17 12 17C9.23858 17 7 14.7614 7 12C7 9.23858 9.23858 7 12 7C14.7614 7 17 9.23858 17 12Z"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  }
                 />
               </div>
               <small className="form-hint">

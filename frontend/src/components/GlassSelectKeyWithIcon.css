@@ -14,6 +14,7 @@
   -webkit-user-select: none;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--spacing-xs);
 }
 
@@ -27,7 +28,7 @@
 }
 
 .glass-select-key-label {
-  white-space: nowrap;
+  display: none; /* Скрываем текст, показываем только иконку */
 }
 
 .glass-select-key-with-icon-wrapper .glass-select-key-native {

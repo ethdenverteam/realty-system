@@ -353,6 +353,38 @@ export default function Layout({
             <span>Логи</span>
           </Link>
           <Link
+            to="/admin/dashboard/users"
+            className={`nav-item ${location.pathname.includes('/users') ? 'active' : ''}`}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M16.6667 17.5V15.8333C16.6667 14.6824 16.2063 13.5787 15.4561 12.8285C14.7059 12.0783 13.6022 11.6667 12.5 11.6667H7.5C6.39783 11.6667 5.29409 12.0783 4.54391 12.8285C3.79373 13.5787 3.33334 14.6824 3.33334 15.8333V17.5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M10 9.16667C11.8409 9.16667 13.3333 7.67428 13.3333 5.83333C13.3333 3.99238 11.8409 2.5 10 2.5C8.15905 2.5 6.66667 3.99238 6.66667 5.83333C6.66667 7.67428 8.15905 9.16667 10 9.16667Z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>Пользователи</span>
+          </Link>
+          <Link
+            to="/admin/dashboard/database-schema"
+            className={`nav-item ${location.pathname.includes('/database-schema') ? 'active' : ''}`}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M4 4H16V16H4V4Z" stroke="currentColor" strokeWidth="2" />
+              <path d="M4 8H16M4 12H16" stroke="currentColor" strokeWidth="2" />
+            </svg>
+            <span>База данных</span>
+          </Link>
+          <Link
             to="/admin/dashboard/test"
             className={`nav-item ${location.pathname.includes('/test') ? 'active' : ''}`}
           >
@@ -360,6 +392,26 @@ export default function Layout({
               <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span>Тесты</span>
+          </Link>
+          <Link
+            to="/admin/dashboard/typescript-types"
+            className={`nav-item ${location.pathname.includes('/typescript-types') ? 'active' : ''}`}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M4 4H16V16H4V4Z" stroke="currentColor" strokeWidth="2" />
+              <path d="M4 8H16M4 12H16" stroke="currentColor" strokeWidth="2" />
+            </svg>
+            <span>TypeScript</span>
+          </Link>
+          <Link
+            to="/admin/dashboard/mobx-store"
+            className={`nav-item ${location.pathname.includes('/mobx-store') ? 'active' : ''}`}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M10 2L2 7L10 12L18 7L10 2Z" fill="currentColor" />
+              <path d="M2 13L10 18L18 13M2 10L10 15L18 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>MobX</span>
           </Link>
           <Link to="/user/dashboard" className="nav-item">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">

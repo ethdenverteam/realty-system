@@ -133,6 +133,60 @@ export default function AdminDashboard(): JSX.Element {
               </svg>
               <span>Структура базы данных</span>
             </a>
+            <a href="/admin/dashboard/test" className="action-card">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M9 11L12 14L22 4"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M21 12V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Тесты компонентов</span>
+            </a>
+            <a href="/admin/dashboard/typescript-types" className="action-card">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M4 4H20V20H4V4Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M4 8H20M4 12H20M4 16H20"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>TypeScript типы</span>
+            </a>
+            <a href="/admin/dashboard/mobx-store" className="action-card">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M10 2L2 7L10 12L18 7L10 2Z"
+                  fill="currentColor"
+                />
+                <path
+                  d="M2 13L10 18L18 13M2 10L10 15L18 10"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>MobX Store</span>
+            </a>
             <a href="/user/dashboard" className="action-card">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                 <path

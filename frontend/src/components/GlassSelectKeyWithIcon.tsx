@@ -114,7 +114,6 @@ export default function GlassSelectKeyWithIcon({
     <div ref={wrapperRef} className={`glass-select-key-with-icon-wrapper ${className}`}>
       <GlassButton className="glass-select-key-button">
         {icon && <span className="glass-select-key-icon">{icon}</span>}
-        <span className="glass-select-key-label">{displayText}</span>
       </GlassButton>
       <select
         ref={selectRef}

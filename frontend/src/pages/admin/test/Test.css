@@ -34,3 +34,29 @@
   flex-wrap: wrap;
 }
 
+.test-cards-wrapper {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.test-cards-wrapper .glass-card {
+  flex: 1;
+  min-width: 250px;
+}
+
+.test-dropdown-wrapper,
+.test-glass-select-wrapper,
+.test-mobile-select-wrapper,
+.test-bottom-nav-wrapper,
+.test-mobile-dropdown-wrapper,
+.test-quick-access-wrapper {
+  margin-bottom: var(--spacing-md);
+  max-width: 400px;
+}
+
+.test-section strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+

@@ -172,10 +172,8 @@
 /* Mobile styles */
 @media (max-width: 767px) {
   .dashboard-page {
-    min-height: calc(100vh - 140px);
     display: flex;
     flex-direction: column;
-    justify-content: center;
   }
 
   .stats-grid {
