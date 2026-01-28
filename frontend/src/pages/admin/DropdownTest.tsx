@@ -7,13 +7,14 @@ import Dropdown, { type DropdownOption } from '../../components/Dropdown'
 import { GlassCard } from '../../components/GlassCard'
 import { GlassButton } from '../../components/GlassButton'
 import GlassMenuButton from '../../components/GlassMenuButton'
+import GlassSelectKeyWithIcon, { type GlassSelectOption } from '../../components/GlassSelectKeyWithIcon'
 import { uiStore } from '../../stores/uiStore'
 import type { RealtyObjectListItem } from '../../types/models'
 import './DropdownTest.css'
 
 /**
- * Тестовая страница для проверки работы выпадающих меню
- * Демонстрирует различные варианты использования компонентов Dropdown и BottomNavDropdown
+ * Тестовая страница для проверки работы выпадающих меню и кнопок
+ * Демонстрирует различные варианты использования компонентов Dropdown, BottomNavDropdown и стеклянных кнопок
  */
 function DropdownTest(): JSX.Element {
   const navigate = useNavigate()
@@ -23,6 +24,7 @@ function DropdownTest(): JSX.Element {
   const [log, setLog] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [buttonStatusFilter, setButtonStatusFilter] = useState<string>('')
+  const [testSelectValue, setTestSelectValue] = useState<string | number>('')
 
   // Тестовые данные для объектов
   const testObjects: RealtyObjectListItem[] = [
@@ -82,7 +84,7 @@ function DropdownTest(): JSX.Element {
   }
 
   return (
-    <Layout title="Тест выпадающих меню" isAdmin>
+    <Layout title="Тест выпадающих меню и кнопок" isAdmin>
       <div className="dropdown-test-page">
         <div className="test-section">
           <h2>Документация: Выбор района</h2>
@@ -275,6 +277,38 @@ const loadObjects = async (): Promise<void> => {
           <p>Кнопка всегда показывает текст «меню», а список внутри — как у навигации. Состояние хранится в MobX store.</p>
           <div className="test-controls">
             <GlassMenuButton />
+          </div>
+        </div>
+
+        <div className="test-section">
+          <h2>GlassSelectKeyWithIcon - универсальный компонент</h2>
+          <p>Стеклянная кнопка с select внутри и опциональной иконкой. Можно использовать для любых списков.</p>
+          <div className="test-controls">
+            <GlassSelectKeyWithIcon
+              options={[
+                { value: 'option1', label: 'Опция 1', icon: <span>🔴</span> },
+                { value: 'option2', label: 'Опция 2', icon: <span>🟢</span> },
+                { value: 'option3', label: 'Опция 3', icon: <span>🔵</span> },
+                { value: 'option4', label: 'Опция 4', icon: <span>🟡</span> },
+              ]}
+              value={testSelectValue}
+              onChange={(value) => {
+                setTestSelectValue(value)
+                addLog(`Выбрано через GlassSelectKeyWithIcon: ${value}`)
+              }}
+              placeholder="Выберите опцию..."
+              icon={
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path
+                    d="M10 2L2 7L10 12L18 7L10 2Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              }
+            />
+            <div className="selected-value">
+              Выбрано: <strong>{testSelectValue || 'Ничего'}</strong>
+            </div>
           </div>
         </div>
 

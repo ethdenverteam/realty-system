@@ -4,8 +4,7 @@ import Layout from '../../components/Layout'
 import api from '../../utils/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
-import BottomNavDropdown from '../../components/BottomNavDropdown'
-import type { DropdownOption } from '../../components/Dropdown'
+import GlassSelectKeyWithIcon, { type GlassSelectOption } from '../../components/GlassSelectKeyWithIcon'
 import type { ApiErrorResponse } from '../../types/models'
 import './Settings.css'
 
@@ -31,7 +30,17 @@ export default function UserSettings(): JSX.Element {
     object_list_display_types: [],
   })
 
-  const roomsTypes = ['Студия', '1к', '2к', '3к', '4+к', 'Дом', '1евро', 'евро1к', '2евро', 'евро2к', '3евро', 'евро3к']
+  // Поля объекта для отображения
+  const objectDisplayFields = [
+    { key: 'rooms_type', label: 'Тип комнат' },
+    { key: 'price', label: 'Цена' },
+    { key: 'area', label: 'Площадь' },
+    { key: 'floor', label: 'Этаж' },
+    { key: 'districts', label: 'Районы' },
+    { key: 'address', label: 'Адрес' },
+    { key: 'renovation', label: 'Ремонт' },
+    { key: 'comment', label: 'Комментарий' },
+  ]
 
   const handleLogout = (): void => {
     if (confirm('Вам придется заново зайти через код. Вы уверены, что хотите выйти?')) {
@@ -155,56 +164,56 @@ export default function UserSettings(): JSX.Element {
             <div className="form-section">
               <h3 className="card-title">Настройки отображения объектов</h3>
               <p className="card-description">
-                Выберите типы объектов для отображения в карточке объекта и списке объектов
+                Выберите поля объекта для отображения в карточке объекта и списке объектов
               </p>
 
               <div className="form-group">
-                <label className="form-label">Типы для карточки объекта (короткое описание)</label>
+                <label className="form-label">Поля для карточки объекта (короткое описание)</label>
                 <div className="checkbox-group">
-                  {roomsTypes.map((type) => (
-                    <label key={type} className="checkbox-label">
+                  {objectDisplayFields.map((field) => (
+                    <label key={field.key} className="checkbox-label">
                       <input
                         type="checkbox"
-                        checked={settings.object_card_display_types?.includes(type) || false}
+                        checked={settings.object_card_display_types?.includes(field.key) || false}
                         onChange={(e) => {
                           const current = settings.object_card_display_types || []
                           const updated = e.target.checked
-                            ? [...current, type]
-                            : current.filter((t) => t !== type)
+                            ? [...current, field.key]
+                            : current.filter((t) => t !== field.key)
                           handleChange('object_card_display_types', updated)
                         }}
                       />
-                      <span>{type}</span>
+                      <span>{field.label}</span>
                     </label>
                   ))}
                 </div>
                 <small className="form-hint">
-                  Если ничего не выбрано, будут показываться все типы
+                  Если ничего не выбрано, будут показываться все поля
                 </small>
               </div>
 
               <div className="form-group">
-                <label className="form-label">Типы для списка объектов (одна строка)</label>
+                <label className="form-label">Поля для списка объектов (одна строка)</label>
                 <div className="checkbox-group">
-                  {roomsTypes.map((type) => (
-                    <label key={type} className="checkbox-label">
+                  {objectDisplayFields.map((field) => (
+                    <label key={field.key} className="checkbox-label">
                       <input
                         type="checkbox"
-                        checked={settings.object_list_display_types?.includes(type) || false}
+                        checked={settings.object_list_display_types?.includes(field.key) || false}
                         onChange={(e) => {
                           const current = settings.object_list_display_types || []
                           const updated = e.target.checked
-                            ? [...current, type]
-                            : current.filter((t) => t !== type)
+                            ? [...current, field.key]
+                            : current.filter((t) => t !== field.key)
                           handleChange('object_list_display_types', updated)
                         }}
                       />
-                      <span>{type}</span>
+                      <span>{field.label}</span>
                     </label>
                   ))}
                 </div>
                 <small className="form-hint">
-                  Если ничего не выбрано, будут показываться все типы
+                  Если ничего не выбрано, будут показываться все поля
                 </small>
               </div>
             </div>
@@ -224,13 +233,18 @@ export default function UserSettings(): JSX.Element {
             <div className="form-group">
               <label className="form-label">Тема оформления</label>
               <div className="theme-selector-wrapper">
-                <BottomNavDropdown
-                  options={availableThemes.map((t) => ({ label: t.label, value: t.value })) as DropdownOption[]}
-                  onSelect={(value) => {
+                <GlassSelectKeyWithIcon
+                  options={availableThemes.map((t) => ({
+                    value: t.value,
+                    label: t.label,
+                  })) as GlassSelectOption[]}
+                  value={theme}
+                  onChange={(value) => {
                     setTheme(value as typeof theme)
                   }}
-                  triggerIcon={
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  placeholder="Выберите тему..."
+                  icon={
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                       <path
                         d="M12 3V1M12 23V21M21 12H23M1 12H3M18.364 5.636L19.778 4.222M4.222 19.778L5.636 18.364M18.364 18.364L19.778 19.778M4.222 4.222L5.636 5.636M17 12C17 14.7614 14.7614 17 12 17C9.23858 17 7 14.7614 7 12C7 9.23858 9.23858 7 12 7C14.7614 7 17 9.23858 17 12Z"
                         stroke="currentColor"
@@ -240,7 +254,6 @@ export default function UserSettings(): JSX.Element {
                       />
                     </svg>
                   }
-                  triggerLabel={availableThemes.find((t) => t.value === theme)?.label || 'Тема'}
                 />
               </div>
               <small className="form-hint">

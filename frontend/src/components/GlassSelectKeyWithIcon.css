@@ -1,0 +1,54 @@
+/* Обёртка для стеклянной кнопки с select */
+.glass-select-key-with-icon-wrapper {
+  position: relative;
+  display: inline-block;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Стили для стеклянной кнопки с select внутри */
+.glass-select-key-with-icon-wrapper .glass-select-key-button {
+  position: relative;
+  pointer-events: none; /* Кнопка не перехватывает клики */
+  user-select: none;
+  -webkit-user-select: none;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.glass-select-key-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.glass-select-key-label {
+  white-space: nowrap;
+}
+
+.glass-select-key-with-icon-wrapper .glass-select-key-native {
+  position: absolute;
+  inset: 0;
+  opacity: 0.001; /* Почти прозрачный, но не 0 - для iOS touch-событий */
+  cursor: pointer;
+  z-index: 10;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  /* Критично для iOS: эти свойства позволяют touch-событиям работать */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  /* Убеждаемся, что select получает все события */
+  pointer-events: auto;
+}
+

@@ -9,15 +9,15 @@ import './TestIndex.css'
 export default function TestIndex(): JSX.Element {
   const tests = [
     {
-      path: '/admin/dashboard/test',
+      path: '/admin/dashboard/test/components',
       title: 'Тест компонентов',
       description: 'Тестирование карточек объектов и списков объектов',
       icon: '🧪',
     },
     {
       path: '/admin/dashboard/test/dropdown-test',
-      title: 'Тест выпадающих меню',
-      description: 'Демонстрация различных вариантов использования Dropdown и BottomNavDropdown',
+      title: 'Тест выпадающих меню и кнопок',
+      description: 'Демонстрация различных вариантов использования Dropdown, BottomNavDropdown и стеклянных кнопок',
       icon: '📋',
     },
   ]
