@@ -31,6 +31,30 @@
   outline-offset: 2px;
 }
 
+/* Glow эффект для меню */
+.bottom-nav-dropdown-trigger.glow-active {
+  animation: menu-glow-flash 0.4s ease-out;
+}
+
+@keyframes menu-glow-flash {
+  0% {
+    box-shadow: 
+      0 10px 30px rgba(0, 0, 0, 0.35),
+      0 0 0 0 var(--glow-color);
+  }
+  50% {
+    box-shadow: 
+      0 10px 30px rgba(0, 0, 0, 0.35),
+      0 0 15px 8px var(--glow-color),
+      inset 0 0 20px color-mix(in srgb, var(--glow-color) 30%, transparent);
+  }
+  100% {
+    box-shadow: 
+      0 10px 30px rgba(0, 0, 0, 0.35),
+      0 0 0 0 var(--glow-color);
+  }
+}
+
 .bottom-nav-dropdown-trigger svg,
 .bottom-nav-dropdown-trigger img {
   width: 24px;

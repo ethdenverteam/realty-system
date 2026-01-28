@@ -51,13 +51,24 @@ export default function BottomNavDropdown({
     setIsOpen(false)
   }
 
+  const triggerRef = useRef<HTMLButtonElement>(null)
+
   const handleToggle = (): void => {
+    // Добавляем glow эффект при клике
+    const trigger = triggerRef.current
+    if (trigger) {
+      trigger.classList.add('glow-active')
+      setTimeout(() => {
+        trigger.classList.remove('glow-active')
+      }, 400)
+    }
     setIsOpen(!isOpen)
   }
 
   return (
     <div className={`bottom-nav-dropdown ${className}`} ref={menuRef}>
       <button
+        ref={triggerRef}
         className="bottom-nav-dropdown-trigger"
         onClick={handleToggle}
         aria-label={triggerLabel}

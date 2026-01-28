@@ -43,19 +43,45 @@
   0% {
     box-shadow: 
       0 4px 30px rgba(0, 0, 0, 0.1),
-      0 0 0 0 var(--color-accent);
+      0 0 0 0 var(--glow-color);
   }
   50% {
     box-shadow: 
       0 4px 30px rgba(0, 0, 0, 0.1),
-      0 0 30px 15px var(--color-accent),
-      inset 0 0 40px color-mix(in srgb, var(--color-accent) 40%, transparent);
+      0 0 15px 8px var(--glow-color),
+      inset 0 0 20px color-mix(in srgb, var(--glow-color) 30%, transparent);
   }
   100% {
     box-shadow: 
       0 4px 30px rgba(0, 0, 0, 0.1),
-      0 0 0 0 var(--color-accent);
+      0 0 0 0 var(--glow-color);
   }
+}
+
+/* Компактная версия карточки */
+.glass-object-card.compact {
+  padding: var(--spacing-md);
+}
+
+.object-details-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  align-items: center;
+}
+
+.object-detail-item {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: #000000;
+  line-height: 1.4;
+}
+
+/* Для темных тем делаем белый текст */
+[data-theme="dark"] .object-detail-item,
+[data-theme="dark-lines"] .object-detail-item,
+[data-theme="dark-random-lines"] .object-detail-item {
+  color: #ffffff;
 }
 
 .object-header {

@@ -1,3 +1,4 @@
+/* Единый стиль стекла для карточки и кнопки */
 .glass-card {
   background: rgba(255, 255, 255, 0.12);
   border-radius: 16px;
@@ -16,15 +17,11 @@
   gap: 8px;
   padding: 10px 18px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.05))
-      border-box,
-    rgba(15, 15, 20, 0.65);
-  box-shadow:
-    0 18px 45px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   color: var(--color-text);
   font-size: var(--font-size-sm);
   font-weight: 500;
@@ -38,16 +35,13 @@
 
 .glass-button:hover {
   transform: translateY(-1px);
-  box-shadow:
-    0 22px 55px rgba(0, 0, 0, 0.7),
-    0 0 0 1px rgba(255, 255, 255, 0.16) inset;
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2);
 }
 
 .glass-button:active {
   transform: translateY(0);
-  box-shadow:
-    0 10px 25px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
 }
 
 .glass-button:disabled {
@@ -74,39 +68,6 @@
   color: var(--color-text);
 }
 
-.glass-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 18px;
-  border-radius: 999px;
-  background: radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.1))
-      border-box,
-    rgba(15, 15, 20, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  color: var(--color-text);
-  cursor: pointer;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, background 0.2s ease-out;
-}
-
-.glass-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
-  background: radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.12))
-      border-box,
-    rgba(20, 20, 30, 0.7);
-}
-
-.glass-button:active {
-  transform: translateY(0);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
-}
 
 /* Эффект glow при нажатии на стеклянные элементы */
 .glass-button.glow-active {
@@ -117,42 +78,43 @@
   animation: glass-glow-flash 0.4s ease-out;
 }
 
+/* Уменьшенный glow эффект с учетом темы */
 @keyframes glass-glow-flash {
   0% {
     box-shadow: 
-      0 10px 30px rgba(0, 0, 0, 0.35),
-      0 0 0 0 var(--color-accent);
+      0 4px 30px rgba(0, 0, 0, 0.1),
+      0 0 0 0 var(--glow-color);
   }
   50% {
     box-shadow: 
-      0 10px 30px rgba(0, 0, 0, 0.35),
-      0 0 30px 15px var(--color-accent),
-      inset 0 0 40px color-mix(in srgb, var(--color-accent) 40%, transparent);
+      0 4px 30px rgba(0, 0, 0, 0.1),
+      0 0 15px 8px var(--glow-color),
+      inset 0 0 20px color-mix(in srgb, var(--glow-color) 30%, transparent);
   }
   100% {
     box-shadow: 
-      0 10px 30px rgba(0, 0, 0, 0.35),
-      0 0 0 0 var(--color-accent);
+      0 4px 30px rgba(0, 0, 0, 0.1),
+      0 0 0 0 var(--glow-color);
   }
 }
 
-/* Для glass-card отдельная анимация */
+/* Для glass-card та же анимация */
 @keyframes glass-card-glow-flash {
   0% {
     box-shadow: 
       0 4px 30px rgba(0, 0, 0, 0.1),
-      0 0 0 0 var(--color-accent);
+      0 0 0 0 var(--glow-color);
   }
   50% {
     box-shadow: 
       0 4px 30px rgba(0, 0, 0, 0.1),
-      0 0 30px 15px var(--color-accent),
-      inset 0 0 40px color-mix(in srgb, var(--color-accent) 40%, transparent);
+      0 0 15px 8px var(--glow-color),
+      inset 0 0 20px color-mix(in srgb, var(--glow-color) 30%, transparent);
   }
   100% {
     box-shadow: 
       0 4px 30px rgba(0, 0, 0, 0.1),
-      0 0 0 0 var(--color-accent);
+      0 0 0 0 var(--glow-color);
   }
 }
 

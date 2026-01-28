@@ -153,7 +153,7 @@ export default function UserObjects(): JSX.Element {
               {objects.map((obj) => (
                 <div 
                   key={obj.object_id} 
-                  className="object-card"
+                  className="object-card compact"
                   onClick={(e) => {
                     // Добавляем glow эффект при клике на карточку
                     const card = e.currentTarget
@@ -163,59 +163,35 @@ export default function UserObjects(): JSX.Element {
                     }, 400)
                   }}
                 >
-                  <div className="object-header">
-                    <h3 className="object-id">{obj.object_id}</h3>
-                    <span
-                      className={`badge badge-${
-                        obj.status === 'опубликовано'
-                          ? 'success'
-                          : obj.status === 'черновик'
-                            ? 'warning'
-                            : 'secondary'
-                      }`}
-                    >
-                      {obj.status}
-                    </span>
-                  </div>
-                  <div className="object-details">
+                  <div className="object-details-compact">
                     {obj.rooms_type && (
-                      <div>
-                        <strong>Тип:</strong> {obj.rooms_type}
+                      <div className="object-detail-item">
+                        {obj.rooms_type}
                       </div>
                     )}
                     {obj.price > 0 && (
-                      <div>
-                        <strong>Цена:</strong> {obj.price} тыс. руб.
+                      <div className="object-detail-item">
+                        {obj.price} тыс. руб.
                       </div>
                     )}
                     {obj.area && (
-                      <div>
-                        <strong>Площадь:</strong> {obj.area} м²
-                      </div>
-                    )}
-                    {obj.floor && (
-                      <div>
-                        <strong>Этаж:</strong> {obj.floor}
+                      <div className="object-detail-item">
+                        {obj.area} м²
                       </div>
                     )}
                     {(obj.districts_json?.length || 0) > 0 && (
-                      <div>
-                        <strong>Районы:</strong> {(obj.districts_json || []).join(', ')}
+                      <div className="object-detail-item">
+                        {(obj.districts_json || []).join(', ')}
                       </div>
                     )}
                   </div>
-                  {obj.comment && (
-                    <div className="object-comment">
-                      {obj.comment.substring(0, 100)}
-                      {obj.comment.length > 100 ? '...' : ''}
-                    </div>
-                  )}
                   <div className="object-actions">
                     <Link to={`/user/dashboard/objects/${obj.object_id}`} className="btn btn-sm btn-primary">
                       Просмотр
                     </Link>
                     <button
-                      onClick={async () => {
+                      onClick={async (e) => {
+                        e.stopPropagation()
                         if (!obj.can_publish) {
                           alert(obj.last_publication ? 
                             `Объект был опубликован менее 24 часов назад. Последняя публикация: ${new Date(obj.last_publication).toLocaleString('ru-RU')}` :

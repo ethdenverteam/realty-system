@@ -87,6 +87,70 @@
   /* Admin colors - dark theme with pink-purple gradient */
   --color-admin: #ff1744;
   --color-admin-light: #ff4081;
+  
+  /* Glow color для темной темы - красный */
+  --glow-color: #ff1744;
+}
+
+[data-theme="light"] {
+  /* Glow color для светлой темы - черный */
+  --glow-color: #000000;
+}
+
+[data-theme="dark-lines"] {
+  /* Glow color для темной темы с линиями - красный */
+  --glow-color: #ff1744;
+}
+
+[data-theme="light-lines"] {
+  /* Glow color для светлой темы с линиями - черный */
+  --glow-color: #000000;
+}
+
+/* 5-я тема: черный фон со случайными линиями */
+[data-theme="dark-random-lines"] {
+  --color-primary: #ffffff;
+  --color-secondary: #999999;
+  --color-accent: #ff1744;
+  --color-success: #4caf50;
+  --color-danger: #ff5252;
+  --color-warning: #ffb74d;
+  
+  --color-bg: #000000;
+  --color-bg-secondary: #1a1a1a;
+  --color-bg-tertiary: #2a2a2a;
+  
+  --color-text: #ffffff;
+  --color-text-secondary: #b0b0b0;
+  --color-text-tertiary: #808080;
+  
+  --color-border: #2a2a2a;
+  --color-border-light: #1a1a1a;
+  
+  --color-admin: #ff1744;
+  --color-admin-light: #ff4081;
+  
+  /* Glow color для темы со случайными линиями - красный */
+  --glow-color: #ff1744;
+}
+
+[data-theme="dark-random-lines"] body {
+  background: #000000;
+  background-attachment: fixed;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Генерация случайных линий для 5-й темы */
+[data-theme="dark-random-lines"] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.6;
+  background-image: var(--random-lines-bg);
+  background-size: 100% 100%;
 }
 
 body {

@@ -27,54 +27,29 @@ export function ObjectCard({ object, onClick }: ObjectCardProps): JSX.Element {
   }
 
   return (
-    <div ref={cardRef} className="object-card glass-object-card" onClick={handleClick}>
-      <div className="object-header">
-        <h3 className="object-id">{object.object_id}</h3>
-        <span
-          className={`badge badge-${
-            object.status === 'опубликовано'
-              ? 'success'
-              : object.status === 'черновик'
-                ? 'warning'
-                : 'secondary'
-          }`}
-        >
-          {object.status}
-        </span>
-      </div>
-      <div className="object-details">
+    <div ref={cardRef} className="object-card glass-object-card compact" onClick={handleClick}>
+      <div className="object-details-compact">
         {object.rooms_type && (
-          <div>
-            <strong>Тип:</strong> {object.rooms_type}
+          <div className="object-detail-item">
+            {object.rooms_type}
           </div>
         )}
         {object.price > 0 && (
-          <div>
-            <strong>Цена:</strong> {object.price} тыс. руб.
+          <div className="object-detail-item">
+            {object.price} тыс. руб.
           </div>
         )}
         {object.area && (
-          <div>
-            <strong>Площадь:</strong> {object.area} м²
-          </div>
-        )}
-        {object.floor && (
-          <div>
-            <strong>Этаж:</strong> {object.floor}
+          <div className="object-detail-item">
+            {object.area} м²
           </div>
         )}
         {(object.districts_json?.length || 0) > 0 && (
-          <div>
-            <strong>Районы:</strong> {(object.districts_json || []).join(', ')}
+          <div className="object-detail-item">
+            {(object.districts_json || []).join(', ')}
           </div>
         )}
       </div>
-      {object.comment && (
-        <div className="object-comment">
-          {object.comment.substring(0, 100)}
-          {object.comment.length > 100 ? '...' : ''}
-        </div>
-      )}
     </div>
   )
 }

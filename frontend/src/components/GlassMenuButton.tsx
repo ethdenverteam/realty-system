@@ -18,6 +18,7 @@ function GlassMenuButton(): JSX.Element {
   const navOptions = createNavigationOptions()
   const selectRef = useRef<HTMLSelectElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   const handleMenuSelect = (value: string): void => {
     uiStore.setMenuChoice(value)

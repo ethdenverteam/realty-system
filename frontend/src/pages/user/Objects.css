@@ -39,6 +39,15 @@
   overflow: hidden;
 }
 
+.object-card.compact {
+  padding: var(--spacing-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+}
+
 .object-card:hover {
   border-color: rgba(255, 255, 255, 0.5);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2);
@@ -58,19 +67,41 @@
   0% {
     box-shadow: 
       0 4px 30px rgba(0, 0, 0, 0.1),
-      0 0 0 0 var(--color-accent);
+      0 0 0 0 var(--glow-color);
   }
   50% {
     box-shadow: 
       0 4px 30px rgba(0, 0, 0, 0.1),
-      0 0 30px 15px var(--color-accent),
-      inset 0 0 40px color-mix(in srgb, var(--color-accent) 40%, transparent);
+      0 0 15px 8px var(--glow-color),
+      inset 0 0 20px color-mix(in srgb, var(--glow-color) 30%, transparent);
   }
   100% {
     box-shadow: 
       0 4px 30px rgba(0, 0, 0, 0.1),
-      0 0 0 0 var(--color-accent);
+      0 0 0 0 var(--glow-color);
   }
+}
+
+.object-details-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  align-items: center;
+  flex: 1;
+}
+
+.object-detail-item {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: #000000;
+  line-height: 1.4;
+}
+
+/* Для темных тем делаем белый текст */
+[data-theme="dark"] .object-detail-item,
+[data-theme="dark-lines"] .object-detail-item,
+[data-theme="dark-random-lines"] .object-detail-item {
+  color: #ffffff;
 }
 
 .object-header {
@@ -106,6 +137,7 @@
 .object-actions {
   display: flex;
   gap: var(--spacing-sm);
+  flex-shrink: 0;
 }
 
 .badge-secondary {
