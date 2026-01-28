@@ -3,6 +3,9 @@ import axios from 'axios'
 import Layout from '../../components/Layout'
 import api from '../../utils/api'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTheme } from '../../contexts/ThemeContext'
+import BottomNavDropdown from '../../components/BottomNavDropdown'
+import type { DropdownOption } from '../../components/Dropdown'
 import type { ApiErrorResponse } from '../../types/models'
 import './Settings.css'
 
@@ -16,6 +19,7 @@ interface UserSettings {
 
 export default function UserSettings(): JSX.Element {
   const { logout } = useAuth()
+  const { theme, setTheme, availableThemes } = useTheme()
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string>('')
   const [success, setSuccess] = useState<string>('')
@@ -211,6 +215,39 @@ export default function UserSettings(): JSX.Element {
               </button>
             </div>
           </form>
+
+          <div className="form-section">
+            <h3 className="card-title">Выбор темы</h3>
+            <p className="card-description">
+              Выберите тему оформления приложения. Изменения применяются сразу.
+            </p>
+            <div className="form-group">
+              <label className="form-label">Тема оформления</label>
+              <div className="theme-selector-wrapper">
+                <BottomNavDropdown
+                  options={availableThemes.map((t) => ({ label: t.label, value: t.value })) as DropdownOption[]}
+                  onSelect={(value) => {
+                    setTheme(value as typeof theme)
+                  }}
+                  triggerIcon={
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M12 3V1M12 23V21M21 12H23M1 12H3M18.364 5.636L19.778 4.222M4.222 19.778L5.636 18.364M18.364 18.364L19.778 19.778M4.222 4.222L5.636 5.636M17 12C17 14.7614 14.7614 17 12 17C9.23858 17 7 14.7614 7 12C7 9.23858 9.23858 7 12 7C14.7614 7 17 9.23858 17 12Z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  }
+                  triggerLabel={availableThemes.find((t) => t.value === theme)?.label || 'Тема'}
+                />
+              </div>
+              <small className="form-hint">
+                Текущая тема: <strong>{availableThemes.find((t) => t.value === theme)?.label}</strong>
+              </small>
+            </div>
+          </div>
 
           <div className="settings-logout-section">
             <h3 className="card-title">Выход</h3>

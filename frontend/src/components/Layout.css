@@ -5,23 +5,25 @@
   background: transparent;
 }
 
-/* Header - luma.com style */
+/* Header - стеклянный стиль */
 .app-header {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: var(--color-bg);
-  border-bottom: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
   padding: var(--spacing-md) var(--spacing-md);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 [data-theme="light"] .app-header {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 [data-theme="dark"] .app-header {
-  background: rgba(18, 18, 18, 0.9);
+  background: rgba(18, 18, 18, 0.12);
 }
 
 .app-header.admin {
@@ -29,7 +31,7 @@
 }
 
 [data-theme="dark"] .app-header.admin {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  background: rgba(102, 126, 234, 0.12);
   border-bottom-color: var(--color-admin);
 }
 
@@ -241,24 +243,27 @@
     height: 44px;
   }
 
-  /* Icon colors - red in dark theme, blue in light theme */
-  [data-theme="dark"] .mobile-header-actions .header-icon-btn {
+  /* Icon colors - всегда красные для дашборд, настройки и объекты */
+  [data-theme="dark"] .mobile-header-actions .header-icon-btn,
+  [data-theme="light"] .mobile-header-actions .header-icon-btn,
+  [data-theme="dark-lines"] .mobile-header-actions .header-icon-btn,
+  [data-theme="light-lines"] .mobile-header-actions .header-icon-btn,
+  [data-theme="dark-random-lines"] .mobile-header-actions .header-icon-btn {
     color: #ff1744;
   }
-
-  [data-theme="light"] .mobile-header-actions .header-icon-btn {
-    color: #2196f3;
+  
+  /* Иконки дашборд, настройки и объекты всегда красные */
+  .mobile-header-actions .header-icon-btn img[alt="Объекты"],
+  .mobile-header-actions .header-icon-btn img[alt="Настройки"] {
+    filter: brightness(0) saturate(100%) invert(27%) sepia(94%) saturate(7151%) hue-rotate(337deg) brightness(101%) contrast(101%);
   }
 
-  [data-theme="dark"] .mobile-header-actions .header-icon-btn:hover {
+  [data-theme="dark"] .mobile-header-actions .header-icon-btn:hover,
+  [data-theme="light"] .mobile-header-actions .header-icon-btn:hover,
+  [data-theme="dark-lines"] .mobile-header-actions .header-icon-btn:hover,
+  [data-theme="light-lines"] .mobile-header-actions .header-icon-btn:hover,
+  [data-theme="dark-random-lines"] .mobile-header-actions .header-icon-btn:hover {
     color: #ff5252;
-    background: rgba(255, 255, 255, 0.12);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-
-  [data-theme="light"] .mobile-header-actions .header-icon-btn:hover {
-    color: #42a5f5;
     background: rgba(255, 255, 255, 0.12);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -301,13 +306,18 @@
     height: 24px;
   }
 
-  /* Icon colors for bottom nav */
-  [data-theme="dark"] .bottom-nav-icon-btn svg {
+  /* Icon colors for bottom nav - всегда красные для дашборд */
+  [data-theme="dark"] .bottom-nav-icon-btn svg,
+  [data-theme="light"] .bottom-nav-icon-btn svg,
+  [data-theme="dark-lines"] .bottom-nav-icon-btn svg,
+  [data-theme="light-lines"] .bottom-nav-icon-btn svg,
+  [data-theme="dark-random-lines"] .bottom-nav-icon-btn svg {
     color: #ff1744;
   }
-
-  [data-theme="light"] .bottom-nav-icon-btn svg {
-    color: #2196f3;
+  
+  /* Иконка дашборд всегда красная */
+  .bottom-nav-icon-btn img[alt="Главная"] {
+    filter: brightness(0) saturate(100%) invert(27%) sepia(94%) saturate(7151%) hue-rotate(337deg) brightness(101%) contrast(101%);
   }
 
   [data-theme="dark"] .mobile-menu-button {

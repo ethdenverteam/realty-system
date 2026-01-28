@@ -13,20 +13,20 @@
 .form-section {
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 32px 8px 32px 8px; /* Сильное искривление по бокам */
+  border-radius: 24px; /* Округлая форма */
   padding: var(--spacing-lg);
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(12px); /* Меньше размытия */
+  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 
 .section-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xl);
   font-weight: 600;
   margin-bottom: var(--spacing-lg);
-  color: var(--color-text);
+  color: #ffffff;
   padding-bottom: var(--spacing-md);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .form-row {
@@ -41,15 +41,23 @@
   gap: var(--spacing-sm);
 }
 
+.form-group .form-label {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  margin-bottom: var(--spacing-xs);
+}
+
 .form-input {
   width: 100%;
   padding: var(--spacing-md);
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: var(--radius-md);
-  font-size: var(--font-size-base);
+  font-size: 20px;
+  font-weight: 600;
   transition: all var(--transition-fast);
   background: rgba(255, 255, 255, 0.12);
-  color: var(--color-text);
+  color: #ffffff;
   font-family: inherit;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);

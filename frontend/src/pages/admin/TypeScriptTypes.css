@@ -1,0 +1,121 @@
+.typescript-types-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.types-category {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.category-title {
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.type-item {
+  margin-bottom: var(--spacing-xl);
+}
+
+.type-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+}
+
+.type-name {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.type-badge {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.type-description {
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-md);
+  font-size: var(--font-size-base);
+}
+
+.type-properties {
+  margin-top: var(--spacing-md);
+}
+
+.type-properties h5 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-text);
+}
+
+.properties-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.properties-table thead {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.properties-table th {
+  padding: var(--spacing-md);
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-text);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.properties-table td {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--color-text-secondary);
+}
+
+.properties-table code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-size-sm);
+}
+
+.prop-name code {
+  color: #ff1744;
+}
+
+.prop-type code {
+  color: #00bcd4;
+}
+
+.prop-required {
+  text-align: center;
+  font-size: var(--font-size-lg);
+}
+
+@media (max-width: 767px) {
+  .properties-table {
+    font-size: var(--font-size-xs);
+  }
+
+  .properties-table th,
+  .properties-table td {
+    padding: var(--spacing-sm);
+  }
+}
+

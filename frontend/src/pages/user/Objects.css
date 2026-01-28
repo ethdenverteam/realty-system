@@ -7,10 +7,13 @@
 
 /* Фильтры в стеклянном блоке */
 .filters-card {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  padding: 0;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 24px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: var(--spacing-lg);
 }
 
 .filters-header {
@@ -79,10 +82,10 @@
 .object-card {
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 32px 8px 32px 8px; /* Сильное искривление по бокам */
+  border-radius: 24px; /* Округлая форма */
   padding: var(--spacing-lg);
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(12px); /* Меньше размытия */
+  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   transition: all var(--transition-fast);
   position: relative;

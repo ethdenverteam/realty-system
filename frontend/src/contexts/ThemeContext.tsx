@@ -5,6 +5,8 @@ type Theme = 'dark' | 'light' | 'dark-lines' | 'light-lines' | 'dark-random-line
 interface ThemeContextValue {
   theme: Theme
   toggleTheme: () => void
+  setTheme: (theme: Theme) => void
+  availableThemes: { value: Theme; label: string }[]
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
@@ -14,7 +16,7 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
     const saved = localStorage.getItem('theme')
     return saved === 'light' || saved === 'dark' || saved === 'dark-lines' || saved === 'light-lines' || saved === 'dark-random-lines'
       ? (saved as Theme)
-      : 'dark'
+      : 'dark-lines' // По умолчанию тема с линиями
   })
 
   useEffect(() => {
@@ -24,6 +26,11 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
     // Генерация случайных линий для темы dark-random-lines
     if (theme === 'dark-random-lines') {
       generateRandomLines()
+    }
+    
+    // Генерация случайного градиента для темы dark-lines
+    if (theme === 'dark-lines') {
+      generateRandomGradient()
     }
   }, [theme])
 
@@ -57,6 +64,36 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
     document.documentElement.style.setProperty('--random-lines-bg', lines.join(', '))
   }
 
+  const generateRandomGradient = (): void => {
+    // Генерируем случайные позиции и цвета для градиента
+    const numGradients = 2 + Math.floor(Math.random() * 3) // 2-4 градиента
+    const gradients: string[] = []
+    const colors = [
+      { r: 255, g: 0, b: 120 },
+      { r: 0, g: 170, b: 255 },
+      { r: 120, g: 255, b: 120 },
+      { r: 255, g: 120, b: 200 },
+      { r: 120, g: 120, b: 255 },
+      { r: 255, g: 200, b: 0 },
+      { r: 255, g: 23, b: 68 },
+    ]
+    
+    for (let i = 0; i < numGradients; i++) {
+      const x = Math.random() * 100
+      const y = Math.random() * 100
+      const size = 20 + Math.random() * 40
+      const color = colors[Math.floor(Math.random() * colors.length)]
+      const opacity = 0.15 + Math.random() * 0.15 // 0.15-0.3
+      
+      gradients.push(
+        `radial-gradient(circle at ${x}% ${y}%, rgba(${color.r}, ${color.g}, ${color.b}, ${opacity}), transparent ${size}%)`
+      )
+    }
+    
+    const gradientString = gradients.join(', ') + ', #000000'
+    document.documentElement.style.setProperty('--random-gradient-bg', gradientString)
+  }
+
   const toggleTheme = () => {
     setTheme((prev) => {
       if (prev === 'dark') return 'dark-lines'
@@ -67,7 +104,21 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
     })
   }
 
-  const value: ThemeContextValue = useMemo(() => ({ theme, toggleTheme }), [theme])
+  const availableThemes: { value: Theme; label: string }[] = useMemo(
+    () => [
+      { value: 'dark', label: 'Темная' },
+      { value: 'dark-lines', label: 'Темная с линиями' },
+      { value: 'light', label: 'Светлая' },
+      { value: 'light-lines', label: 'Светлая с линиями' },
+      { value: 'dark-random-lines', label: 'Темная со случайными линиями' },
+    ],
+    []
+  )
+
+  const value: ThemeContextValue = useMemo(
+    () => ({ theme, toggleTheme, setTheme, availableThemes }),
+    [theme, availableThemes]
+  )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }

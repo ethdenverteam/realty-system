@@ -1,16 +1,47 @@
 /* Единый стиль стекла для карточки и кнопки */
-/* Сильное искривление по бокам, меньше размытия внутри */
+/* Сильное искривление по краям, опциональное размытие внутри */
 .glass-card {
   background: rgba(255, 255, 255, 0.12);
-  border-radius: 32px 8px 32px 8px; /* Сильное искривление по бокам */
+  border-radius: 24px; /* Округлая форма */
   border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(12px); /* Меньше размытия */
+  backdrop-filter: blur(12px); /* Размытие по умолчанию */
   -webkit-backdrop-filter: blur(12px);
   padding: var(--spacing-lg);
   color: var(--color-text);
   position: relative;
   overflow: hidden;
+}
+
+/* Варианты стекла: прозрачное, затемненное, осветленное */
+.glass-card.glass-transparent {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.glass-card.glass-darkened {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.glass-card.glass-lightened {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Варианты размытия */
+.glass-card.glass-no-blur {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.glass-card.glass-strong-blur {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Стекло на фоне стекла - нижнее прозрачное на 97% и затемненное */
+.glass-card.glass-nested {
+  background: rgba(0, 0, 0, 0.03); /* 97% прозрачности */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 /* Дополнительный эффект для боковых сторон */
@@ -40,11 +71,11 @@
   justify-content: center;
   gap: 8px;
   padding: 10px 18px;
-  border-radius: 999px;
+  border-radius: 24px; /* Округлая форма */
   border: 1px solid rgba(255, 255, 255, 0.3);
   background: rgba(255, 255, 255, 0.12);
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(12px); /* Меньше размытия */
+  backdrop-filter: blur(12px); /* Размытие по умолчанию */
   -webkit-backdrop-filter: blur(12px);
   color: var(--color-text);
   font-size: var(--font-size-sm);
@@ -55,6 +86,29 @@
     box-shadow 0.18s ease-out,
     background 0.18s ease-out,
     border-color 0.18s ease-out;
+}
+
+/* Варианты стекла для кнопок */
+.glass-button.glass-transparent {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.glass-button.glass-darkened {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.glass-button.glass-lightened {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.glass-button.glass-no-blur {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.glass-button.glass-strong-blur {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .glass-button:hover {

@@ -39,14 +39,14 @@ export default function UserDashboard(): JSX.Element {
         {error && <div className="alert alert-error">{error}</div>}
 
         <div className="stats-grid">
-          <div className="stat-card">
+          <Link to="/user/dashboard/autopublish" className="stat-card" style={{ textDecoration: 'none', color: 'inherit' }}>
             <div className="stat-value">{loading ? '-' : (stats?.autopublish_objects_count ?? 0)}</div>
             <div className="stat-label">Объектов на автопубликации</div>
-          </div>
-          <div className="stat-card">
+          </Link>
+          <Link to="/user/dashboard/objects" className="stat-card" style={{ textDecoration: 'none', color: 'inherit' }}>
             <div className="stat-value">{loading ? '-' : (stats?.objects_count ?? '-')}</div>
             <div className="stat-label">Объектов всего</div>
-          </div>
+          </Link>
         </div>
 
         <div className="card">

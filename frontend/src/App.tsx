@@ -11,6 +11,9 @@ import AdminUsers from './pages/admin/Users'
 import AdminDatabaseSchema from './pages/admin/DatabaseSchema'
 import AdminDropdownTest from './pages/admin/DropdownTest'
 import AdminTest from './pages/admin/test/Test'
+import AdminTestIndex from './pages/admin/test/TestIndex'
+import AdminTypeScriptTypes from './pages/admin/TypeScriptTypes'
+import AdminMobXStore from './pages/admin/MobXStore'
 import UserCreateObject from './pages/user/CreateObject'
 import UserDashboard from './pages/user/Dashboard'
 import UserEditObject from './pages/user/EditObject'
@@ -84,7 +87,39 @@ export default function App(): JSX.Element {
               path="/admin/dashboard/test"
               element={
                 <ProtectedRoute requireAdmin>
+                  <AdminTestIndex />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard/test/components"
+              element={
+                <ProtectedRoute requireAdmin>
                   <AdminTest />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard/test/dropdown-test"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminDropdownTest />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard/typescript-types"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminTypeScriptTypes />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard/mobx-store"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminMobXStore />
                 </ProtectedRoute>
               }
             />

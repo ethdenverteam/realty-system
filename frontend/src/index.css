@@ -215,13 +215,9 @@ body::before {
     linear-gradient(235deg, rgba(255, 120, 200, 0.4) 1px, transparent 1px);
 }
 
-/* Тестовый фон (всегда виден) — если даже его не видно, значит фон перекрывается где-то ещё */
+/* Градиент генерируется случайно через JavaScript в ThemeContext */
 [data-theme="dark-lines"] body {
-  background:
-    radial-gradient(circle at 20% 10%, rgba(255, 0, 120, 0.22), transparent 55%),
-    radial-gradient(circle at 80% 30%, rgba(0, 170, 255, 0.20), transparent 60%),
-    radial-gradient(circle at 50% 90%, rgba(120, 255, 120, 0.14), transparent 55%),
-    #000000;
+  background: var(--random-gradient-bg, #000000);
   background-attachment: fixed;
 }
 
@@ -291,9 +287,9 @@ input, textarea, select {
 .card {
   background: rgba(255, 255, 255, 0.12) !important;
   border: 1px solid rgba(255, 255, 255, 0.3) !important;
-  border-radius: 32px 8px 32px 8px !important; /* Сильное искривление по бокам */
+  border-radius: 24px !important; /* Округлая форма */
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1) !important;
-  backdrop-filter: blur(12px) !important; /* Меньше размытия */
+  backdrop-filter: blur(12px) !important; /* Размытие по умолчанию */
   -webkit-backdrop-filter: blur(12px) !important;
 }
 

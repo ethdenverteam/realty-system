@@ -64,14 +64,14 @@ export default function Layout({
                 className="header-icon-btn"
                 aria-label="Объекты"
               >
-                <img src="/SVG/objects_up.svg" alt="Объекты" width="24" height="24" style={{ filter: theme === 'dark' ? 'invert(1)' : 'none' }} />
+                <img src="/SVG/objects_up.svg" alt="Объекты" width="24" height="24" style={{ filter: 'brightness(0) saturate(100%) invert(27%) sepia(94%) saturate(7151%) hue-rotate(337deg) brightness(101%) contrast(101%)' }} />
               </Link>
               <Link
                 to="/user/dashboard/settings"
                 className="header-icon-btn"
                 aria-label="Настройки"
               >
-                <img src="/SVG/settings_up.svg" alt="Настройки" width="24" height="24" style={{ filter: theme === 'dark' ? 'invert(1)' : 'none' }} />
+                <img src="/SVG/settings_up.svg" alt="Настройки" width="24" height="24" style={{ filter: 'brightness(0) saturate(100%) invert(27%) sepia(94%) saturate(7151%) hue-rotate(337deg) brightness(101%) contrast(101%)' }} />
               </Link>
               <button
                 className="header-icon-btn"
@@ -180,13 +180,33 @@ export default function Layout({
               <span>База данных</span>
             </Link>
             <Link
-              to="/admin/dashboard/dropdown-test"
-              className={`top-nav-item ${location.pathname.includes('/dropdown-test') ? 'active' : ''}`}
+              to="/admin/dashboard/test"
+              className={`top-nav-item ${location.pathname.includes('/test') ? 'active' : ''}`}
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span>Тест меню</span>
+              <span>Тесты</span>
+            </Link>
+            <Link
+              to="/admin/dashboard/typescript-types"
+              className={`top-nav-item ${location.pathname.includes('/typescript-types') ? 'active' : ''}`}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M4 4H16V16H4V4Z" stroke="currentColor" strokeWidth="2" />
+                <path d="M4 8H16M4 12H16" stroke="currentColor" strokeWidth="2" />
+              </svg>
+              <span>TypeScript</span>
+            </Link>
+            <Link
+              to="/admin/dashboard/mobx-store"
+              className={`top-nav-item ${location.pathname.includes('/mobx-store') ? 'active' : ''}`}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M10 2L2 7L10 12L18 7L10 2Z" fill="currentColor" />
+                <path d="M2 13L10 18L18 13M2 10L10 15L18 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>MobX Store</span>
             </Link>
             <Link to="/user/dashboard" className="top-nav-item">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -272,7 +292,7 @@ export default function Layout({
             className={`bottom-nav-icon-btn ${location.pathname === '/user/dashboard' ? 'active' : ''}`}
             aria-label="Главная"
           >
-            <img src="/SVG/dashboard_down.svg" alt="Главная" width="24" height="24" style={{ filter: theme === 'dark' ? 'invert(1)' : 'none' }} />
+            <img src="/SVG/dashboard_down.svg" alt="Главная" width="24" height="24" style={{ filter: 'brightness(0) saturate(100%) invert(27%) sepia(94%) saturate(7151%) hue-rotate(337deg) brightness(101%) contrast(101%)' }} />
           </Link>
           <Link
             to="/user/dashboard/objects/create"
@@ -333,13 +353,13 @@ export default function Layout({
             <span>Логи</span>
           </Link>
           <Link
-            to="/admin/dashboard/dropdown-test"
-            className={`nav-item ${location.pathname.includes('/dropdown-test') ? 'active' : ''}`}
+            to="/admin/dashboard/test"
+            className={`nav-item ${location.pathname.includes('/test') ? 'active' : ''}`}
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span>Тест меню</span>
+            <span>Тесты</span>
           </Link>
           <Link to="/user/dashboard" className="nav-item">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
