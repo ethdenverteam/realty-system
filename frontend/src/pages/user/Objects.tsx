@@ -1,12 +1,14 @@
 import axios from 'axios'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
+import { GlassCard } from '../../components/GlassCard'
 import api from '../../utils/api'
 import type { RealtyObjectListItem, ObjectsListResponse, ApiErrorResponse } from '../../types/models'
 import './Objects.css'
 
 export default function UserObjects(): JSX.Element {
+  const navigate = useNavigate()
   const [objects, setObjects] = useState<RealtyObjectListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
@@ -15,10 +17,25 @@ export default function UserObjects(): JSX.Element {
   const [roomsTypeFilter, setRoomsTypeFilter] = useState('')
   const [districtFilter, setDistrictFilter] = useState('')
   const [districts, setDistricts] = useState<string[]>([])
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedObjects, setSelectedObjects] = useState<Set<number | string>>(new Set())
+  const [listDisplayTypes, setListDisplayTypes] = useState<string[]>([])
 
   useEffect(() => {
     void loadDistricts()
+    void loadSettings()
   }, [])
+
+  const loadSettings = async (): Promise<void> => {
+    try {
+      const res = await api.get<{ object_list_display_types?: string[] }>('/user/dashboard/settings/data')
+      setListDisplayTypes(res.data.object_list_display_types || [])
+    } catch (err: unknown) {
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+        console.error('Error loading settings:', err.response?.data || err.message)
+      }
+    }
+  }
 
   useEffect(() => {
     void loadObjects()
@@ -70,10 +87,24 @@ export default function UserObjects(): JSX.Element {
       }
     >
       <div className="objects-page">
-        <div className="card">
-          <div className="card-header-row">
-            <h2 className="card-title">Список объектов</h2>
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        {/* Фильтры в отдельном стеклянном блоке */}
+        <GlassCard className="filters-card">
+          <div className="filters-header">
+            <h2 className="filters-title">Фильтры</h2>
+            <button
+              type="button"
+              className={`selection-toggle ${selectionMode ? 'active' : ''}`}
+              onClick={() => {
+                setSelectionMode(!selectionMode)
+                if (!selectionMode) {
+                  setSelectedObjects(new Set())
+                }
+              }}
+            >
+              {selectionMode ? 'Отменить выбор' : 'Выбрать'}
+            </button>
+          </div>
+          <div className="filters-row">
               <select
                 className="form-input form-input-sm"
                 value={statusFilter}
@@ -139,101 +170,77 @@ export default function UserObjects(): JSX.Element {
                 <option value="price_desc">Цена: дороже</option>
                 <option value="price_asc">Цена: дешевле</option>
               </select>
-            </div>
           </div>
+        </GlassCard>
 
-          {loading ? (
+        {/* Список объектов в отдельном блоке */}
+        {loading ? (
             <div className="loading">Загрузка...</div>
           ) : objects.length === 0 ? (
-            <div className="empty-state">
-              У вас пока нет объектов. <Link to="/user/dashboard/objects/create">Создайте первый объект</Link>
-            </div>
+            <GlassCard className="empty-state-card">
+              <div className="empty-state">
+                У вас пока нет объектов. <Link to="/user/dashboard/objects/create">Создайте первый объект</Link>
+              </div>
+            </GlassCard>
           ) : (
             <div className="objects-list">
-              {objects.map((obj) => (
-                <div 
-                  key={obj.object_id} 
-                  className="object-card compact"
-                  onClick={(e) => {
-                    // Добавляем glow эффект при клике на карточку
-                    const card = e.currentTarget
-                    card.classList.add('glow-active')
-                    setTimeout(() => {
-                      card.classList.remove('glow-active')
-                    }, 400)
-                  }}
-                >
-                  <div className="object-details-compact">
-                    {obj.rooms_type && (
-                      <div className="object-detail-item">
-                        {obj.rooms_type}
-                      </div>
-                    )}
-                    {obj.price > 0 && (
-                      <div className="object-detail-item">
-                        {obj.price} тыс. руб.
-                      </div>
-                    )}
-                    {obj.area && (
-                      <div className="object-detail-item">
-                        {obj.area} м²
-                      </div>
-                    )}
-                    {(obj.districts_json?.length || 0) > 0 && (
-                      <div className="object-detail-item">
-                        {(obj.districts_json || []).join(', ')}
-                      </div>
-                    )}
-                  </div>
-                  <div className="object-actions">
-                    <Link to={`/user/dashboard/objects/${obj.object_id}`} className="btn btn-sm btn-primary">
-                      Просмотр
-                    </Link>
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        if (!obj.can_publish) {
-                          alert(obj.last_publication ? 
-                            `Объект был опубликован менее 24 часов назад. Последняя публикация: ${new Date(obj.last_publication).toLocaleString('ru-RU')}` :
-                            'Объект нельзя опубликовать сейчас')
-                          return
-                        }
-                        if (!confirm('Вы уверены, что хотите опубликовать этот объект через бота?')) {
-                          return
-                        }
-                        try {
-                          const res = await api.post('/user/dashboard/objects/publish', {
-                            object_id: obj.object_id,
-                          })
-                          if (res.data.success) {
-                            const message = res.data.message || `Объект успешно опубликован в ${res.data.published_count || 0} чатов!`
-                            alert(message)
-                            await loadObjects()
+              {objects
+                .filter((obj) => {
+                  // Фильтрация по настройкам отображения
+                  if (listDisplayTypes.length > 0 && obj.rooms_type) {
+                    return listDisplayTypes.includes(obj.rooms_type)
+                  }
+                  return true
+                })
+                .map((obj) => {
+                  const isSelected = selectedObjects.has(obj.object_id)
+                  return (
+                    <div 
+                      key={obj.object_id} 
+                      className={`object-card compact ${isSelected ? 'selected' : ''}`}
+                      onClick={(e) => {
+                        if (selectionMode) {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          const newSelected = new Set(selectedObjects)
+                          if (isSelected) {
+                            newSelected.delete(obj.object_id)
                           } else {
-                            alert(res.data.error || 'Ошибка публикации')
+                            newSelected.add(obj.object_id)
                           }
-                        } catch (err: unknown) {
-                          let message = 'Ошибка публикации'
-                          if (axios.isAxiosError<ApiErrorResponse>(err)) {
-                            message = err.response?.data?.error || err.response?.data?.message || err.message || message
-                          }
-                          alert(message)
+                          setSelectedObjects(newSelected)
+                        } else {
+                          navigate(`/user/dashboard/objects/${obj.object_id}`)
                         }
                       }}
-                      className="btn btn-sm btn-secondary"
-                      title={!obj.can_publish && obj.last_publication ? 
-                        `Объект был опубликован менее 24 часов назад. Последняя публикация: ${new Date(obj.last_publication).toLocaleString('ru-RU')}` : 
-                        undefined}
-                      disabled={!obj.can_publish}
                     >
-                      {!obj.can_publish ? 'Опубликовать (нельзя)' : 'Опубликовать'}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                      <div className="object-details-compact single-line">
+                        {obj.rooms_type && (
+                          <span className="object-detail-item">
+                            {obj.rooms_type}
+                          </span>
+                        )}
+                        {obj.price > 0 && (
+                          <span className="object-detail-item">
+                            {obj.price}тр
+                          </span>
+                        )}
+                        {obj.area && (
+                          <span className="object-detail-item">
+                            {obj.area}м²
+                          </span>
+                        )}
+                        {(obj.districts_json?.length || 0) > 0 && (
+                          <span className="object-detail-item">
+                            {(obj.districts_json || []).join(',')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
             </div>
           )}
-        </div>
       </div>
     </Layout>
   )

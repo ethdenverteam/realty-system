@@ -10,6 +10,8 @@ interface UserSettings {
   phone: string
   contact_name: string
   default_show_username: boolean
+  object_card_display_types?: string[]
+  object_list_display_types?: string[]
 }
 
 export default function UserSettings(): JSX.Element {
@@ -21,7 +23,11 @@ export default function UserSettings(): JSX.Element {
     phone: '',
     contact_name: '',
     default_show_username: false,
+    object_card_display_types: [],
+    object_list_display_types: [],
   })
+
+  const roomsTypes = ['Студия', '1к', '2к', '3к', '4+к', 'Дом', '1евро', 'евро1к', '2евро', 'евро2к', '3евро', 'евро3к']
 
   const handleLogout = (): void => {
     if (confirm('Вам придется заново зайти через код. Вы уверены, что хотите выйти?')) {
@@ -80,7 +86,7 @@ export default function UserSettings(): JSX.Element {
     }
   }
 
-  const handleChange = (field: keyof UserSettings, value: string | boolean): void => {
+  const handleChange = (field: keyof UserSettings, value: string | boolean | string[]): void => {
     setSettings({
       ...settings,
       [field]: value,
@@ -138,6 +144,63 @@ export default function UserSettings(): JSX.Element {
                 </label>
                 <small className="form-hint">
                   При создании новых объектов будет включено отображение вашего Telegram username
+                </small>
+              </div>
+            </div>
+
+            <div className="form-section">
+              <h3 className="card-title">Настройки отображения объектов</h3>
+              <p className="card-description">
+                Выберите типы объектов для отображения в карточке объекта и списке объектов
+              </p>
+
+              <div className="form-group">
+                <label className="form-label">Типы для карточки объекта (короткое описание)</label>
+                <div className="checkbox-group">
+                  {roomsTypes.map((type) => (
+                    <label key={type} className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={settings.object_card_display_types?.includes(type) || false}
+                        onChange={(e) => {
+                          const current = settings.object_card_display_types || []
+                          const updated = e.target.checked
+                            ? [...current, type]
+                            : current.filter((t) => t !== type)
+                          handleChange('object_card_display_types', updated)
+                        }}
+                      />
+                      <span>{type}</span>
+                    </label>
+                  ))}
+                </div>
+                <small className="form-hint">
+                  Если ничего не выбрано, будут показываться все типы
+                </small>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Типы для списка объектов (одна строка)</label>
+                <div className="checkbox-group">
+                  {roomsTypes.map((type) => (
+                    <label key={type} className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={settings.object_list_display_types?.includes(type) || false}
+                        onChange={(e) => {
+                          const current = settings.object_list_display_types || []
+                          const updated = e.target.checked
+                            ? [...current, type]
+                            : current.filter((t) => t !== type)
+                          handleChange('object_list_display_types', updated)
+                        }}
+                      />
+                      <span>{type}</span>
+                    </label>
+                  ))}
+                </div>
+                <small className="form-hint">
+                  Если ничего не выбрано, будут показываться все типы
                 </small>
               </div>
             </div>

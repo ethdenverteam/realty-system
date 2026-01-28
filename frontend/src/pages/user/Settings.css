@@ -58,6 +58,13 @@
   cursor: pointer;
 }
 
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-sm);
+}
+
 .form-actions {
   margin-top: var(--spacing-lg);
 }

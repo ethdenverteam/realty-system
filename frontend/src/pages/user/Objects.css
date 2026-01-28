@@ -5,13 +5,61 @@
   background: transparent;
 }
 
-.card-header-row {
+/* Фильтры в стеклянном блоке */
+.filters-card {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.filters-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
   flex-wrap: wrap;
+  gap: var(--spacing-md);
+}
+
+.filters-title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.filters-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.selection-toggle {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  transition: all var(--transition-fast);
+}
+
+.selection-toggle:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.selection-toggle.active {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}
+
+.empty-state-card {
+  text-align: center;
+  padding: var(--spacing-xl);
 }
 
 .form-input-sm {
@@ -82,6 +130,22 @@
   }
 }
 
+/* Зеленый glow для выбранных объектов */
+.object-card.selected {
+  box-shadow: 
+    0 4px 30px rgba(0, 0, 0, 0.1),
+    0 0 15px 8px #4caf50,
+    inset 0 0 20px color-mix(in srgb, #4caf50 30%, transparent);
+  border-color: rgba(76, 175, 80, 0.5);
+}
+
+.object-card.selected:hover {
+  box-shadow: 
+    0 8px 40px rgba(0, 0, 0, 0.2),
+    0 0 20px 10px #4caf50,
+    inset 0 0 25px color-mix(in srgb, #4caf50 35%, transparent);
+}
+
 .object-details-compact {
   display: flex;
   flex-wrap: wrap;
@@ -90,11 +154,23 @@
   flex: 1;
 }
 
+.object-details-compact.single-line {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow: hidden;
+  gap: var(--spacing-sm);
+}
+
 .object-detail-item {
   font-size: var(--font-size-lg);
   font-weight: 600;
   color: #000000;
   line-height: 1.4;
+  white-space: nowrap;
+}
+
+.object-details-compact.single-line .object-detail-item {
+  display: inline;
 }
 
 /* Для темных тем делаем белый текст */
