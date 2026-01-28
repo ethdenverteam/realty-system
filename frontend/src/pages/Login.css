@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--spacing-md);
-  background: var(--color-bg);
+  background: transparent;
 }
 
 .login-container {
@@ -35,12 +35,15 @@
   align-items: flex-start;
   gap: var(--spacing-sm);
   padding: var(--spacing-md);
-  background: var(--color-bg-secondary);
-  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 32px 8px 32px 8px;
   margin-bottom: var(--spacing-lg);
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
   line-height: 1.5;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .login-info svg {
@@ -51,11 +54,14 @@
 
 .login-error {
   padding: var(--spacing-md);
-  background: #fee;
+  background: rgba(255, 238, 238, 0.12);
   color: #c33;
-  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 204, 204, 0.3);
+  border-radius: 32px 8px 32px 8px;
   margin-bottom: var(--spacing-md);
   font-size: var(--font-size-sm);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .login-form {
@@ -79,12 +85,14 @@
 .form-input {
   width: 100%;
   padding: var(--spacing-md);
-  border: 1px solid var(--color-border);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: var(--radius-md);
   font-size: var(--font-size-lg);
   transition: all var(--transition-fast);
-  background: var(--color-bg);
+  background: rgba(255, 255, 255, 0.12);
   color: var(--color-text);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .form-input:focus {

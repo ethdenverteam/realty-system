@@ -287,6 +287,16 @@ input, textarea, select {
   font-size: inherit;
 }
 
+/* Универсальный стеклянный стиль для всех карточек */
+.card {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 32px 8px 32px 8px !important; /* Сильное искривление по бокам */
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(12px) !important; /* Меньше размытия */
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
 /* Utility classes */
 .sr-only {
   position: absolute;

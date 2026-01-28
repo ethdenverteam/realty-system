@@ -14,9 +14,9 @@
 .dropdown-button {
   width: 100%;
   padding: var(--spacing-md, 12px);
-  border: 1px solid var(--color-border);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: var(--radius-md, 8px);
-  background: var(--color-bg);
+  background: rgba(255, 255, 255, 0.12);
   color: var(--color-text);
   font-size: var(--font-size-base, 14px);
   text-align: left;
@@ -27,11 +27,13 @@
   transition: all var(--transition-fast, 0.2s);
   font-family: inherit;
   gap: var(--spacing-sm, 8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .dropdown-button:hover {
-  border-color: var(--color-text);
-  background: var(--color-bg-secondary);
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .dropdown-button:focus {
@@ -87,10 +89,12 @@
   left: 0;
   right: 0;
   margin-top: var(--spacing-xs, 4px);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md, 8px);
-  box-shadow: var(--shadow-lg, 0 4px 6px rgba(0, 0, 0, 0.1));
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 32px 8px 32px 8px; /* Сильное искривление по бокам */
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(12px); /* Меньше размытия */
+  -webkit-backdrop-filter: blur(12px);
   z-index: 1000;
   overflow-y: auto;
   overflow-x: hidden;
@@ -152,8 +156,10 @@
   color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .dropdown-option {
@@ -178,13 +184,17 @@
 }
 
 .dropdown-option:hover:not(.disabled) {
-  background: var(--color-bg-secondary);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .dropdown-option.selected {
-  background: var(--color-bg-secondary);
+  background: rgba(255, 255, 255, 0.12);
   font-weight: 600;
   color: var(--color-accent, #2196f3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .dropdown-option.disabled {

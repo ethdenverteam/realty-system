@@ -12,17 +12,21 @@
 }
 
 .stat-card {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 32px 8px 32px 8px; /* Сильное искривление по бокам */
   padding: var(--spacing-lg);
   text-align: center;
   transition: all var(--transition-fast);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(12px); /* Меньше размытия */
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .stat-card:hover {
-  border-color: var(--color-text);
-  box-shadow: var(--shadow-md);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
 }
 
 .stat-value {
@@ -37,12 +41,15 @@
   color: var(--color-text-secondary);
 }
 
-/* Card */
+/* Card - стеклянный стиль */
 .card {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 32px 8px 32px 8px; /* Сильное искривление по бокам */
   padding: var(--spacing-lg);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(12px); /* Меньше размытия */
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .card-title {
@@ -64,16 +71,21 @@
   align-items: center;
   gap: var(--spacing-md);
   padding: var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 32px 8px 32px 8px; /* Сильное искривление по бокам */
   text-decoration: none;
   color: var(--color-text);
   transition: all var(--transition-fast);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(12px); /* Меньше размытия */
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .action-card:hover {
-  border-color: var(--color-text);
-  background: var(--color-bg-secondary);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
 }
 
 .action-card svg {
@@ -137,9 +149,12 @@
 }
 
 .alert-error {
-  background: #fee;
+  background: rgba(255, 238, 238, 0.12);
   color: #c33;
-  border: 1px solid #fcc;
+  border: 1px solid rgba(255, 204, 204, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 32px 8px 32px 8px;
 }
 
 /* Mobile styles */

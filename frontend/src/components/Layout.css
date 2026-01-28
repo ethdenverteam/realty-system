@@ -79,8 +79,10 @@
 }
 
 .header-icon-btn:hover {
-  background: var(--color-bg-secondary);
+  background: rgba(255, 255, 255, 0.12);
   color: var(--color-text);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 /* Main content */
@@ -99,13 +101,15 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--color-bg);
-  border-top: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
   display: flex;
   justify-content: space-around;
   padding: var(--spacing-sm) 0;
   z-index: 100;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .nav-item {
@@ -134,14 +138,16 @@
 }
 
 .nav-item:active {
-  background: var(--color-bg-secondary);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 /* Top navigation for desktop */
 .top-nav {
   display: none;
-  background: var(--color-bg);
-  border-bottom: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
   padding: 0 var(--spacing-md);
   position: sticky;
   top: 60px;
@@ -151,6 +157,8 @@
   justify-content: center;
   max-width: 1200px;
   margin: 0 auto;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .top-nav-item {
@@ -173,7 +181,9 @@
 
 .top-nav-item:hover {
   color: var(--color-text);
-  background: var(--color-bg-secondary);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .top-nav-item.active {
@@ -242,12 +252,16 @@
 
   [data-theme="dark"] .mobile-header-actions .header-icon-btn:hover {
     color: #ff5252;
-    background: var(--color-bg-secondary);
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   [data-theme="light"] .mobile-header-actions .header-icon-btn:hover {
     color: #42a5f5;
-    background: var(--color-bg-secondary);
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   /* Mobile bottom nav */
@@ -276,7 +290,9 @@
 
   .bottom-nav-icon-btn:hover,
   .bottom-nav-icon-btn.active {
-    background: var(--color-bg-secondary);
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   .bottom-nav-icon-btn img,

@@ -5,25 +5,19 @@
 }
 
 .log-terminal-container {
-  background: #1e1e1e;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 32px 8px 32px 8px; /* Сильное искривление по бокам */
   padding: var(--spacing-md);
   max-height: 70vh;
   overflow-y: auto;
   font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
   font-size: 13px;
   line-height: 1.6;
-}
-
-[data-theme="light"] .log-terminal-container {
-  background: #f5f5f5;
-  color: #000;
-}
-
-[data-theme="dark"] .log-terminal-container {
-  background: #0a0a0a;
-  color: #e0e0e0;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(12px); /* Меньше размытия */
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--color-text);
 }
 
 .log-placeholder {
@@ -73,17 +67,17 @@
 }
 
 .log-terminal-container::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
 }
 
 .log-terminal-container::-webkit-scrollbar-thumb {
-  background: #555;
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 4px;
 }
 
 .log-terminal-container::-webkit-scrollbar-thumb:hover {
-  background: #777;
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .log-footer {
