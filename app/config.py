@@ -55,6 +55,10 @@ class Config:
     ADMIN_ID = int(os.getenv('ADMIN_ID', '0'))
     CHANNEL_ID = int(os.getenv('CHANNEL_ID', '0'))
     
+    # Telethon Configuration (for user accounts)
+    TELEGRAM_API_ID = int(os.getenv('TELEGRAM_API_ID', '0'))
+    TELEGRAM_API_HASH = os.getenv('TELEGRAM_API_HASH', '')
+    
     # File Upload
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB

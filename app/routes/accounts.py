@@ -4,9 +4,18 @@ Telegram accounts routes
 from flask import Blueprint, request, jsonify
 from app.database import db
 from app.models.telegram_account import TelegramAccount
+from app.models.chat import Chat
 from app.utils.decorators import jwt_required, role_required
 from app.utils.logger import log_action, log_error
+from app.utils.telethon_client import (
+    start_connection, verify_code, verify_2fa, get_chats, 
+    send_test_message as telethon_send_test_message, get_session_path, run_async
+)
+from app.config import Config
+from datetime import datetime
 import logging
+import os
+import re
 
 accounts_bp = Blueprint('accounts', __name__)
 logger = logging.getLogger(__name__)
@@ -24,15 +33,214 @@ def list_accounts(current_user):
     return jsonify([acc.to_dict() for acc in accounts])
 
 
-@accounts_bp.route('/', methods=['POST'])
+@accounts_bp.route('/connect/start', methods=['POST'])
 @jwt_required
-def create_account(current_user):
-    """Create new Telegram account (placeholder for Telethon integration)"""
+def connect_start(current_user):
+    """Start Telegram account connection (step 1: phone number)"""
     data = request.get_json()
+    phone = data.get('phone', '').strip()
     
-    # TODO: Implement Telethon session creation
-    # This is a placeholder
-    return jsonify({'error': 'Not implemented yet'}), 501
+    if not phone:
+        return jsonify({'error': 'Phone number is required'}), 400
+    
+    # Validate phone format (should start with +)
+    if not phone.startswith('+'):
+        return jsonify({'error': 'Phone number must start with + (e.g., +79991234567)'}), 400
+    
+    # Check if account already exists
+    existing = TelegramAccount.query.filter_by(phone=phone).first()
+    if existing:
+        # Check ownership
+        if current_user.web_role != 'admin' and existing.owner_id != current_user.user_id:
+            return jsonify({'error': 'This phone number is already connected to another account'}), 400
+        # Account exists and belongs to user - check if session file exists
+        session_path = get_session_path(phone)
+        if os.path.exists(session_path):
+            return jsonify({
+                'error': 'Account already connected',
+                'account_id': existing.account_id
+            }), 400
+    
+    try:
+        # Start connection
+        success, result = run_async(start_connection(phone))
+        
+        if not success:
+            return jsonify({'error': result}), 400
+        
+        # If already authorized, create account record
+        if result is None:
+            # Session already exists and authorized
+            session_path = get_session_path(phone)
+            if not os.path.exists(session_path):
+                return jsonify({'error': 'Session file not found'}), 500
+            
+            # Create or update account
+            if existing:
+                account = existing
+            else:
+                account = TelegramAccount(
+                    owner_id=current_user.user_id,
+                    phone=phone,
+                    session_file=session_path,
+                    is_active=True
+                )
+                db.session.add(account)
+            
+            db.session.commit()
+            
+            log_action(
+                action='account_connected',
+                user_id=current_user.user_id,
+                details={'account_id': account.account_id, 'phone': phone}
+            )
+            
+            return jsonify({
+                'success': True,
+                'account_id': account.account_id,
+                'message': 'Account already authorized'
+            })
+        
+        # Code sent, return code_hash
+        return jsonify({
+            'success': True,
+            'code_hash': result,
+            'message': 'Verification code sent to Telegram'
+        })
+    except Exception as e:
+        logger.error(f"Error starting connection: {e}", exc_info=True)
+        log_error(e, 'account_connect_start_failed', current_user.user_id, {'phone': phone})
+        return jsonify({'error': f'Connection error: {str(e)}'}), 500
+
+
+@accounts_bp.route('/connect/verify-code', methods=['POST'])
+@jwt_required
+def connect_verify_code(current_user):
+    """Verify phone code (step 2: verification code)"""
+    data = request.get_json()
+    phone = data.get('phone', '').strip()
+    code = data.get('code', '').strip()
+    code_hash = data.get('code_hash', '').strip()
+    
+    if not phone or not code or not code_hash:
+        return jsonify({'error': 'Phone, code, and code_hash are required'}), 400
+    
+    try:
+        success, error_msg, requires_2fa = run_async(verify_code(phone, code, code_hash))
+        
+        if not success:
+            return jsonify({'error': error_msg}), 400
+        
+        if requires_2fa:
+            # 2FA required
+            return jsonify({
+                'success': True,
+                'requires_2fa': True,
+                'message': '2FA password required'
+            })
+        
+        # Successfully connected - create account record
+        session_path = get_session_path(phone)
+        if not os.path.exists(session_path):
+            return jsonify({'error': 'Session file not created'}), 500
+        
+        # Check if account already exists
+        account = TelegramAccount.query.filter_by(phone=phone).first()
+        if account:
+            # Update existing
+            if current_user.web_role != 'admin' and account.owner_id != current_user.user_id:
+                return jsonify({'error': 'Access denied'}), 403
+            account.session_file = session_path
+            account.is_active = True
+            account.last_error = None
+        else:
+            # Create new
+            account = TelegramAccount(
+                owner_id=current_user.user_id,
+                phone=phone,
+                session_file=session_path,
+                is_active=True
+            )
+            db.session.add(account)
+        
+        db.session.commit()
+        
+        log_action(
+            action='account_connected',
+            user_id=current_user.user_id,
+            details={'account_id': account.account_id, 'phone': phone}
+        )
+        
+        return jsonify({
+            'success': True,
+            'account_id': account.account_id,
+            'requires_2fa': False,
+            'message': 'Account connected successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error verifying code: {e}", exc_info=True)
+        log_error(e, 'account_verify_code_failed', current_user.user_id, {'phone': phone})
+        return jsonify({'error': f'Verification error: {str(e)}'}), 500
+
+
+@accounts_bp.route('/connect/verify-2fa', methods=['POST'])
+@jwt_required
+def connect_verify_2fa(current_user):
+    """Verify 2FA password (step 3: 2FA code)"""
+    data = request.get_json()
+    phone = data.get('phone', '').strip()
+    password = data.get('password', '').strip()
+    
+    if not phone or not password:
+        return jsonify({'error': 'Phone and password are required'}), 400
+    
+    try:
+        success, error_msg = run_async(verify_2fa(phone, password))
+        
+        if not success:
+            return jsonify({'error': error_msg}), 400
+        
+        # Successfully connected - create account record
+        session_path = get_session_path(phone)
+        if not os.path.exists(session_path):
+            return jsonify({'error': 'Session file not created'}), 500
+        
+        # Check if account already exists
+        account = TelegramAccount.query.filter_by(phone=phone).first()
+        if account:
+            # Update existing
+            if current_user.web_role != 'admin' and account.owner_id != current_user.user_id:
+                return jsonify({'error': 'Access denied'}), 403
+            account.session_file = session_path
+            account.is_active = True
+            account.last_error = None
+        else:
+            # Create new
+            account = TelegramAccount(
+                owner_id=current_user.user_id,
+                phone=phone,
+                session_file=session_path,
+                is_active=True
+            )
+            db.session.add(account)
+        
+        db.session.commit()
+        
+        log_action(
+            action='account_connected',
+            user_id=current_user.user_id,
+            details={'account_id': account.account_id, 'phone': phone, 'with_2fa': True}
+        )
+        
+        return jsonify({
+            'success': True,
+            'account_id': account.account_id,
+            'message': 'Account connected successfully with 2FA'
+        })
+    except Exception as e:
+        logger.error(f"Error verifying 2FA: {e}", exc_info=True)
+        log_error(e, 'account_verify_2fa_failed', current_user.user_id, {'phone': phone})
+        return jsonify({'error': f'2FA verification error: {str(e)}'}), 500
 
 
 @accounts_bp.route('/<int:account_id>', methods=['PUT'])
@@ -78,6 +286,104 @@ def update_account(account_id, current_user):
         return jsonify({'error': str(e)}), 500
 
 
+@accounts_bp.route('/<int:account_id>/chats', methods=['GET'])
+@jwt_required
+def get_account_chats(account_id, current_user):
+    """Get list of chats from Telegram account"""
+    account = TelegramAccount.query.get(account_id)
+    
+    if not account:
+        return jsonify({'error': 'Account not found'}), 404
+    
+    # Check ownership
+    if current_user.web_role != 'admin' and account.owner_id != current_user.user_id:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        success, chats, error_msg = run_async(get_chats(account.phone))
+        
+        if not success:
+            # Update account error
+            account.last_error = error_msg
+            db.session.commit()
+            return jsonify({'error': error_msg}), 500
+        
+        # Update last_used
+        account.last_used = datetime.utcnow()
+        account.last_error = None
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'chats': chats or []
+        })
+    except Exception as e:
+        logger.error(f"Error getting chats: {e}", exc_info=True)
+        account.last_error = str(e)
+        db.session.commit()
+        log_error(e, 'account_get_chats_failed', current_user.user_id, {'account_id': account_id})
+        return jsonify({'error': f'Error loading chats: {str(e)}'}), 500
+
+
+@accounts_bp.route('/<int:account_id>/test-message', methods=['POST'])
+@jwt_required
+def send_test_message(account_id, current_user):
+    """Send test message from Telegram account"""
+    account = TelegramAccount.query.get(account_id)
+    
+    if not account:
+        return jsonify({'error': 'Account not found'}), 404
+    
+    # Check ownership
+    if current_user.web_role != 'admin' and account.owner_id != current_user.user_id:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    data = request.get_json()
+    chat_id = data.get('chat_id', '').strip()
+    message = data.get('message', 'Тестовое сообщение').strip()
+    
+    if not chat_id:
+        return jsonify({'error': 'chat_id is required'}), 400
+    
+    try:
+        success, error_msg, message_id = run_async(telethon_send_test_message(account.phone, chat_id, message))
+        
+        if not success:
+            # Update account error
+            account.last_error = error_msg
+            account.last_used = datetime.utcnow()
+            db.session.commit()
+            return jsonify({'error': error_msg}), 500
+        
+        # Update last_used
+        account.last_used = datetime.utcnow()
+        account.last_error = None
+        db.session.commit()
+        
+        log_action(
+            action='account_test_message_sent',
+            user_id=current_user.user_id,
+            details={
+                'account_id': account_id,
+                'chat_id': chat_id,
+                'message_id': message_id
+            }
+        )
+        
+        return jsonify({
+            'success': True,
+            'message_id': message_id,
+            'message': 'Test message sent successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error sending test message: {e}", exc_info=True)
+        account.last_error = str(e)
+        account.last_used = datetime.utcnow()
+        db.session.commit()
+        log_error(e, 'account_test_message_failed', current_user.user_id, {'account_id': account_id})
+        return jsonify({'error': f'Error sending message: {str(e)}'}), 500
+
+
 @accounts_bp.route('/<int:account_id>', methods=['DELETE'])
 @jwt_required
 def delete_account(account_id, current_user):
@@ -93,6 +399,15 @@ def delete_account(account_id, current_user):
     
     try:
         account_info = {'account_id': account_id, 'phone': account.phone}
+        
+        # Delete session file if exists
+        session_path = account.session_file
+        if session_path and os.path.exists(session_path):
+            try:
+                os.remove(session_path)
+            except Exception as e:
+                logger.warning(f"Failed to delete session file {session_path}: {e}")
+        
         db.session.delete(account)
         db.session.commit()
         
