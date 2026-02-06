@@ -10,7 +10,9 @@ from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, P
 from telethon.tl.types import Channel, Chat, User
 from app.config import Config
 
+# Use both loggers: app.utils.telethon_client for app logs and telethon for telethon-specific logs
 logger = logging.getLogger(__name__)
+telethon_logger = logging.getLogger('telethon')  # For test_telethon.log
 
 # Store active connection attempts (phone -> client)
 _active_connections: Dict[str, TelegramClient] = {}
@@ -53,21 +55,33 @@ async def start_connection(phone: str) -> Tuple[bool, Optional[str]]:
     Start connection process for phone number
     Returns: (success, error_message or code_hash)
     """
-    logger.info(f"Starting connection for phone: {phone}")
+    log_msg = f"Starting connection for phone: {phone}"
+    logger.info(log_msg)
+    telethon_logger.info(log_msg)
     try:
-        logger.debug(f"Creating Telethon client for phone: {phone}")
+        debug_msg = f"Creating Telethon client for phone: {phone}"
+        logger.debug(debug_msg)
+        telethon_logger.debug(debug_msg)
         client = await create_client(phone)
         
-        logger.debug(f"Connecting to Telegram servers...")
+        debug_msg = f"Connecting to Telegram servers..."
+        logger.debug(debug_msg)
+        telethon_logger.debug(debug_msg)
         await client.connect()
-        logger.info(f"Successfully connected to Telegram servers")
+        log_msg = f"Successfully connected to Telegram servers"
+        logger.info(log_msg)
+        telethon_logger.info(log_msg)
         
         is_authorized = await client.is_user_authorized()
-        logger.debug(f"User authorized status: {is_authorized}")
+        debug_msg = f"User authorized status: {is_authorized}"
+        logger.debug(debug_msg)
+        telethon_logger.debug(debug_msg)
         
         if not is_authorized:
             # Send code request
-            logger.info(f"Sending verification code request for phone: {phone}")
+            log_msg = f"Sending verification code request for phone: {phone}"
+            logger.info(log_msg)
+            telethon_logger.info(log_msg)
             try:
                 sent_code = await client.send_code_request(phone)
                 code_hash = sent_code.phone_code_hash
@@ -80,14 +94,18 @@ async def start_connection(phone: str) -> Tuple[bool, Optional[str]]:
                 next_type = getattr(sent_code, 'next_type', None)
                 next_type_name = next_type.__class__.__name__ if next_type else None
                 
-                logger.info(
+                # Log to both loggers
+                log_message = (
                     f"Verification code sent successfully for phone {phone}. "
                     f"Code hash: {code_hash[:10]}..., "
                     f"Type: {code_type_name}, "
                     f"Phone registered: {phone_registered}, "
                     f"Timeout: {timeout}s"
                 )
-                logger.debug(
+                logger.info(log_message)
+                telethon_logger.info(log_message)
+                
+                debug_message = (
                     f"Full sent_code response: "
                     f"type={sent_code.__class__.__name__}, "
                     f"phone_code_hash={code_hash}, "
@@ -96,46 +114,69 @@ async def start_connection(phone: str) -> Tuple[bool, Optional[str]]:
                     f"timeout={timeout}, "
                     f"next_type={next_type_name}"
                 )
+                logger.debug(debug_message)
+                telethon_logger.debug(debug_message)
                 
-                # Log warning if code type is not SMS (might indicate issues)
-                if code_type_name not in ['SentCodeTypeSms', 'SentCodeTypeApp']:
-                    logger.warning(
-                        f"⚠️ Unexpected code type for phone {phone}: {code_type_name}. "
-                        f"This might indicate the code won't be sent via SMS. "
-                        f"Phone registered: {phone_registered}, Next type: {next_type_name}"
+                # CRITICAL: Check if code type is App (not SMS) - this means code won't come via SMS!
+                if code_type_name == 'SentCodeTypeApp':
+                    warning_msg = (
+                        f"⚠️ ВНИМАНИЕ: Код для номера {phone} отправляется через ПРИЛОЖЕНИЕ Telegram, "
+                        f"а НЕ по SMS! Код придет только в приложение Telegram на этом телефоне. "
+                        f"Пользователь должен открыть приложение Telegram, чтобы получить код."
                     )
+                    logger.warning(warning_msg)
+                    telethon_logger.warning(warning_msg)
+                elif code_type_name not in ['SentCodeTypeSms', 'SentCodeTypeApp']:
+                    warning_msg = (
+                        f"⚠️ Неожиданный тип кода для номера {phone}: {code_type_name}. "
+                        f"Код может не прийти по SMS. Phone registered: {phone_registered}, Next type: {next_type_name}"
+                    )
+                    logger.warning(warning_msg)
+                    telethon_logger.warning(warning_msg)
                 
                 # Special logging for international numbers that might have SMS delivery issues
                 country_code = phone[:3] if len(phone) >= 3 else phone[:2] if len(phone) >= 2 else ''
                 if country_code and country_code not in ['+7', '+1']:  # Russia and US/North America
-                    logger.info(
-                        f"🌍 International number detected: {phone} (country code: {country_code}). "
-                        f"Code type: {code_type_name}, Registered: {phone_registered}. "
-                        f"If SMS doesn't arrive, Telegram might require using the app or call method."
+                    info_msg = (
+                        f"🌍 Международный номер: {phone} (код страны: {country_code}). "
+                        f"Тип кода: {code_type_name}, Зарегистрирован: {phone_registered}. "
+                        f"Если SMS не приходит, Telegram может требовать использование приложения или звонка."
                     )
+                    logger.info(info_msg)
+                    telethon_logger.info(info_msg)
                 
                 # Check if phone is not registered - this is critical for code delivery
                 if phone_registered is False:
-                    logger.error(
-                        f"❌ Phone number {phone} is NOT registered in Telegram! "
-                        f"User must first register this number in Telegram app before connecting."
+                    error_msg = (
+                        f"❌ Номер телефона {phone} НЕ зарегистрирован в Telegram! "
+                        f"Пользователь должен сначала зарегистрировать этот номер в приложении Telegram."
                     )
+                    logger.error(error_msg)
+                    telethon_logger.error(error_msg)
                 
                 _active_connections[phone] = client
                 return (True, code_hash)
             except PhoneNumberInvalidError as e:
-                logger.error(f"Invalid phone number format: {phone}. Error: {e}")
+                error_msg = f"Invalid phone number format: {phone}. Error: {e}"
+                logger.error(error_msg)
+                telethon_logger.error(error_msg)
                 return (False, "Invalid phone number format")
             except Exception as e:
-                logger.error(f"Error sending code for phone {phone}: {e}", exc_info=True)
+                error_msg = f"Error sending code for phone {phone}: {e}"
+                logger.error(error_msg, exc_info=True)
+                telethon_logger.error(error_msg, exc_info=True)
                 return (False, f"Failed to send code: {str(e)}")
         else:
             # Already authorized
-            logger.info(f"Phone {phone} is already authorized")
+            log_msg = f"Phone {phone} is already authorized"
+            logger.info(log_msg)
+            telethon_logger.info(log_msg)
             await client.disconnect()
             return (True, None)
     except Exception as e:
-        logger.error(f"Error starting connection for phone {phone}: {e}", exc_info=True)
+        error_msg = f"Error starting connection for phone {phone}: {e}"
+        logger.error(error_msg, exc_info=True)
+        telethon_logger.error(error_msg, exc_info=True)
         return (False, f"Connection error: {str(e)}")
 
 

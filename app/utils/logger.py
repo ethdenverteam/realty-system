@@ -190,6 +190,12 @@ def setup_logging():
     telethon_logger.setLevel(logging.DEBUG)
     telethon_logger.propagate = True  # Also propagate to root for test_app.log
     
+    # Also add app.utils.telethon_client logger to test_telethon.log
+    telethon_client_logger = logging.getLogger('app.utils.telethon_client')
+    telethon_client_logger.addHandler(telethon_file_handler)
+    telethon_client_logger.setLevel(logging.DEBUG)
+    telethon_client_logger.propagate = True  # Also propagate to root
+    
     # Database handler for errors
     db_handler = DatabaseLogHandler()
     db_handler.setLevel(logging.ERROR)
