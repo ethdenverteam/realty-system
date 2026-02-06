@@ -340,6 +340,7 @@ def delete_object(object_id, current_user):
 def publish_object_via_account(current_user):
     """Publish object via user Telegram account"""
     from datetime import datetime, timedelta
+    import logging
     from app.models.telegram_account import TelegramAccount
     from app.models.chat import Chat
     from app.models.publication_history import PublicationHistory
@@ -384,10 +385,21 @@ def publish_object_via_account(current_user):
     rate_status = get_rate_limit_status(account.phone)
     if not rate_status['can_send']:
         wait_seconds = rate_status['wait_seconds']
+        minutes = int(wait_seconds // 60)
+        seconds = int(wait_seconds % 60)
+        if minutes > 0:
+            wait_msg = f"{minutes} мин {seconds} сек"
+        else:
+            wait_msg = f"{seconds} сек"
+        
+        reason = "В эту минуту уже было отправлено сообщение" if wait_seconds < 60 else "Превышен часовой лимит (60 сообщений в час)"
+        
         return jsonify({
-            'error': 'Rate limit exceeded',
-            'details': f'Please wait {int(wait_seconds)} seconds before sending another message',
+            'error': 'Превышен лимит отправки сообщений',
+            'details': f'{reason}. Подождите {wait_msg} перед следующей отправкой.',
             'wait_seconds': wait_seconds,
+            'wait_message': wait_msg,
+            'reason': reason,
             'next_available': rate_status['next_available']
         }), 429
     

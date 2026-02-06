@@ -4,6 +4,8 @@ Telethon client utilities for managing user Telegram accounts
 import asyncio
 import os
 import logging
+import time
+import threading
 from typing import Optional, Dict, List, Tuple
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, PhoneNumberInvalidError
@@ -16,6 +18,17 @@ telethon_logger = logging.getLogger('telethon')  # For test_telethon.log
 
 # Store active connection attempts (phone -> client)
 _active_connections: Dict[str, TelegramClient] = {}
+
+# Lock for session file access to prevent "database is locked" errors
+_session_locks: Dict[str, threading.Lock] = {}
+_session_locks_lock = threading.Lock()
+
+def get_session_lock(phone: str) -> threading.Lock:
+    """Get or create a lock for a specific phone number's session file"""
+    with _session_locks_lock:
+        if phone not in _session_locks:
+            _session_locks[phone] = threading.Lock()
+        return _session_locks[phone]
 
 
 def get_session_path(phone: str) -> str:
@@ -292,10 +305,56 @@ async def get_chats(phone: str) -> Tuple[bool, Optional[List[Dict]], Optional[st
     Get list of chats from Telegram account
     Returns: (success, chats_list, error_message)
     """
+    session_lock = get_session_lock(phone)
+    max_retries = 3
+    retry_delay = 1.0
+    client = None
+    
+    for attempt in range(max_retries):
+        try:
+            # Acquire lock before accessing session file
+            if session_lock.acquire(timeout=10):
+                try:
+                    client = await create_client(phone)
+                    await client.connect()
+                    break
+                except Exception as lock_error:
+                    if "database is locked" in str(lock_error).lower() or "locked" in str(lock_error).lower():
+                        if attempt < max_retries - 1:
+                            logger.warning(f"Session file locked for {phone}, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                            await asyncio.sleep(retry_delay)
+                            retry_delay *= 2
+                            continue
+                        else:
+                            return (False, None, f"Session file is locked. Another process is using this account. Please wait and try again.")
+                    else:
+                        raise
+                finally:
+                    if session_lock.locked():
+                        session_lock.release()
+            else:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    return (False, None, "Session file is locked by another process. Please try again in a few seconds.")
+        except Exception as e:
+            if "database is locked" in str(e).lower() or "locked" in str(e).lower():
+                if attempt < max_retries - 1:
+                    logger.warning(f"Session file locked for {phone}, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    return (False, None, f"Session file is locked. Another process is using this account. Please wait and try again.")
+            else:
+                raise
+    
+    if client is None:
+        return (False, None, "Failed to create client after retries")
+    
     try:
-        client = await create_client(phone)
-        await client.connect()
-        
         # Check authorization with better error handling
         try:
             is_authorized = await client.is_user_authorized()
@@ -369,8 +428,27 @@ async def get_chats(phone: str) -> Tuple[bool, Optional[List[Dict]], Optional[st
         await client.disconnect()
         return (True, chats, None)
     except Exception as e:
+        error_msg = str(e)
+        if "database is locked" in error_msg.lower() or "locked" in error_msg.lower():
+            logger.error(f"Database locked error getting chats for {phone}: {e}")
+            try:
+                await client.disconnect()
+            except:
+                pass
+            return (False, None, "Session file is locked by another process. Please wait a few seconds and try again.")
         logger.error(f"Error getting chats: {e}")
+        try:
+            await client.disconnect()
+        except:
+            pass
         return (False, None, f"Error loading chats: {str(e)}")
+    finally:
+        # Ensure lock is released
+        if session_lock.locked():
+            try:
+                session_lock.release()
+            except:
+                pass
 
 
 async def send_test_message(phone: str, chat_id: str, message: str = "Тестовое сообщение") -> Tuple[bool, Optional[str], Optional[int]]:
@@ -378,15 +456,56 @@ async def send_test_message(phone: str, chat_id: str, message: str = "Тесто
     Send test message from Telegram account
     Returns: (success, error_message, message_id)
     """
-    from app.utils.rate_limiter import wait_if_needed, record_message_sent
+    from app.utils.rate_limiter import wait_if_needed, record_message_sent, can_send_message
+    
+    # Check rate limit first and return detailed error if needed
+    can_send, wait_seconds = can_send_message(phone)
+    if not can_send:
+        minutes = int(wait_seconds // 60)
+        seconds = int(wait_seconds % 60)
+        if minutes > 0:
+            wait_msg = f"{minutes} мин {seconds} сек"
+        else:
+            wait_msg = f"{seconds} сек"
+        return (False, f"Превышен лимит отправки сообщений. В эту минуту уже было отправлено сообщение. Подождите {wait_msg} перед следующей отправкой.", None)
+    
+    session_lock = get_session_lock(phone)
+    max_retries = 3
+    retry_delay = 1.0
+    
+    for attempt in range(max_retries):
+        try:
+            # Acquire lock before accessing session file
+            if session_lock.acquire(timeout=10):
+                try:
+                    # Apply rate limiting
+                    wait_if_needed(phone)
+                    
+                    client = await create_client(phone)
+                    await client.connect()
+                    break
+                finally:
+                    session_lock.release()
+            else:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    return (False, "Session file is locked by another process. Please try again in a few seconds.", None)
+        except Exception as lock_error:
+            if "database is locked" in str(lock_error).lower() or "locked" in str(lock_error).lower():
+                if attempt < max_retries - 1:
+                    logger.warning(f"Session file locked for {phone}, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    return (False, "Session file is locked. Another process is using this account. Please wait and try again.", None)
+            else:
+                raise
     
     try:
-        # Apply rate limiting
-        wait_if_needed(phone)
-        
-        client = await create_client(phone)
-        await client.connect()
-        
         # Check authorization with better error handling
         try:
             is_authorized = await client.is_user_authorized()
@@ -413,12 +532,27 @@ async def send_test_message(phone: str, chat_id: str, message: str = "Тесто
         await client.disconnect()
         return (True, None, message_id)
     except Exception as e:
+        error_msg = str(e)
+        if "database is locked" in error_msg.lower() or "locked" in error_msg.lower():
+            logger.error(f"Database locked error sending test message for {phone}: {e}")
+            try:
+                await client.disconnect()
+            except:
+                pass
+            return (False, "Session file is locked by another process. Please wait a few seconds and try again.", None)
         logger.error(f"Error sending test message: {e}")
         try:
             await client.disconnect()
         except:
             pass
         return (False, f"Error sending message: {str(e)}", None)
+    finally:
+        # Ensure lock is released
+        if session_lock.locked():
+            try:
+                session_lock.release()
+            except:
+                pass
 
 
 async def send_object_message(phone: str, chat_id: str, message_text: str, photos: Optional[List[str]] = None) -> Tuple[bool, Optional[str], Optional[int]]:
@@ -426,17 +560,74 @@ async def send_object_message(phone: str, chat_id: str, message_text: str, photo
     Send object publication message from Telegram account
     Returns: (success, error_message, message_id)
     """
-    from app.utils.rate_limiter import wait_if_needed, record_message_sent
+    from app.utils.rate_limiter import wait_if_needed, record_message_sent, can_send_message
     import os
     from app.config import Config
     
+    # Check rate limit first and return detailed error if needed
+    can_send, wait_seconds = can_send_message(phone)
+    if not can_send:
+        minutes = int(wait_seconds // 60)
+        seconds = int(wait_seconds % 60)
+        if minutes > 0:
+            wait_msg = f"{minutes} мин {seconds} сек"
+        else:
+            wait_msg = f"{seconds} сек"
+        return (False, f"Превышен лимит отправки сообщений. В эту минуту уже было отправлено сообщение. Подождите {wait_msg} перед следующей отправкой.", None)
+    
+    session_lock = get_session_lock(phone)
+    max_retries = 3
+    retry_delay = 1.0
+    client = None
+    
+    for attempt in range(max_retries):
+        try:
+            # Acquire lock before accessing session file
+            if session_lock.acquire(timeout=10):
+                try:
+                    # Apply rate limiting
+                    wait_if_needed(phone)
+                    
+                    client = await create_client(phone)
+                    await client.connect()
+                    break
+                except Exception as lock_error:
+                    if "database is locked" in str(lock_error).lower() or "locked" in str(lock_error).lower():
+                        if attempt < max_retries - 1:
+                            logger.warning(f"Session file locked for {phone}, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                            await asyncio.sleep(retry_delay)
+                            retry_delay *= 2
+                            continue
+                        else:
+                            return (False, "Session file is locked. Another process is using this account. Please wait and try again.", None)
+                    else:
+                        raise
+                finally:
+                    if session_lock.locked():
+                        session_lock.release()
+            else:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    return (False, "Session file is locked by another process. Please try again in a few seconds.", None)
+        except Exception as e:
+            if "database is locked" in str(e).lower() or "locked" in str(e).lower():
+                if attempt < max_retries - 1:
+                    logger.warning(f"Session file locked for {phone}, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    return (False, "Session file is locked. Another process is using this account. Please wait and try again.", None)
+            else:
+                raise
+    
+    if client is None:
+        return (False, "Failed to create client after retries", None)
+    
     try:
-        # Apply rate limiting
-        wait_if_needed(phone)
-        
-        client = await create_client(phone)
-        await client.connect()
-        
         # Check authorization with better error handling
         try:
             is_authorized = await client.is_user_authorized()
@@ -502,12 +693,27 @@ async def send_object_message(phone: str, chat_id: str, message_text: str, photo
         await client.disconnect()
         return (True, None, message_id)
     except Exception as e:
+        error_msg = str(e)
+        if "database is locked" in error_msg.lower() or "locked" in error_msg.lower():
+            logger.error(f"Database locked error sending object message for {phone}: {e}")
+            try:
+                await client.disconnect()
+            except:
+                pass
+            return (False, "Session file is locked by another process. Please wait a few seconds and try again.", None)
         logger.error(f"Error sending object message: {e}")
         try:
             await client.disconnect()
         except:
             pass
         return (False, f"Error sending message: {str(e)}", None)
+    finally:
+        # Ensure lock is released
+        if session_lock.locked():
+            try:
+                session_lock.release()
+            except:
+                pass
 
 
 def cleanup_connection(phone: str):
