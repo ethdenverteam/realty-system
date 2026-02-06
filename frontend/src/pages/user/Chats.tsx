@@ -53,11 +53,11 @@ export default function Chats(): JSX.Element {
 
   useEffect(() => {
     if (selectedAccountId) {
-      void loadChats(selectedAccountId)
+      void loadChats(selectedAccountId, search)
     } else {
       setChats([])
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, search])
 
   const loadAccounts = async (): Promise<void> => {
     try {
@@ -220,37 +220,28 @@ export default function Chats(): JSX.Element {
 
         <GlassCard className="chats-card">
           <div className="card-header-row">
-            <h2 className="card-title">Чаты из аккаунтов</h2>
+            <h2 className="card-title">
+              Чаты из аккаунтов
+              {selectedAccountId && !loading && (
+                <span className="chats-count"> ({chats.length})</span>
+              )}
+            </h2>
             <div className="chats-actions">
-              <select
-                value={selectedAccountId || ''}
-                onChange={(e) => setSelectedAccountId(Number(e.target.value))}
-                className="select-account form-input form-input-sm"
-                disabled={loading}
-              >
-                <option value="">Выберите аккаунт</option>
-                {accounts.map(acc => (
-                  <option key={acc.account_id} value={acc.account_id}>
-                    {acc.phone}
-                  </option>
-                ))}
-              </select>
-              {selectedAccountId && (
-                <>
-                  <input
-                    type="text"
-                    className="form-input form-input-sm chats-search-input"
-                    placeholder="Поиск по чатам..."
-                    value={search}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      setSearch(value)
-                      if (selectedAccountId) {
-                        void loadChats(selectedAccountId, value)
-                      }
-                    }}
-                    disabled={loading}
-                  />
+              <div className="chats-actions-row">
+                <select
+                  value={selectedAccountId || ''}
+                  onChange={(e) => setSelectedAccountId(Number(e.target.value))}
+                  className="select-account form-input form-input-sm"
+                  disabled={loading}
+                >
+                  <option value="">Выберите аккаунт</option>
+                  {accounts.map(acc => (
+                    <option key={acc.account_id} value={acc.account_id}>
+                      {acc.phone}
+                    </option>
+                  ))}
+                </select>
+                {selectedAccountId && (
                   <button
                     className="btn btn-secondary"
                     onClick={() => void refreshChats()}
@@ -258,7 +249,21 @@ export default function Chats(): JSX.Element {
                   >
                     {refreshing ? 'Обновление...' : 'Обновить чаты'}
                   </button>
-                </>
+                )}
+              </div>
+              {selectedAccountId && (
+                <div className="chats-actions-row">
+                  <input
+                    type="text"
+                    className="form-input form-input-sm chats-search-input"
+                    placeholder="Поиск по чатам..."
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value)
+                    }}
+                    disabled={loading}
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -279,11 +284,6 @@ export default function Chats(): JSX.Element {
                     <span className="object-detail-item">
                       {chat.title}
                     </span>
-                    {chat.members_count > 0 && (
-                      <span className="object-detail-item">
-                        {chat.members_count} участников
-                      </span>
-                    )}
                   </div>
                   <div className="chat-actions">
                     <button

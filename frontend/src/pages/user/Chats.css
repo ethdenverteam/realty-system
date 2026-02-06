@@ -15,8 +15,16 @@
 
 .chats-actions {
   display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  align-items: flex-start;
+}
+
+.chats-actions-row {
+  display: flex;
   gap: var(--spacing-sm);
   align-items: center;
+  width: 100%;
 }
 
 .chats-card {
@@ -180,4 +188,14 @@
 
 .chats-search-input {
   max-width: 220px;
+}
+
+@media (min-width: 768px) {
+  .chats-actions {
+    align-items: center;
+  }
+
+  .chats-actions-row {
+    width: auto;
+  }
 }

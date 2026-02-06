@@ -132,6 +132,30 @@ export default function TelegramAccounts(): JSX.Element {
     }
   }
 
+  const deleteAccount = async (accountId: number): Promise<void> => {
+    const confirmed = window.confirm(
+      'Вы уверены, что хотите ПОЛНОСТЬЮ УДАЛИТЬ аккаунт? Будет удалена сессия и все связанные с ним чаты.'
+    )
+    if (!confirmed) return
+
+    try {
+      setError('')
+      const res = await api.delete<{ success: boolean; error?: string }>(`/accounts/${accountId}`)
+      if (!res.data.success && res.data.error) {
+        setError(res.data.error)
+        return
+      }
+      setSuccess('Аккаунт и связанные с ним чаты успешно удалены')
+      void loadAccounts()
+    } catch (err: unknown) {
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+        setError(err.response?.data?.error || 'Ошибка удаления аккаунта')
+      } else {
+        setError('Ошибка удаления аккаунта')
+      }
+    }
+  }
+
   return (
     <Layout title="Telegram аккаунты">
       <div className="telegram-accounts-page">
@@ -183,6 +207,12 @@ export default function TelegramAccounts(): JSX.Element {
                       onClick={() => void toggleAccountActive(account.account_id, account.is_active)}
                     >
                       {account.is_active ? 'Деактивировать' : 'Активировать'}
+                    </button>
+                    <button
+                      className="btn btn-small btn-danger"
+                      onClick={() => void deleteAccount(account.account_id)}
+                    >
+                      ПОЛНОСТЬЮ УДАЛИТЬ
                     </button>
                   </div>
                 </div>

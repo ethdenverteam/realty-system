@@ -8,8 +8,14 @@ from app.models.chat import Chat
 from app.utils.decorators import jwt_required, role_required
 from app.utils.logger import log_action, log_error
 from app.utils.telethon_client import (
-    start_connection, verify_code, verify_2fa, get_chats, 
-    send_test_message as telethon_send_test_message, get_session_path, run_async
+    start_connection,
+    verify_code,
+    verify_2fa,
+    get_chats,
+    send_test_message as telethon_send_test_message,
+    get_session_path,
+    run_async,
+    create_client,
 )
 from app.config import Config
 from datetime import datetime
@@ -72,7 +78,6 @@ def connect_start(current_user):
         if os.path.exists(session_path):
             # Try to verify if session is still valid by attempting connection
             try:
-                from app.utils.telethon_client import run_async, create_client
                 test_client = run_async(create_client(phone))
                 run_async(test_client.connect())
                 is_valid = run_async(test_client.is_user_authorized())
@@ -505,6 +510,9 @@ def delete_account(account_id, current_user):
                 os.remove(session_path)
             except Exception as e:
                 logger.warning(f"Failed to delete session file {session_path}: {e}")
+
+        # Delete all chats associated with this account (user-owned chats)
+        Chat.query.filter_by(owner_type='user', owner_account_id=account_id).delete(synchronize_session=False)
         
         db.session.delete(account)
         db.session.commit()
