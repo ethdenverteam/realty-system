@@ -15,6 +15,12 @@ export default function ViewObject(): JSX.Element {
   const [publishing, setPublishing] = useState(false)
   const [publishError, setPublishError] = useState('')
   const [publishSuccess, setPublishSuccess] = useState(false)
+  const [showAccountPublishModal, setShowAccountPublishModal] = useState(false)
+  const [accounts, setAccounts] = useState<Array<{ account_id: number; phone: string }>>([])
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
+  const [chats, setChats] = useState<Array<{ chat_id: number; title: string }>>([])
+  const [selectedChatId, setSelectedChatId] = useState<number | null>(null)
+  const [publishingViaAccount, setPublishingViaAccount] = useState(false)
 
   const loadObject = useCallback(async () => {
     if (!objectId) return
@@ -268,6 +274,20 @@ export default function ViewObject(): JSX.Element {
               Редактировать
             </Link>
             <button
+              onClick={async () => {
+                try {
+                  const res = await api.get<Array<{ account_id: number; phone: string }>>('/accounts')
+                  setAccounts(res.data.filter(acc => acc.is_active))
+                  setShowAccountPublishModal(true)
+                } catch (err) {
+                  setPublishError('Ошибка загрузки аккаунтов')
+                }
+              }}
+              className="btn btn-primary"
+            >
+              Опубликовать через аккаунт
+            </button>
+            <button
               onClick={handlePublish}
               disabled={publishing || !object.can_publish}
               className="btn btn-primary"
@@ -282,6 +302,102 @@ export default function ViewObject(): JSX.Element {
           </div>
         </div>
       </div>
+
+      {showAccountPublishModal && (
+        <div className="modal-overlay" onClick={() => setShowAccountPublishModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Опубликовать через аккаунт</h3>
+              <button className="modal-close" onClick={() => setShowAccountPublishModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Выберите аккаунт:</label>
+                <select
+                  value={selectedAccountId || ''}
+                  onChange={async (e) => {
+                    const accId = Number(e.target.value)
+                    setSelectedAccountId(accId)
+                    setSelectedChatId(null)
+                    try {
+                      const res = await api.get<Array<{ chat_id: number; title: string }>>('/chats', {
+                        params: { account_id: accId, owner_type: 'user' }
+                      })
+                      setChats(res.data)
+                    } catch (err) {
+                      setPublishError('Ошибка загрузки чатов')
+                    }
+                  }}
+                  className="form-control"
+                >
+                  <option value="">Выберите аккаунт</option>
+                  {accounts.map(acc => (
+                    <option key={acc.account_id} value={acc.account_id}>
+                      {acc.phone}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {selectedAccountId && (
+                <div className="form-group">
+                  <label>Выберите чат:</label>
+                  <select
+                    value={selectedChatId || ''}
+                    onChange={(e) => setSelectedChatId(Number(e.target.value))}
+                    className="form-control"
+                  >
+                    <option value="">Выберите чат</option>
+                    {chats.map(chat => (
+                      <option key={chat.chat_id} value={chat.chat_id}>
+                        {chat.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="modal-actions">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowAccountPublishModal(false)}
+                >
+                  Отмена
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    if (!objectId || !selectedAccountId || !selectedChatId) return
+                    try {
+                      setPublishingViaAccount(true)
+                      setPublishError('')
+                      const res = await api.post<{ success: boolean; message_id?: number }>('/objects/publish-via-account', {
+                        object_id: objectId,
+                        account_id: selectedAccountId,
+                        chat_id: selectedChatId
+                      })
+                      if (res.data.success) {
+                        setPublishSuccess(true)
+                        setShowAccountPublishModal(false)
+                        await loadObject()
+                      }
+                    } catch (err: unknown) {
+                      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+                        setPublishError(err.response?.data?.error || 'Ошибка публикации')
+                      } else {
+                        setPublishError('Ошибка публикации')
+                      }
+                    } finally {
+                      setPublishingViaAccount(false)
+                    }
+                  }}
+                  disabled={!selectedAccountId || !selectedChatId || publishingViaAccount}
+                >
+                  {publishingViaAccount ? 'Публикация...' : 'Опубликовать'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   )
 }

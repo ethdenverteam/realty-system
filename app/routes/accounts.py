@@ -338,6 +338,42 @@ def get_account_chats(account_id, current_user):
             db.session.commit()
             return jsonify({'error': error_msg}), 500
         
+        # Cache chats to database
+        if chats:
+            cache_time = datetime.utcnow()
+            for chat_data in chats:
+                telegram_chat_id = str(chat_data.get('id', ''))
+                if not telegram_chat_id:
+                    continue
+                
+                # Find existing chat or create new
+                existing_chat = Chat.query.filter_by(
+                    telegram_chat_id=telegram_chat_id,
+                    owner_type='user',
+                    owner_account_id=account_id
+                ).first()
+                
+                if existing_chat:
+                    # Update existing chat
+                    existing_chat.title = chat_data.get('title', existing_chat.title)
+                    existing_chat.type = chat_data.get('type', existing_chat.type)
+                    existing_chat.members_count = chat_data.get('members_count', 0)
+                    existing_chat.cached_at = cache_time
+                    existing_chat.is_active = True
+                else:
+                    # Create new cached chat
+                    new_chat = Chat(
+                        telegram_chat_id=telegram_chat_id,
+                        title=chat_data.get('title', 'Unknown'),
+                        type=chat_data.get('type', 'group'),
+                        owner_type='user',
+                        owner_account_id=account_id,
+                        members_count=chat_data.get('members_count', 0),
+                        cached_at=cache_time,
+                        is_active=True
+                    )
+                    db.session.add(new_chat)
+        
         # Update last_used
         account.last_used = datetime.utcnow()
         account.last_error = None
@@ -412,6 +448,25 @@ def send_test_message(account_id, current_user):
         db.session.commit()
         log_error(e, 'account_test_message_failed', current_user.user_id, {'account_id': account_id})
         return jsonify({'error': f'Error sending message: {str(e)}'}), 500
+
+
+@accounts_bp.route('/<int:account_id>/rate-limit-status', methods=['GET'])
+@jwt_required
+def get_rate_limit_status(account_id, current_user):
+    """Get rate limit status for account"""
+    from app.utils.rate_limiter import get_rate_limit_status as get_rate_status
+    
+    account = TelegramAccount.query.get(account_id)
+    
+    if not account:
+        return jsonify({'error': 'Account not found'}), 404
+    
+    # Check ownership
+    if current_user.web_role != 'admin' and account.owner_id != current_user.user_id:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    status = get_rate_status(account.phone)
+    return jsonify(status)
 
 
 @accounts_bp.route('/<int:account_id>', methods=['DELETE'])

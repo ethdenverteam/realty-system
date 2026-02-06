@@ -24,11 +24,13 @@ def list_chats(current_user):
         from sqlalchemy import text
         
         owner_type = request.args.get('owner_type', None)
+        account_id = request.args.get('account_id', type=int)
         
         # Check if filters_json column exists
         inspector = sqlalchemy_inspect(db.engine)
         columns = [col['name'] for col in inspector.get_columns('chats')]
         has_filters_json = 'filters_json' in columns
+        has_cached_at = 'cached_at' in columns
         
         # If filters_json doesn't exist, use raw SQL
         if not has_filters_json:
@@ -68,7 +70,8 @@ def list_chats(current_user):
                     'added_date': row[9].isoformat() if row[9] else None,
                     'last_publication': row[10].isoformat() if row[10] else None,
                     'total_publications': row[11],
-                    'filters_json': {}
+                    'filters_json': {},
+                    'cached_at': None
                 }
                 result.append(chat_dict)
             return jsonify(result)
@@ -77,6 +80,14 @@ def list_chats(current_user):
         query = Chat.query.filter_by(is_active=True)
         if owner_type:
             query = query.filter_by(owner_type=owner_type)
+        if account_id:
+            # Filter by account for user chats
+            from app.models.telegram_account import TelegramAccount
+            account = TelegramAccount.query.get(account_id)
+            if account and (current_user.web_role == 'admin' or account.owner_id == current_user.user_id):
+                query = query.filter_by(owner_account_id=account_id, owner_type='user')
+            else:
+                return jsonify({'error': 'Access denied'}), 403
         
         chats = query.all()
         return jsonify([chat.to_dict() for chat in chats])

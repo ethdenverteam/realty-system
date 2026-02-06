@@ -335,6 +335,189 @@ def delete_object(object_id, current_user):
         return jsonify({'error': str(e)}), 500
 
 
+@objects_bp.route('/publish-via-account', methods=['POST'])
+@jwt_required
+def publish_object_via_account(current_user):
+    """Publish object via user Telegram account"""
+    from datetime import datetime, timedelta
+    from app.models.telegram_account import TelegramAccount
+    from app.models.chat import Chat
+    from app.models.publication_history import PublicationHistory
+    from app.utils.telethon_client import send_object_message, run_async
+    from app.utils.rate_limiter import get_rate_limit_status
+    from bot.utils import format_publication_text
+    from bot.models import User as BotUser, Object as BotObject
+    from bot.database import get_db as get_bot_db
+    
+    data = request.get_json()
+    object_id = data.get('object_id')
+    account_id = data.get('account_id')
+    chat_id = data.get('chat_id')
+    
+    if not object_id or not account_id or not chat_id:
+        return jsonify({'error': 'object_id, account_id, and chat_id are required'}), 400
+    
+    # Get account
+    account = TelegramAccount.query.get(account_id)
+    if not account:
+        return jsonify({'error': 'Account not found'}), 404
+    
+    # Check ownership
+    if current_user.web_role != 'admin' and account.owner_id != current_user.user_id:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    # Get chat
+    chat = Chat.query.get(chat_id)
+    if not chat:
+        return jsonify({'error': 'Chat not found'}), 404
+    
+    # Check chat belongs to account
+    if chat.owner_account_id != account_id or chat.owner_type != 'user':
+        return jsonify({'error': 'Chat does not belong to this account'}), 400
+    
+    # Get object
+    obj = Object.query.filter_by(object_id=object_id, user_id=current_user.user_id).first()
+    if not obj:
+        return jsonify({'error': 'Object not found'}), 404
+    
+    # Check rate limits
+    rate_status = get_rate_limit_status(account.phone)
+    if not rate_status['can_send']:
+        wait_seconds = rate_status['wait_seconds']
+        return jsonify({
+            'error': 'Rate limit exceeded',
+            'details': f'Please wait {int(wait_seconds)} seconds before sending another message',
+            'wait_seconds': wait_seconds,
+            'next_available': rate_status['next_available']
+        }), 429
+    
+    # Check if object was published to this chat within last 24 hours
+    yesterday = datetime.utcnow() - timedelta(days=1)
+    recent_pub = PublicationHistory.query.filter(
+        PublicationHistory.object_id == object_id,
+        PublicationHistory.chat_id == chat_id,
+        PublicationHistory.published_at >= yesterday,
+        PublicationHistory.deleted == False
+    ).first()
+    
+    if recent_pub:
+        return jsonify({
+            'error': 'Object was already published to this chat within 24 hours'
+        }), 400
+    
+    try:
+        # Get bot user and object for formatting
+        bot_user = None
+        bot_db = get_bot_db()
+        try:
+            if hasattr(current_user, 'telegram_id') and current_user.telegram_id:
+                bot_user = bot_db.query(BotUser).filter_by(telegram_id=int(current_user.telegram_id)).first()
+        finally:
+            bot_db.close()
+        
+        bot_db = get_bot_db()
+        try:
+            bot_obj = bot_db.query(BotObject).filter_by(object_id=object_id).first()
+            if not bot_obj:
+                # Create bot object from web object
+                bot_obj = BotObject(
+                    object_id=obj.object_id,
+                    user_id=bot_user.user_id if bot_user else None,
+                    rooms_type=obj.rooms_type,
+                    price=obj.price,
+                    districts_json=obj.districts_json,
+                    region=obj.region,
+                    city=obj.city,
+                    photos_json=obj.photos_json,
+                    area=obj.area,
+                    floor=obj.floor,
+                    address=obj.address,
+                    renovation=obj.renovation,
+                    comment=obj.comment,
+                    contact_name=obj.contact_name,
+                    show_username=obj.show_username,
+                    phone_number=obj.phone_number,
+                    status=obj.status,
+                    source='web'
+                )
+                bot_db.add(bot_obj)
+                bot_db.commit()
+        finally:
+            bot_db.close()
+        
+        # Format publication text
+        publication_text = format_publication_text(bot_obj, bot_user, is_preview=False)
+        
+        # Send message via telethon
+        success, error_msg, message_id = run_async(
+            send_object_message(
+                account.phone,
+                chat.telegram_chat_id,
+                publication_text,
+                obj.photos_json or []
+            )
+        )
+        
+        if not success:
+            account.last_error = error_msg
+            account.last_used = datetime.utcnow()
+            db.session.commit()
+            return jsonify({'error': error_msg}), 500
+        
+        # Update chat statistics
+        chat.total_publications = (chat.total_publications or 0) + 1
+        chat.last_publication = datetime.utcnow()
+        
+        # Create publication history
+        history = PublicationHistory(
+            object_id=object_id,
+            chat_id=chat_id,
+            account_id=account_id,
+            published_at=datetime.utcnow(),
+            message_id=str(message_id) if message_id else None,
+            deleted=False
+        )
+        db.session.add(history)
+        
+        # Update object status
+        obj.status = "опубликовано"
+        obj.publication_date = datetime.utcnow()
+        
+        # Update account
+        account.last_used = datetime.utcnow()
+        account.last_error = None
+        
+        db.session.commit()
+        
+        # Log action
+        log_action(
+            action='web_object_published_via_account',
+            user_id=current_user.user_id,
+            details={
+                'object_id': object_id,
+                'account_id': account_id,
+                'chat_id': chat_id,
+                'message_id': message_id
+            }
+        )
+        
+        return jsonify({
+            'success': True,
+            'message_id': message_id,
+            'message': 'Object published successfully'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error publishing object via account: {e}", exc_info=True)
+        log_error(e, 'web_object_publish_via_account_failed', current_user.user_id, {
+            'object_id': object_id,
+            'account_id': account_id,
+            'chat_id': chat_id
+        })
+        return jsonify({'error': str(e)}), 500
+
+
 @objects_bp.route('/publish', methods=['POST'])
 @jwt_required
 def publish_object_via_bot(current_user):

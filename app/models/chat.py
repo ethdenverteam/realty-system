@@ -24,6 +24,7 @@ class Chat(db.Model):
     added_date = Column(DateTime, default=datetime.utcnow, nullable=False)
     last_publication = Column(DateTime, nullable=True)
     total_publications = Column(Integer, default=0, nullable=False)
+    cached_at = Column(DateTime, nullable=True)  # When this chat was cached from user account
     
     # Relationships
     account = relationship('TelegramAccount', back_populates='chats')
@@ -48,6 +49,7 @@ class Chat(db.Model):
             'added_date': self.added_date.isoformat() if self.added_date else None,
             'last_publication': self.last_publication.isoformat() if self.last_publication else None,
             'total_publications': self.total_publications,
+            'cached_at': self.cached_at.isoformat() if self.cached_at else None,
         }
         # Safely handle filters_json - it might not exist in the database
         try:

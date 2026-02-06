@@ -22,7 +22,11 @@ def get_session_path(phone: str) -> str:
     """Get path to session file for phone number"""
     # Normalize phone number (remove spaces, dashes, parentheses, but keep + for filename safety)
     # For filename, we'll use a safe version without special characters
+    # IMPORTANT: Use consistent normalization - remove + but keep all digits
     normalized_phone = phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '').replace('+', '')
+    # Ensure we have a valid filename (replace any remaining special chars)
+    import re
+    normalized_phone = re.sub(r'[^0-9]', '', normalized_phone)
     session_filename = f"{normalized_phone}.session"
     return os.path.join(Config.SESSIONS_FOLDER, session_filename)
 
@@ -361,7 +365,12 @@ async def send_test_message(phone: str, chat_id: str, message: str = "Тесто
     Send test message from Telegram account
     Returns: (success, error_message, message_id)
     """
+    from app.utils.rate_limiter import wait_if_needed, record_message_sent
+    
     try:
+        # Apply rate limiting
+        wait_if_needed(phone)
+        
         client = await create_client(phone)
         await client.connect()
         
@@ -373,10 +382,90 @@ async def send_test_message(phone: str, chat_id: str, message: str = "Тесто
         sent_message = await client.send_message(int(chat_id), message)
         message_id = sent_message.id
         
+        # Record message sent for rate limiting
+        record_message_sent(phone)
+        
         await client.disconnect()
         return (True, None, message_id)
     except Exception as e:
         logger.error(f"Error sending test message: {e}")
+        try:
+            await client.disconnect()
+        except:
+            pass
+        return (False, f"Error sending message: {str(e)}", None)
+
+
+async def send_object_message(phone: str, chat_id: str, message_text: str, photos: Optional[List[str]] = None) -> Tuple[bool, Optional[str], Optional[int]]:
+    """
+    Send object publication message from Telegram account
+    Returns: (success, error_message, message_id)
+    """
+    from app.utils.rate_limiter import wait_if_needed, record_message_sent
+    import os
+    from app.config import Config
+    
+    try:
+        # Apply rate limiting
+        wait_if_needed(phone)
+        
+        client = await create_client(phone)
+        await client.connect()
+        
+        if not await client.is_user_authorized():
+            await client.disconnect()
+            return (False, "Account not authorized. Please connect first.", None)
+        
+        # Send message with photos if available
+        if photos and len(photos) > 0:
+            # Prepare photo files
+            photo_files = []
+            base_dir = os.path.dirname(os.path.dirname(__file__))
+            for photo_path in photos[:10]:  # Telegram allows max 10 photos
+                # Handle both relative and absolute paths
+                if photo_path.startswith('/'):
+                    full_path = os.path.join(base_dir, photo_path.lstrip('/'))
+                elif photo_path.startswith('uploads/'):
+                    full_path = os.path.join(base_dir, photo_path)
+                else:
+                    full_path = os.path.join(base_dir, photo_path)
+                
+                if os.path.exists(full_path):
+                    photo_files.append(full_path)
+                else:
+                    logger.warning(f"Photo file not found: {full_path} (original path: {photo_path})")
+            
+            if photo_files:
+                # Send as media group or single photo
+                if len(photo_files) > 1:
+                    # Send as media group
+                    from telethon.tl.types import InputMediaUploadedPhoto
+                    media = []
+                    for photo_file in photo_files:
+                        uploaded_file = await client.upload_file(photo_file)
+                        media.append(InputMediaUploadedPhoto(uploaded_file))
+                    sent_messages = await client.send_file(int(chat_id), media, caption=message_text, parse_mode='html')
+                    message_id = sent_messages[0].id if isinstance(sent_messages, list) else sent_messages.id
+                else:
+                    # Send single photo
+                    sent_message = await client.send_file(int(chat_id), photo_files[0], caption=message_text, parse_mode='html')
+                    message_id = sent_message.id
+            else:
+                # No valid photos, send text only
+                sent_message = await client.send_message(int(chat_id), message_text, parse_mode='html')
+                message_id = sent_message.id
+        else:
+            # Send text only
+            sent_message = await client.send_message(int(chat_id), message_text, parse_mode='html')
+            message_id = sent_message.id
+        
+        # Record message sent for rate limiting
+        record_message_sent(phone)
+        
+        await client.disconnect()
+        return (True, None, message_id)
+    except Exception as e:
+        logger.error(f"Error sending object message: {e}")
         try:
             await client.disconnect()
         except:
