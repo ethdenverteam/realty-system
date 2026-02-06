@@ -26,16 +26,27 @@ export default function ConnectTelegramAccount(): JSX.Element {
       return
     }
     
-    if (!phone.startsWith('+')) {
-      setError('Номер должен начинаться с + (например, +79991234567)')
+    // Normalize phone: remove spaces, dashes, but keep +
+    const phoneNormalized = phone.replace(/\s+/g, '').replace(/-/g, '').replace(/\(/g, '').replace(/\)/g, '')
+    
+    if (!phoneNormalized.startsWith('+')) {
+      setError('Номер должен начинаться с + (например, +56 9 4095 1404 или +79991234567)')
       return
     }
+    
+    if (phoneNormalized.length < 7) {
+      setError('Номер телефона слишком короткий')
+      return
+    }
+    
+    // Update phone state with normalized version
+    setPhone(phoneNormalized)
 
     try {
       setLoading(true)
       setError('')
       const res = await api.post<{ success: boolean; code_hash?: string; account_id?: number; message?: string }>('/accounts/connect/start', {
-        phone: phone.trim()
+        phone: phoneNormalized
       })
       
       if (res.data.success) {
@@ -70,8 +81,10 @@ export default function ConnectTelegramAccount(): JSX.Element {
     try {
       setLoading(true)
       setError('')
+      // Normalize phone before sending
+      const phoneNormalized = phone.replace(/\s+/g, '').replace(/-/g, '').replace(/\(/g, '').replace(/\)/g, '')
       const res = await api.post<{ success: boolean; requires_2fa?: boolean; account_id?: number; message?: string }>('/accounts/connect/verify-code', {
-        phone: phone,
+        phone: phoneNormalized,
         code: code.trim(),
         code_hash: codeHash
       })
@@ -107,8 +120,10 @@ export default function ConnectTelegramAccount(): JSX.Element {
     try {
       setLoading(true)
       setError('')
+      // Normalize phone before sending
+      const phoneNormalized = phone.replace(/\s+/g, '').replace(/-/g, '').replace(/\(/g, '').replace(/\)/g, '')
       const res = await api.post<{ success: boolean; account_id?: number; message?: string }>('/accounts/connect/verify-2fa', {
-        phone: phone,
+        phone: phoneNormalized,
         password: password2FA.trim()
       })
       

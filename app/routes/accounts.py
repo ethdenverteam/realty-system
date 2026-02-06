@@ -43,9 +43,20 @@ def connect_start(current_user):
     if not phone:
         return jsonify({'error': 'Phone number is required'}), 400
     
+    # Normalize phone number: remove spaces, dashes, parentheses, but keep +
+    # Accept any format with country code starting with +
+    phone_normalized = phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+    
     # Validate phone format (should start with +)
-    if not phone.startswith('+'):
-        return jsonify({'error': 'Phone number must start with + (e.g., +79991234567)'}), 400
+    if not phone_normalized.startswith('+'):
+        return jsonify({'error': 'Phone number must start with + (e.g., +56 9 4095 1404 or +79991234567)'}), 400
+    
+    # Check minimum length (country code + at least 5 digits)
+    if len(phone_normalized) < 7:
+        return jsonify({'error': 'Phone number is too short'}), 400
+    
+    # Use normalized phone for further processing
+    phone = phone_normalized
     
     # Check if account already exists
     existing = TelegramAccount.query.filter_by(phone=phone).first()
@@ -125,6 +136,9 @@ def connect_verify_code(current_user):
     if not phone or not code or not code_hash:
         return jsonify({'error': 'Phone, code, and code_hash are required'}), 400
     
+    # Normalize phone number
+    phone = phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+    
     try:
         success, error_msg, requires_2fa = run_async(verify_code(phone, code, code_hash))
         
@@ -193,6 +207,9 @@ def connect_verify_2fa(current_user):
     
     if not phone or not password:
         return jsonify({'error': 'Phone and password are required'}), 400
+    
+    # Normalize phone number
+    phone = phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
     
     try:
         success, error_msg = run_async(verify_2fa(phone, password))

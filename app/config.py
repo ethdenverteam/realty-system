@@ -4,8 +4,22 @@ Application configuration
 import os
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+# Try to load .env from multiple locations
+env_paths = [
+    Path(__file__).parent.parent / '.env',  # Project root
+    Path.home() / 'real' / '.env',  # ~/real/.env
+    Path('.env'),  # Current directory
+]
+
+for env_path in env_paths:
+    if env_path.exists():
+        load_dotenv(env_path)
+        break
+else:
+    # Fallback to default load_dotenv() behavior
+    load_dotenv()
 
 
 def build_database_url():
@@ -56,8 +70,8 @@ class Config:
     CHANNEL_ID = int(os.getenv('CHANNEL_ID', '0'))
     
     # Telethon Configuration (for user accounts)
-    TELEGRAM_API_ID = int(os.getenv('TELEGRAM_API_ID', '0'))
-    TELEGRAM_API_HASH = os.getenv('TELEGRAM_API_HASH', '')
+    TELEGRAM_API_ID = int(os.getenv('TELEGRAM_API_ID', '0') or '0')
+    TELEGRAM_API_HASH = os.getenv('TELEGRAM_API_HASH', '') or ''
     
     # File Upload
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')

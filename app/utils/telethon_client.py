@@ -18,8 +18,9 @@ _active_connections: Dict[str, TelegramClient] = {}
 
 def get_session_path(phone: str) -> str:
     """Get path to session file for phone number"""
-    # Normalize phone number (remove + and spaces)
-    normalized_phone = phone.replace('+', '').replace(' ', '').replace('-', '')
+    # Normalize phone number (remove spaces, dashes, parentheses, but keep + for filename safety)
+    # For filename, we'll use a safe version without special characters
+    normalized_phone = phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '').replace('+', '')
     session_filename = f"{normalized_phone}.session"
     return os.path.join(Config.SESSIONS_FOLDER, session_filename)
 
@@ -31,8 +32,10 @@ async def create_client(phone: str) -> TelegramClient:
     # Ensure sessions directory exists
     os.makedirs(Config.SESSIONS_FOLDER, exist_ok=True)
     
-    if not Config.TELEGRAM_API_ID or not Config.TELEGRAM_API_HASH:
-        raise ValueError("TELEGRAM_API_ID and TELEGRAM_API_HASH must be configured")
+    if not Config.TELEGRAM_API_ID or Config.TELEGRAM_API_ID == 0 or not Config.TELEGRAM_API_HASH:
+        error_msg = f"TELEGRAM_API_ID and TELEGRAM_API_HASH must be configured. Current values: API_ID={Config.TELEGRAM_API_ID}, API_HASH={'***' if Config.TELEGRAM_API_HASH else '(empty)'}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
     
     client = TelegramClient(
         session_path,
