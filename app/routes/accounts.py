@@ -77,7 +77,14 @@ def connect_start(current_user):
     
     try:
         # Start connection
-        success, result = run_async(start_connection(phone))
+        connection_result = run_async(start_connection(phone))
+        
+        # Handle both old format (2 values) and new format (3 values)
+        if len(connection_result) == 3:
+            success, result, warning = connection_result
+        else:
+            success, result = connection_result
+            warning = None
         
         if not success:
             return jsonify({'error': result}), 400
@@ -116,11 +123,14 @@ def connect_start(current_user):
             })
         
         # Code sent, return code_hash
-        return jsonify({
+        response = {
             'success': True,
             'code_hash': result,
             'message': 'Verification code sent to Telegram'
-        })
+        }
+        if warning:
+            response['warning'] = warning
+        return jsonify(response)
     except Exception as e:
         logger.error(f"Error starting connection: {e}", exc_info=True)
         log_error(e, 'account_connect_start_failed', current_user.user_id, {'phone': phone})

@@ -50,10 +50,10 @@ async def create_client(phone: str) -> TelegramClient:
     return client
 
 
-async def start_connection(phone: str) -> Tuple[bool, Optional[str]]:
+async def start_connection(phone: str) -> Tuple[bool, Optional[str], Optional[str]]:
     """
     Start connection process for phone number
-    Returns: (success, error_message or code_hash)
+    Returns: (success, error_message or code_hash, warning_message)
     """
     log_msg = f"Starting connection for phone: {phone}"
     logger.info(log_msg)
@@ -83,10 +83,32 @@ async def start_connection(phone: str) -> Tuple[bool, Optional[str]]:
             logger.info(log_msg)
             telethon_logger.info(log_msg)
             try:
+                # Try to send code - first attempt (Telegram decides the method)
                 sent_code = await client.send_code_request(phone)
                 code_hash = sent_code.phone_code_hash
                 
-                # Extract detailed information about code sending
+                # Check if we got App type and phone_registered is None/False - try to force SMS
+                code_type = getattr(sent_code, 'type', None)
+                code_type_name = code_type.__class__.__name__ if code_type else 'Unknown'
+                phone_registered = getattr(sent_code, 'phone_registered', None)
+                
+                # If we got App type and phone might not be registered, try to request SMS instead
+                if code_type_name == 'SentCodeTypeApp' and (phone_registered is None or phone_registered is False):
+                    logger.info(f"Attempting to request SMS code instead of App code for phone {phone}")
+                    telethon_logger.info(f"Attempting to request SMS code instead of App code for phone {phone}")
+                    try:
+                        # Try to resend code via SMS (if Telegram allows)
+                        sent_code = await client.send_code_request(phone, force_sms=True)
+                        code_hash = sent_code.phone_code_hash
+                        logger.info(f"Successfully requested SMS code for phone {phone}")
+                        telethon_logger.info(f"Successfully requested SMS code for phone {phone}")
+                    except Exception as sms_error:
+                        # SMS request failed, use original App code
+                        logger.warning(f"Failed to request SMS code for {phone}: {sms_error}. Using App code.")
+                        telethon_logger.warning(f"Failed to request SMS code for {phone}: {sms_error}. Using App code.")
+                        # sent_code already contains the App code from first request
+                
+                # Re-extract info after potential SMS request
                 code_type = getattr(sent_code, 'type', None)
                 code_type_name = code_type.__class__.__name__ if code_type else 'Unknown'
                 phone_registered = getattr(sent_code, 'phone_registered', None)
@@ -119,13 +141,27 @@ async def start_connection(phone: str) -> Tuple[bool, Optional[str]]:
                 
                 # CRITICAL: Check if code type is App (not SMS) - this means code won't come via SMS!
                 if code_type_name == 'SentCodeTypeApp':
-                    warning_msg = (
-                        f"⚠️ ВНИМАНИЕ: Код для номера {phone} отправляется через ПРИЛОЖЕНИЕ Telegram, "
-                        f"а НЕ по SMS! Код придет только в приложение Telegram на этом телефоне. "
-                        f"Пользователь должен открыть приложение Telegram, чтобы получить код."
-                    )
-                    logger.warning(warning_msg)
-                    telethon_logger.warning(warning_msg)
+                    # If phone_registered is None or False, code might not arrive even in app!
+                    if phone_registered is None or phone_registered is False:
+                        critical_warning = (
+                            f"🚨 КРИТИЧЕСКОЕ ПРЕДУПРЕЖДЕНИЕ для номера {phone}: "
+                            f"Код отправляется через ПРИЛОЖЕНИЕ (SentCodeTypeApp), "
+                            f"но phone_registered={phone_registered}. "
+                            f"Код НЕ ПРИДЕТ, если номер НЕ зарегистрирован в Telegram! "
+                            f"Пользователь должен сначала зарегистрировать номер в приложении Telegram, "
+                            f"затем открыть приложение и дождаться кода. "
+                            f"Если номер уже зарегистрирован, убедитесь что приложение Telegram открыто и подключено к интернету."
+                        )
+                        logger.error(critical_warning)
+                        telethon_logger.error(critical_warning)
+                    else:
+                        warning_msg = (
+                            f"⚠️ ВНИМАНИЕ: Код для номера {phone} отправляется через ПРИЛОЖЕНИЕ Telegram, "
+                            f"а НЕ по SMS! Код придет только в приложение Telegram на этом телефоне. "
+                            f"Пользователь должен открыть приложение Telegram, чтобы получить код."
+                        )
+                        logger.warning(warning_msg)
+                        telethon_logger.warning(warning_msg)
                 elif code_type_name not in ['SentCodeTypeSms', 'SentCodeTypeApp']:
                     warning_msg = (
                         f"⚠️ Неожиданный тип кода для номера {phone}: {code_type_name}. "
@@ -155,29 +191,39 @@ async def start_connection(phone: str) -> Tuple[bool, Optional[str]]:
                     telethon_logger.error(error_msg)
                 
                 _active_connections[phone] = client
-                return (True, code_hash)
+                
+                # Generate warning message if needed
+                warning_message = None
+                if code_type_name == 'SentCodeTypeApp' and (phone_registered is None or phone_registered is False):
+                    warning_message = (
+                        f"Код отправляется через приложение Telegram. "
+                        f"Если номер не зарегистрирован в Telegram, код не придет. "
+                        f"Убедитесь, что номер зарегистрирован в приложении Telegram и приложение открыто."
+                    )
+                
+                return (True, code_hash, warning_message)
             except PhoneNumberInvalidError as e:
                 error_msg = f"Invalid phone number format: {phone}. Error: {e}"
                 logger.error(error_msg)
                 telethon_logger.error(error_msg)
-                return (False, "Invalid phone number format")
+                return (False, "Invalid phone number format", None)
             except Exception as e:
                 error_msg = f"Error sending code for phone {phone}: {e}"
                 logger.error(error_msg, exc_info=True)
                 telethon_logger.error(error_msg, exc_info=True)
-                return (False, f"Failed to send code: {str(e)}")
+                return (False, f"Failed to send code: {str(e)}", None)
         else:
             # Already authorized
             log_msg = f"Phone {phone} is already authorized"
             logger.info(log_msg)
             telethon_logger.info(log_msg)
             await client.disconnect()
-            return (True, None)
+            return (True, None, None)
     except Exception as e:
         error_msg = f"Error starting connection for phone {phone}: {e}"
         logger.error(error_msg, exc_info=True)
         telethon_logger.error(error_msg, exc_info=True)
-        return (False, f"Connection error: {str(e)}")
+        return (False, f"Connection error: {str(e)}", None)
 
 
 async def verify_code(phone: str, code: str, code_hash: str) -> Tuple[bool, Optional[str], Optional[str]]:
