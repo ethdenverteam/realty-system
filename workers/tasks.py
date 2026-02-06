@@ -3,9 +3,11 @@ Celery tasks for background processing
 """
 from workers.celery_app import celery_app
 from bot.database import get_db
-from bot.models import PublicationQueue, Object, Chat, PublicationHistory
+from bot.models import PublicationQueue, Object, Chat, PublicationHistory, AutopublishConfig
 from datetime import datetime, timedelta
 import logging
+
+from bot.utils import get_districts_config
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +108,142 @@ def process_autopublish():
             publish_to_telegram.delay(queue.queue_id)
         
         return len(queues)
+    finally:
+        db.close()
+
+
+def _get_matching_bot_chats_for_object(db, obj: Object):
+    """
+    Подбор чатов бота для объекта по тем же правилам,
+    что и ручная публикация через бота.
+    """
+    target_chats = []
+
+    chats = db.query(Chat).filter_by(owner_type='bot', is_active=True).all()
+
+    rooms_type = obj.rooms_type or ""
+    districts = obj.districts_json or []
+    price = obj.price or 0
+
+    districts_config = get_districts_config()
+
+    # Добавляем родительские районы
+    all_districts = set(districts)
+    for district in districts:
+        if isinstance(district, str) and district in districts_config:
+            parent_districts = districts_config[district]
+            if isinstance(parent_districts, list):
+                all_districts.update(parent_districts)
+
+    for chat in chats:
+        matches = False
+        filters = chat.filters_json or {}
+
+        has_filters_json = bool(
+            filters.get('rooms_types')
+            or filters.get('districts')
+            or filters.get('price_min') is not None
+            or filters.get('price_max') is not None
+        )
+
+        if has_filters_json:
+            rooms_match = True
+            districts_match = True
+            price_match = True
+
+            if filters.get('rooms_types'):
+                rooms_match = rooms_type in filters['rooms_types']
+
+            if filters.get('districts'):
+                chat_districts = set(filters['districts'])
+                districts_match = bool(chat_districts.intersection(all_districts))
+
+            price_min = filters.get('price_min')
+            price_max = filters.get('price_max')
+            if price_min is not None or price_max is not None:
+                price_min = price_min or 0
+                price_max = price_max if price_max is not None else float('inf')
+                price_match = price_min <= price < price_max
+
+            if rooms_match and districts_match and price_match:
+                matches = True
+        else:
+            # Legacy category support
+            category = chat.category or ""
+
+            if category.startswith("rooms_") and category.replace("rooms_", "") == rooms_type:
+                matches = True
+
+            if category.startswith("district_"):
+                district_name = category.replace("district_", "")
+                if district_name in all_districts:
+                    matches = True
+
+            if category.startswith("price_"):
+                try:
+                    parts = category.replace("price_", "").split("_")
+                    if len(parts) == 2:
+                        min_price = float(parts[0])
+                        max_price = float(parts[1])
+                        if min_price <= price < max_price:
+                            matches = True
+                except Exception:
+                    pass
+
+        if matches:
+            target_chats.append(chat)
+
+    return target_chats
+
+
+@celery_app.task(name='workers.tasks.schedule_daily_autopublish')
+def schedule_daily_autopublish():
+    """
+    Создать задачи автопубликации для всех объектов с включенной автопубликацией.
+
+    Предполагается запуск через celery beat раз в день в 06:00 UTC (09:00 МСК).
+    """
+    db = get_db()
+    try:
+        configs = db.query(AutopublishConfig).filter_by(enabled=True).all()
+        created_queues = 0
+
+        for cfg in configs:
+            obj = db.query(Object).filter_by(object_id=cfg.object_id).first()
+            if not obj:
+                continue
+
+            # Не публикуем архивные объекты
+            if obj.status == 'архив':
+                continue
+
+            # Через бота: чаты подбираются автоматически
+            if cfg.bot_enabled:
+                chats = _get_matching_bot_chats_for_object(db, obj)
+                for chat in chats:
+                    queue = PublicationQueue(
+                        object_id=obj.object_id,
+                        chat_id=chat.chat_id,
+                        account_id=None,
+                        user_id=obj.user_id,
+                        type='bot',
+                        mode='autopublish',
+                        status='pending',
+                        created_at=datetime.utcnow(),
+                    )
+                    db.add(queue)
+                    created_queues += 1
+
+            # Зона расширения: автопубликация через аккаунты пользователей
+            # (accounts_config_json). Пока не реализована.
+
+        db.commit()
+        logger.info(f"schedule_daily_autopublish: created {created_queues} queue items")
+        return created_queues
+    except Exception as e:
+        logger.error(f"Error in schedule_daily_autopublish: {e}", exc_info=True)
+        db.rollback()
+        return 0
     finally:
         db.close()
 

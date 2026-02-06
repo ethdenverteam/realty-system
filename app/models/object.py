@@ -37,6 +37,7 @@ class Object(db.Model):
     user = relationship('User', back_populates='objects')
     publication_queues = relationship('PublicationQueue', back_populates='object')
     publication_history = relationship('PublicationHistory', back_populates='object')
+    autopublish_config = relationship('AutopublishConfig', back_populates='object', uselist=False)
     
     def __repr__(self):
         return f'<Object {self.object_id} ({self.rooms_type}, {self.price}к)>'

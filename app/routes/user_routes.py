@@ -8,6 +8,7 @@ from app.models.publication_queue import PublicationQueue
 from app.models.publication_history import PublicationHistory
 from app.models.telegram_account import TelegramAccount
 from app.models.quick_access import QuickAccess
+from app.models.autopublish_config import AutopublishConfig
 from app.utils.decorators import jwt_required
 from app.utils.logger import log_action, log_error
 from sqlalchemy import func
@@ -73,6 +74,144 @@ def user_stats(current_user):
         'accounts_count': accounts_count,
         'autopublish_objects_count': autopublish_objects
     })
+
+
+@user_routes_bp.route('/dashboard/autopublish', methods=['GET'])
+@jwt_required
+def get_autopublish_config(current_user):
+    """Get list of objects with autopublish settings and available objects to add"""
+    # Get configs for current user
+    configs = AutopublishConfig.query.filter_by(user_id=current_user.user_id).all()
+
+    # Preload object data
+    object_ids = [cfg.object_id for cfg in configs]
+    objects_map = {}
+    if object_ids:
+        objects = Object.query.filter(
+            Object.user_id == current_user.user_id,
+            Object.object_id.in_(object_ids)
+        ).all()
+        objects_map = {obj.object_id: obj for obj in objects}
+
+    # Build response list
+    autopublish_items = []
+    for cfg in configs:
+        obj = objects_map.get(cfg.object_id)
+        if not obj:
+            continue
+
+        item = {
+            'object': obj.to_dict(),
+            'config': cfg.to_dict(),
+            # Для бота чаты подбираются автоматически по фильтрам,
+            # поэтому явно не сохраняем их список в конфиге.
+        }
+        autopublish_items.append(item)
+
+    # Available objects to add (не в архиве)
+    used_ids = set(object_ids)
+    available_objects = Object.query.filter(
+        Object.user_id == current_user.user_id,
+        Object.status != 'архив',
+        ~Object.object_id.in_(used_ids)
+    ).all()
+
+    return jsonify({
+        'autopublish_items': autopublish_items,
+        'available_objects': [obj.to_dict() for obj in available_objects],
+    })
+
+
+@user_routes_bp.route('/dashboard/autopublish', methods=['POST'])
+@jwt_required
+def create_or_update_autopublish_config(current_user):
+    """Create or update autopublish config for object"""
+    data = request.get_json() or {}
+    object_id = data.get('object_id')
+    bot_enabled = bool(data.get('bot_enabled', True))
+
+    if not object_id:
+        return jsonify({'error': 'object_id is required'}), 400
+
+    obj = Object.query.filter_by(object_id=object_id, user_id=current_user.user_id).first()
+    if not obj:
+        return jsonify({'error': 'Object not found'}), 404
+
+    cfg = AutopublishConfig.query.filter_by(
+        user_id=current_user.user_id,
+        object_id=object_id
+    ).first()
+
+    if not cfg:
+        cfg = AutopublishConfig(
+            user_id=current_user.user_id,
+            object_id=object_id,
+        )
+        db.session.add(cfg)
+
+    cfg.bot_enabled = bot_enabled
+    # На этом этапе аккаунты пользователей не конфигурируем (расширение позже)
+    cfg.enabled = bool(bot_enabled)
+
+    try:
+        db.session.commit()
+        return jsonify({'success': True, 'config': cfg.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        log_error(e, 'autopublish_config_save_failed', current_user.user_id, {'object_id': object_id})
+        return jsonify({'error': str(e)}), 500
+
+
+@user_routes_bp.route('/dashboard/autopublish/<string:object_id>', methods=['PUT'])
+@jwt_required
+def update_autopublish_config(object_id, current_user):
+    """Update existing autopublish config (enable/disable, bot_enabled)"""
+    cfg = AutopublishConfig.query.filter_by(
+        user_id=current_user.user_id,
+        object_id=object_id
+    ).first()
+
+    if not cfg:
+        return jsonify({'error': 'Config not found'}), 404
+
+    data = request.get_json() or {}
+
+    if 'enabled' in data:
+        cfg.enabled = bool(data['enabled'])
+    if 'bot_enabled' in data:
+        cfg.bot_enabled = bool(data['bot_enabled'])
+        if cfg.bot_enabled:
+            cfg.enabled = True
+
+    try:
+        db.session.commit()
+        return jsonify({'success': True, 'config': cfg.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        log_error(e, 'autopublish_config_update_failed', current_user.user_id, {'object_id': object_id})
+        return jsonify({'error': str(e)}), 500
+
+
+@user_routes_bp.route('/dashboard/autopublish/<string:object_id>', methods=['DELETE'])
+@jwt_required
+def delete_autopublish_config(object_id, current_user):
+    """Delete autopublish config for object"""
+    cfg = AutopublishConfig.query.filter_by(
+        user_id=current_user.user_id,
+        object_id=object_id
+    ).first()
+
+    if not cfg:
+        return jsonify({'error': 'Config not found'}), 404
+
+    try:
+        db.session.delete(cfg)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        log_error(e, 'autopublish_config_delete_failed', current_user.user_id, {'object_id': object_id})
+        return jsonify({'error': str(e)}), 500
 
 
 @user_routes_bp.route('/dashboard/objects', methods=['GET'])

@@ -4,3 +4,49 @@
   gap: var(--spacing-lg);
 }
 
+.autopublish-card {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: var(--spacing-lg);
+}
+
+.autopublish-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.autopublish-list,
+.autopublish-available-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.autopublish-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.autopublish-flags {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.autopublish-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.autopublish-available-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+

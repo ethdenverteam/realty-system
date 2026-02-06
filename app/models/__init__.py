@@ -12,6 +12,7 @@ from app.models.statistics import Statistics
 from app.models.bot_web_code import BotWebCode
 from app.models.system_setting import SystemSetting
 from app.models.quick_access import QuickAccess
+from app.models.autopublish_config import AutopublishConfig
 
 __all__ = [
     'User',
@@ -25,5 +26,6 @@ __all__ = [
     'BotWebCode',
     'SystemSetting',
     'QuickAccess',
+    'AutopublishConfig',
 ]
 

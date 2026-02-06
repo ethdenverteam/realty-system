@@ -182,6 +182,28 @@ export interface ObjectsListResponse {
   per_page?: number;
 }
 
+// Autopublish types
+export interface AutopublishConfigDto {
+  config_id: number;
+  user_id: number;
+  object_id: string;
+  enabled: boolean;
+  bot_enabled: boolean;
+  accounts_config_json?: Record<string, unknown> | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface AutopublishItem {
+  object: RealtyObjectListItem | RealtyObject;
+  config: AutopublishConfigDto;
+}
+
+export interface AutopublishListResponse {
+  autopublish_items: AutopublishItem[];
+  available_objects: RealtyObjectListItem[];
+}
+
 export interface PublishObjectRequest {
   object_id: string;
 }

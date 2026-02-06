@@ -3,7 +3,8 @@ Import database models for bot
 """
 from app.models import (
     User, Object, TelegramAccount, Chat, PublicationQueue,
-    PublicationHistory, ActionLog, Statistics, BotWebCode, SystemSetting
+    PublicationHistory, ActionLog, Statistics, BotWebCode, SystemSetting,
+    AutopublishConfig,
 )
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     'Statistics',
     'BotWebCode',
     'SystemSetting',
+    'AutopublishConfig',
 ]
 
