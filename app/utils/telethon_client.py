@@ -296,9 +296,22 @@ async def get_chats(phone: str) -> Tuple[bool, Optional[List[Dict]], Optional[st
         client = await create_client(phone)
         await client.connect()
         
-        if not await client.is_user_authorized():
+        # Check authorization with better error handling
+        try:
+            is_authorized = await client.is_user_authorized()
+        except Exception as auth_error:
+            logger.error(f"Error checking authorization for {phone}: {auth_error}")
             await client.disconnect()
-            return (False, None, "Account not authorized. Please connect first.")
+            return (False, None, f"Authorization check failed: {str(auth_error)}. Please reconnect the account.")
+        
+        if not is_authorized:
+            await client.disconnect()
+            # Check if session file exists
+            session_path = get_session_path(phone)
+            if os.path.exists(session_path):
+                return (False, None, "Session file exists but account is not authorized. Please reconnect the account.")
+            else:
+                return (False, None, "Account not authorized. Please connect first.")
         
         chats = []
         async for dialog in client.iter_dialogs():
@@ -374,9 +387,21 @@ async def send_test_message(phone: str, chat_id: str, message: str = "Тесто
         client = await create_client(phone)
         await client.connect()
         
-        if not await client.is_user_authorized():
+        # Check authorization with better error handling
+        try:
+            is_authorized = await client.is_user_authorized()
+        except Exception as auth_error:
+            logger.error(f"Error checking authorization for {phone}: {auth_error}")
             await client.disconnect()
-            return (False, "Account not authorized. Please connect first.", None)
+            return (False, f"Authorization check failed: {str(auth_error)}. Please reconnect the account.", None)
+        
+        if not is_authorized:
+            await client.disconnect()
+            session_path = get_session_path(phone)
+            if os.path.exists(session_path):
+                return (False, "Session file exists but account is not authorized. Please reconnect the account.", None)
+            else:
+                return (False, "Account not authorized. Please connect first.", None)
         
         # Send message
         sent_message = await client.send_message(int(chat_id), message)
@@ -412,9 +437,21 @@ async def send_object_message(phone: str, chat_id: str, message_text: str, photo
         client = await create_client(phone)
         await client.connect()
         
-        if not await client.is_user_authorized():
+        # Check authorization with better error handling
+        try:
+            is_authorized = await client.is_user_authorized()
+        except Exception as auth_error:
+            logger.error(f"Error checking authorization for {phone}: {auth_error}")
             await client.disconnect()
-            return (False, "Account not authorized. Please connect first.", None)
+            return (False, f"Authorization check failed: {str(auth_error)}. Please reconnect the account.", None)
+        
+        if not is_authorized:
+            await client.disconnect()
+            session_path = get_session_path(phone)
+            if os.path.exists(session_path):
+                return (False, "Session file exists but account is not authorized. Please reconnect the account.", None)
+            else:
+                return (False, "Account not authorized. Please connect first.", None)
         
         # Send message with photos if available
         if photos and len(photos) > 0:

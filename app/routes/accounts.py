@@ -67,13 +67,26 @@ def connect_start(current_user):
         # Check ownership
         if current_user.web_role != 'admin' and existing.owner_id != current_user.user_id:
             return jsonify({'error': 'This phone number is already connected to another account'}), 400
-        # Account exists and belongs to user - check if session file exists
+        # Account exists and belongs to user - check if session file exists and is valid
         session_path = get_session_path(phone)
         if os.path.exists(session_path):
-            return jsonify({
-                'error': 'Account already connected',
-                'account_id': existing.account_id
-            }), 400
+            # Try to verify if session is still valid by attempting connection
+            try:
+                from app.utils.telethon_client import run_async, create_client
+                test_client = run_async(create_client(phone))
+                run_async(test_client.connect())
+                is_valid = run_async(test_client.is_user_authorized())
+                run_async(test_client.disconnect())
+                if is_valid:
+                    return jsonify({
+                        'error': 'Account already connected',
+                        'account_id': existing.account_id
+                    }), 400
+                # Session exists but not authorized - allow reconnection
+                logger.info(f"Session file exists for {phone} but account is not authorized. Allowing reconnection.")
+            except Exception as e:
+                logger.warning(f"Error checking session validity for {phone}: {e}. Allowing reconnection.")
+                # Allow reconnection if check fails
     
     try:
         # Start connection
