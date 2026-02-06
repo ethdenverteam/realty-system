@@ -60,6 +60,7 @@ services:
       - ./logs:/app/logs
       - ./static:/app/static
       - ./templates:/app/templates
+      - ./sessions:/app/sessions
     ports:
       - "5000:5000"
     depends_on:
@@ -93,6 +94,7 @@ services:
       - ./bot:/app/bot
       - ./uploads:/app/uploads
       - ./logs:/app/logs
+      - ./sessions:/app/sessions
     depends_on:
       postgres:
         condition: service_healthy

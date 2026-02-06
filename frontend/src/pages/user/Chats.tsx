@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Layout from '../../components/Layout'
+import { GlassCard } from '../../components/GlassCard'
 import api from '../../utils/api'
 import axios from 'axios'
 import type { ApiErrorResponse } from '../../types/models'
@@ -44,6 +45,7 @@ export default function Chats(): JSX.Element {
   const [selectedChatId, setSelectedChatId] = useState<number | null>(null)
   const [objects, setObjects] = useState<RealtyObject[]>([])
   const [publishing, setPublishing] = useState(false)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     void loadAccounts()
@@ -77,12 +79,19 @@ export default function Chats(): JSX.Element {
     }
   }
 
-  const loadChats = async (accountId: number): Promise<void> => {
+  const loadChats = async (accountId: number, searchQuery?: string): Promise<void> => {
     try {
       setLoading(true)
       setError('')
+      const params: Record<string, string | number> = {
+        account_id: accountId,
+        owner_type: 'user'
+      }
+      if (searchQuery && searchQuery.trim() !== '') {
+        params.search = searchQuery.trim()
+      }
       const res = await api.get<CachedChat[]>('/chats', {
-        params: { account_id: accountId, owner_type: 'user' }
+        params
       })
       setChats(res.data)
     } catch (err: unknown) {
@@ -107,7 +116,7 @@ export default function Chats(): JSX.Element {
         setSuccess('Чаты обновлены')
         setTimeout(() => setSuccess(''), 3000)
         // Reload cached chats
-        await loadChats(selectedAccountId)
+        await loadChats(selectedAccountId, search)
       }
     } catch (err: unknown) {
       if (axios.isAxiosError<ApiErrorResponse>(err)) {
@@ -209,14 +218,14 @@ export default function Chats(): JSX.Element {
           </div>
         )}
 
-        <div className="card">
+        <GlassCard className="chats-card">
           <div className="card-header-row">
             <h2 className="card-title">Чаты из аккаунтов</h2>
             <div className="chats-actions">
               <select
                 value={selectedAccountId || ''}
                 onChange={(e) => setSelectedAccountId(Number(e.target.value))}
-                className="select-account"
+                className="select-account form-input form-input-sm"
                 disabled={loading}
               >
                 <option value="">Выберите аккаунт</option>
@@ -227,13 +236,29 @@ export default function Chats(): JSX.Element {
                 ))}
               </select>
               {selectedAccountId && (
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => void refreshChats()}
-                  disabled={refreshing}
-                >
-                  {refreshing ? 'Обновление...' : 'Обновить чаты'}
-                </button>
+                <>
+                  <input
+                    type="text"
+                    className="form-input form-input-sm chats-search-input"
+                    placeholder="Поиск по чатам..."
+                    value={search}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setSearch(value)
+                      if (selectedAccountId) {
+                        void loadChats(selectedAccountId, value)
+                      }
+                    }}
+                    disabled={loading}
+                  />
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => void refreshChats()}
+                    disabled={refreshing}
+                  >
+                    {refreshing ? 'Обновление...' : 'Обновить чаты'}
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -242,27 +267,23 @@ export default function Chats(): JSX.Element {
 
           {!loading && selectedAccountId && chats.length === 0 && (
             <div className="empty-state">
-              <p>Чаты не найдены. Нажмите "Обновить чаты" для загрузки.</p>
+              <p>Чаты не найдены. Нажмите "Обновить чаты" для загрузки или измените параметры поиска.</p>
             </div>
           )}
 
           {!loading && chats.length > 0 && (
-            <div className="chats-list">
+            <div className="objects-list chats-list">
               {chats.map(chat => (
-                <div key={chat.chat_id} className="chat-item">
-                  <div className="chat-info">
-                    <h3>{chat.title}</h3>
-                    <div className="chat-meta">
-                      <span className="chat-type">{chat.type}</span>
-                      {chat.members_count > 0 && (
-                        <span className="chat-members">{chat.members_count} участников</span>
-                      )}
-                      {chat.cached_at && (
-                        <span className="chat-cached">
-                          Кэшировано: {new Date(chat.cached_at).toLocaleString('ru-RU')}
-                        </span>
-                      )}
-                    </div>
+                <div key={chat.chat_id} className="object-card compact chat-item">
+                  <div className="object-details-compact single-line">
+                    <span className="object-detail-item">
+                      {chat.title}
+                    </span>
+                    {chat.members_count > 0 && (
+                      <span className="object-detail-item">
+                        {chat.members_count} участников
+                      </span>
+                    )}
                   </div>
                   <div className="chat-actions">
                     <button
@@ -286,7 +307,7 @@ export default function Chats(): JSX.Element {
               ))}
             </div>
           )}
-        </div>
+        </GlassCard>
 
         {showPublishModal && (
           <div className="modal-overlay" onClick={() => setShowPublishModal(false)}>

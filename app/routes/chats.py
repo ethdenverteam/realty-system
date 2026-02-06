@@ -9,6 +9,7 @@ from app.utils.logger import log_action, log_error
 from datetime import datetime
 import logging
 import re
+from sqlalchemy import or_, String
 
 chats_bp = Blueprint('chats', __name__)
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ def list_chats(current_user):
         
         owner_type = request.args.get('owner_type', None)
         account_id = request.args.get('account_id', type=int)
+        search = request.args.get('search', type=str)
         
         # Check if filters_json column exists
         inspector = sqlalchemy_inspect(db.engine)
@@ -34,23 +36,32 @@ def list_chats(current_user):
         
         # If filters_json doesn't exist, use raw SQL
         if not has_filters_json:
-            sql = text("""
+            base_sql = """
                 SELECT chat_id, telegram_chat_id, title, type, category, 
                        owner_type, owner_account_id, is_active, members_count,
                        added_date, last_publication, total_publications
                 FROM chats
                 WHERE is_active = true
-            """)
+            """
             params = {}
             if owner_type:
-                sql = text("""
-                    SELECT chat_id, telegram_chat_id, title, type, category, 
-                           owner_type, owner_account_id, is_active, members_count,
-                           added_date, last_publication, total_publications
-                    FROM chats
-                    WHERE is_active = true AND owner_type = :owner_type
-                """)
-                params = {'owner_type': owner_type}
+                base_sql += " AND owner_type = :owner_type"
+                params['owner_type'] = owner_type
+            if account_id:
+                base_sql += " AND owner_account_id = :account_id AND owner_type = 'user'"
+                params['account_id'] = account_id
+            if search:
+                base_sql += """
+                    AND (
+                        title ILIKE :q OR
+                        telegram_chat_id ILIKE :q OR
+                        COALESCE(category, '') ILIKE :q OR
+                        owner_type ILIKE :q OR
+                        CAST(members_count AS TEXT) ILIKE :q
+                    )
+                """
+                params['q'] = f"%{search}%"
+            sql = text(base_sql)
             
             result_proxy = db.session.execute(sql, params)
             rows = result_proxy.fetchall()
@@ -88,6 +99,19 @@ def list_chats(current_user):
                 query = query.filter_by(owner_account_id=account_id, owner_type='user')
             else:
                 return jsonify({'error': 'Access denied'}), 403
+
+        if search:
+            like_pattern = f"%{search}%"
+            query = query.filter(
+                or_(
+                    Chat.title.ilike(like_pattern),
+                    Chat.telegram_chat_id.ilike(like_pattern),
+                    Chat.category.ilike(like_pattern),
+                    Chat.owner_type.ilike(like_pattern),
+                    # Cast members_count and filters_json to text for search
+                    db.cast(Chat.members_count, String).ilike(like_pattern),
+                )
+            )
         
         chats = query.all()
         return jsonify([chat.to_dict() for chat in chats])

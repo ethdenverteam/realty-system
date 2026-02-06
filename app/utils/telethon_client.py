@@ -44,6 +44,20 @@ def get_session_path(phone: str) -> str:
     return os.path.join(Config.SESSIONS_FOLDER, session_filename)
 
 
+def _is_connection_error(exc: Exception) -> bool:
+    """
+    Heuristic to detect connection-related errors that are worth retrying.
+    """
+    message = str(exc).lower()
+    keywords = [
+        'connection', 'disconnect', 'timed out', 'timeout',
+        'network is unreachable', 'failed to establish a new connection',
+        'cannot connect', 'unable to connect', 'connection reset',
+        'dns', 'name or service not known'
+    ]
+    return any(k in message for k in keywords)
+
+
 async def create_client(phone: str) -> TelegramClient:
     """Create Telethon client for phone number"""
     session_path = get_session_path(phone)
@@ -248,32 +262,67 @@ async def verify_code(phone: str, code: str, code_hash: str) -> Tuple[bool, Opti
     Verify phone code
     Returns: (success, error_message, requires_2fa)
     """
-    if phone not in _active_connections:
-        return (False, "Connection not found. Please start connection again.", None)
+    max_retries = 3
+    retry_delay = 1.0
     
-    client = _active_connections[phone]
-    
-    try:
+    for attempt in range(max_retries):
+        # Ensure we have an active client; if not, try to recreate it from session
+        if phone not in _active_connections:
+            try:
+                client = await create_client(phone)
+                await client.connect()
+                _active_connections[phone] = client
+            except Exception as conn_err:
+                logger.error(f"Error creating client for verify_code (attempt {attempt + 1}/{max_retries}) for {phone}: {conn_err}")
+                if _is_connection_error(conn_err) and attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                return (False, f"Connection error while verifying code: {str(conn_err)}", None)
+        
+        client = _active_connections[phone]
+        
         try:
-            await client.sign_in(phone, code, phone_code_hash=code_hash)
-            # Successfully signed in
-            await client.disconnect()
-            del _active_connections[phone]
-            return (True, None, None)
-        except SessionPasswordNeededError:
-            # 2FA required
-            return (True, None, "2FA_REQUIRED")
-        except PhoneCodeInvalidError:
-            return (False, "Invalid verification code", None)
+            try:
+                await client.sign_in(phone, code, phone_code_hash=code_hash)
+                # Successfully signed in
+                await client.disconnect()
+                del _active_connections[phone]
+                return (True, None, None)
+            except SessionPasswordNeededError:
+                # 2FA required, keep client in _active_connections for verify_2fa
+                return (True, None, "2FA_REQUIRED")
+            except PhoneCodeInvalidError:
+                return (False, "Invalid verification code", None)
+            except Exception as e:
+                logger.error(f"Error verifying code (attempt {attempt + 1}/{max_retries}) for {phone}: {e}")
+                if _is_connection_error(e) and attempt < max_retries - 1:
+                    # Reset client and retry on connection-related problems
+                    try:
+                        await client.disconnect()
+                    except Exception:
+                        pass
+                    if phone in _active_connections:
+                        del _active_connections[phone]
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                return (False, f"Verification error: {str(e)}", None)
         except Exception as e:
-            logger.error(f"Error verifying code: {e}")
-            return (False, f"Verification error: {str(e)}", None)
-    except Exception as e:
-        logger.error(f"Error in verify_code: {e}")
-        if phone in _active_connections:
-            await _active_connections[phone].disconnect()
-            del _active_connections[phone]
-        return (False, f"Error: {str(e)}", None)
+            logger.error(f"Unexpected error in verify_code (attempt {attempt + 1}/{max_retries}) for {phone}: {e}")
+            if phone in _active_connections:
+                try:
+                    await _active_connections[phone].disconnect()
+                except Exception:
+                    pass
+                del _active_connections[phone]
+            if _is_connection_error(e) and attempt < max_retries - 1:
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2
+                continue
+            return (False, f"Error: {str(e)}", None)
+    
+    return (False, "Verification failed after multiple connection attempts. Please try again.", None)
 
 
 async def verify_2fa(phone: str, password: str) -> Tuple[bool, Optional[str]]:
@@ -281,23 +330,54 @@ async def verify_2fa(phone: str, password: str) -> Tuple[bool, Optional[str]]:
     Verify 2FA password
     Returns: (success, error_message)
     """
-    if phone not in _active_connections:
-        return (False, "Connection not found. Please start connection again.")
+    max_retries = 3
+    retry_delay = 1.0
     
-    client = _active_connections[phone]
-    
-    try:
-        await client.sign_in(password=password)
-        # Successfully signed in
-        await client.disconnect()
-        del _active_connections[phone]
-        return (True, None)
-    except Exception as e:
-        logger.error(f"Error verifying 2FA: {e}")
-        if phone in _active_connections:
-            await _active_connections[phone].disconnect()
+    for attempt in range(max_retries):
+        # If connection context is lost, try to recreate client from existing session file
+        if phone not in _active_connections:
+            try:
+                client = await create_client(phone)
+                await client.connect()
+                _active_connections[phone] = client
+            except Exception as conn_err:
+                logger.error(f"Error creating client for verify_2fa (attempt {attempt + 1}/{max_retries}) for {phone}: {conn_err}")
+                if _is_connection_error(conn_err) and attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                return (False, f"Connection error while verifying 2FA: {str(conn_err)}")
+        
+        client = _active_connections[phone]
+        
+        try:
+            await client.sign_in(password=password)
+            # Successfully signed in
+            await client.disconnect()
             del _active_connections[phone]
-        return (False, f"Invalid 2FA password: {str(e)}")
+            return (True, None)
+        except Exception as e:
+            logger.error(f"Error verifying 2FA (attempt {attempt + 1}/{max_retries}) for {phone}: {e}")
+            if _is_connection_error(e) and attempt < max_retries - 1:
+                try:
+                    await client.disconnect()
+                except Exception:
+                    pass
+                if phone in _active_connections:
+                    del _active_connections[phone]
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2
+                continue
+            # Any non-connection error is treated as invalid 2FA password
+            if phone in _active_connections:
+                try:
+                    await _active_connections[phone].disconnect()
+                except Exception:
+                    pass
+                del _active_connections[phone]
+            return (False, f"Invalid 2FA password: {str(e)}")
+    
+    return (False, "2FA verification failed after multiple connection attempts. Please try again.")
 
 
 async def get_chats(phone: str) -> Tuple[bool, Optional[List[Dict]], Optional[str]]:
@@ -368,7 +448,14 @@ async def get_chats(phone: str) -> Tuple[bool, Optional[List[Dict]], Optional[st
             # Check if session file exists
             session_path = get_session_path(phone)
             if os.path.exists(session_path):
-                return (False, None, "Session file exists but account is not authorized. Please reconnect the account.")
+                # Session exists but is not authorized – most likely stale/bитая сессия после перезапуска/смены API.
+                # Автоматически удаляем файл, чтобы не заставлять пользователя разбираться вручную.
+                try:
+                    os.remove(session_path)
+                    logger.warning(f"Session file existed but was not authorized for {phone}. Deleted session file to force clean reconnect.")
+                except Exception as rm_err:
+                    logger.error(f"Failed to delete unauthorized session file {session_path} for {phone}: {rm_err}")
+                return (False, None, "Session file existed but account was not authorized. Session has been reset, please reconnect the account.")
             else:
                 return (False, None, "Account not authorized. Please connect first.")
         
@@ -518,7 +605,12 @@ async def send_test_message(phone: str, chat_id: str, message: str = "Тесто
             await client.disconnect()
             session_path = get_session_path(phone)
             if os.path.exists(session_path):
-                return (False, "Session file exists but account is not authorized. Please reconnect the account.", None)
+                try:
+                    os.remove(session_path)
+                    logger.warning(f"Session file existed but was not authorized for {phone} (send_test_message). Deleted session file to force clean reconnect.")
+                except Exception as rm_err:
+                    logger.error(f"Failed to delete unauthorized session file {session_path} for {phone} (send_test_message): {rm_err}")
+                return (False, "Session file existed but account was not authorized. Session has been reset, please reconnect the account.", None)
             else:
                 return (False, "Account not authorized. Please connect first.", None)
         
@@ -640,7 +732,12 @@ async def send_object_message(phone: str, chat_id: str, message_text: str, photo
             await client.disconnect()
             session_path = get_session_path(phone)
             if os.path.exists(session_path):
-                return (False, "Session file exists but account is not authorized. Please reconnect the account.", None)
+                try:
+                    os.remove(session_path)
+                    logger.warning(f"Session file existed but was not authorized for {phone} (send_object_message). Deleted session file to force clean reconnect.")
+                except Exception as rm_err:
+                    logger.error(f"Failed to delete unauthorized session file {session_path} for {phone} (send_object_message): {rm_err}")
+                return (False, "Session file existed but account was not authorized. Session has been reset, please reconnect the account.", None)
             else:
                 return (False, "Account not authorized. Please connect first.", None)
         
