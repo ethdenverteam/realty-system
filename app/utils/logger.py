@@ -176,6 +176,20 @@ def setup_logging():
     celery_logger.setLevel(logging.DEBUG)
     celery_logger.propagate = True
     
+    # Telethon logger (for user account connections)
+    telethon_logger = logging.getLogger('telethon')
+    telethon_logs_file = os.path.join(Config.LOG_FOLDER, 'test_telethon.log')
+    telethon_file_handler = logging.FileHandler(
+        telethon_logs_file,
+        mode='a',
+        encoding='utf-8'
+    )
+    telethon_file_handler.setLevel(logging.DEBUG)
+    telethon_file_handler.setFormatter(detailed_formatter)
+    telethon_logger.addHandler(telethon_file_handler)
+    telethon_logger.setLevel(logging.DEBUG)
+    telethon_logger.propagate = True  # Also propagate to root for test_app.log
+    
     # Database handler for errors
     db_handler = DatabaseLogHandler()
     db_handler.setLevel(logging.ERROR)
@@ -194,6 +208,7 @@ def setup_logging():
     logging.getLogger('sqlalchemy').setLevel(logging.WARNING)  # General SQLAlchemy (warnings only)
     logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)  # SQL queries go to test_database.log
     logging.getLogger('telegram').setLevel(logging.INFO)  # Changed to INFO for bot details
+    logging.getLogger('telethon').setLevel(logging.DEBUG)  # DEBUG level for Telethon (user accounts)
     logging.getLogger('httpx').setLevel(logging.INFO)
     logging.getLogger('asyncio').setLevel(logging.WARNING)
     

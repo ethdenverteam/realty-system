@@ -58,6 +58,9 @@ def connect_start(current_user):
     # Use normalized phone for further processing
     phone = phone_normalized
     
+    # Log phone number for debugging (especially for international numbers like +56)
+    logger.info(f"Processing phone number connection request: original='{data.get('phone', '')}', normalized='{phone}', country_code='{phone[:3] if len(phone) >= 3 else 'unknown'}'")
+    
     # Check if account already exists
     existing = TelegramAccount.query.filter_by(phone=phone).first()
     if existing:

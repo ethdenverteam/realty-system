@@ -59,6 +59,7 @@ if [ -d "logs" ]; then
     > logs/test_celery.log 2>/dev/null || true
     > logs/test_bot.log 2>/dev/null || true
     > logs/test_bot_errors.log 2>/dev/null || true
+    > logs/test_telethon.log 2>/dev/null || true
     echo "✅ Test logs cleared (fresh start for AI analysis)"
 fi
 

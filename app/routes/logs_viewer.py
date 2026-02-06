@@ -223,7 +223,8 @@ def download_log_file(log_type):
         'test_api': 'test_api.log',
         'test_celery': 'test_celery.log',
         'test_bot': 'test_bot.log',
-        'test_bot_errors': 'test_bot_errors.log'
+        'test_bot_errors': 'test_bot_errors.log',
+        'test_telethon': 'test_telethon.log'
     }
     
     # Production logs (full history)
@@ -289,7 +290,8 @@ def download_test_logs():
             'test_api.log': os.path.join(Config.LOG_FOLDER, 'test_api.log'),
             'test_celery.log': os.path.join(Config.LOG_FOLDER, 'test_celery.log'),
             'test_bot.log': os.path.join(Config.LOG_FOLDER, 'test_bot.log'),
-            'test_bot_errors.log': os.path.join(Config.LOG_FOLDER, 'test_bot_errors.log')
+            'test_bot_errors.log': os.path.join(Config.LOG_FOLDER, 'test_bot_errors.log'),
+            'test_telethon.log': os.path.join(Config.LOG_FOLDER, 'test_telethon.log')
         }
         
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:

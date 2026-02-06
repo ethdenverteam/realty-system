@@ -16,7 +16,7 @@ LOCAL_LOGS_DIR = Path(__file__).parent / "logs_server"
 # Типы ТЕСТОВЫХ логов для скачивания (короткие, свежие логи для AI)
 TEST_LOG_TYPES = [
     'test_app', 'test_errors', 'test_database', 'test_api', 
-    'test_celery', 'test_bot', 'test_bot_errors'
+    'test_celery', 'test_bot', 'test_bot_errors', 'test_telethon'
 ]
 TEST_LOG_FILENAMES = {
     'test_app': 'test_app.log',
@@ -25,7 +25,8 @@ TEST_LOG_FILENAMES = {
     'test_api': 'test_api.log',
     'test_celery': 'test_celery.log',
     'test_bot': 'test_bot.log',
-    'test_bot_errors': 'test_bot_errors.log'
+    'test_bot_errors': 'test_bot_errors.log',
+    'test_telethon': 'test_telethon.log'
 }
 
 
