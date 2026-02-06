@@ -261,7 +261,6 @@ export default function Chats(): JSX.Element {
                     onChange={(e) => {
                       setSearch(e.target.value)
                     }}
-                    disabled={loading}
                   />
                 </div>
               )}
