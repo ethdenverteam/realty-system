@@ -129,6 +129,7 @@ def create_or_update_autopublish_config(current_user):
     data = request.get_json() or {}
     object_id = data.get('object_id')
     bot_enabled = bool(data.get('bot_enabled', True))
+    accounts_config = data.get('accounts_config_json') or data.get('accounts_config')
 
     if not object_id:
         return jsonify({'error': 'object_id is required'}), 400
@@ -150,8 +151,16 @@ def create_or_update_autopublish_config(current_user):
         db.session.add(cfg)
 
     cfg.bot_enabled = bot_enabled
-    # На этом этапе аккаунты пользователей не конфигурируем (расширение позже)
-    cfg.enabled = bool(bot_enabled)
+    # Сохраняем настройки аккаунтов, если переданы
+    if isinstance(accounts_config, dict):
+        cfg.accounts_config_json = accounts_config
+    elif accounts_config is None:
+        # Не затираем существующие настройки, если ключ не передан
+        pass
+
+    # Включено, если включен бот или есть конфигурация аккаунтов
+    has_accounts = bool(getattr(cfg, 'accounts_config_json', None))
+    cfg.enabled = bool(bot_enabled or has_accounts)
 
     try:
         db.session.commit()
@@ -165,7 +174,7 @@ def create_or_update_autopublish_config(current_user):
 @user_routes_bp.route('/dashboard/autopublish/<string:object_id>', methods=['PUT'])
 @jwt_required
 def update_autopublish_config(object_id, current_user):
-    """Update existing autopublish config (enable/disable, bot_enabled)"""
+    """Update existing autopublish config (enable/disable, bot_enabled, accounts)"""
     cfg = AutopublishConfig.query.filter_by(
         user_id=current_user.user_id,
         object_id=object_id
@@ -180,8 +189,15 @@ def update_autopublish_config(object_id, current_user):
         cfg.enabled = bool(data['enabled'])
     if 'bot_enabled' in data:
         cfg.bot_enabled = bool(data['bot_enabled'])
-        if cfg.bot_enabled:
-            cfg.enabled = True
+    if 'accounts_config_json' in data or 'accounts_config' in data:
+        accounts_config = data.get('accounts_config_json') or data.get('accounts_config')
+        if isinstance(accounts_config, dict):
+            cfg.accounts_config_json = accounts_config
+
+    # Пересчёт enabled: включено, если включен бот или есть аккаунты
+    has_accounts = bool(getattr(cfg, 'accounts_config_json', None))
+    if 'enabled' not in data:
+        cfg.enabled = bool(cfg.bot_enabled or has_accounts)
 
     try:
         db.session.commit()

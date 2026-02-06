@@ -50,3 +50,44 @@
   cursor: pointer;
 }
 
+.autopublish-accounts-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.autopublish-account-block {
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.autopublish-account-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-weight: 500;
+}
+
+.autopublish-account-chats {
+  margin-top: var(--spacing-sm);
+  padding-left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.autopublish-chats-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.autopublish-chat-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+}
+

@@ -3,7 +3,7 @@ Celery tasks for background processing
 """
 from workers.celery_app import celery_app
 from bot.database import get_db
-from bot.models import PublicationQueue, Object, Chat, PublicationHistory, AutopublishConfig
+from bot.models import PublicationQueue, Object, Chat, PublicationHistory, AutopublishConfig, TelegramAccount
 from datetime import datetime, timedelta
 import logging
 
@@ -234,8 +234,46 @@ def schedule_daily_autopublish():
                     db.add(queue)
                     created_queues += 1
 
-            # Зона расширения: автопубликация через аккаунты пользователей
-            # (accounts_config_json). Пока не реализована.
+            # Автопубликация через аккаунты пользователей (accounts_config_json)
+            accounts_cfg = getattr(cfg, 'accounts_config_json', None) or {}
+            accounts_list = accounts_cfg.get('accounts') if isinstance(accounts_cfg, dict) else None
+
+            if accounts_list and isinstance(accounts_list, list):
+                for acc_entry in accounts_list:
+                    try:
+                        account_id = int(acc_entry.get('account_id'))
+                    except Exception:
+                        continue
+                    chat_ids = acc_entry.get('chat_ids') or []
+                    if not chat_ids:
+                        continue
+
+                    # Проверяем, что аккаунт существует и активен
+                    account = db.query(TelegramAccount).get(account_id)
+                    if not account or not account.is_active:
+                        continue
+
+                    # Ограничиваемся чатами этого аккаунта
+                    user_chats = db.query(Chat).filter(
+                        Chat.owner_type == 'user',
+                        Chat.owner_account_id == account_id,
+                        Chat.chat_id.in_(chat_ids),
+                        Chat.is_active == True,
+                    ).all()
+
+                    for chat in user_chats:
+                        queue = PublicationQueue(
+                            object_id=obj.object_id,
+                            chat_id=chat.chat_id,
+                            account_id=account_id,
+                            user_id=obj.user_id,
+                            type='user',
+                            mode='autopublish',
+                            status='pending',
+                            created_at=datetime.utcnow(),
+                        )
+                        db.add(queue)
+                        created_queues += 1
 
         db.commit()
         logger.info(f"schedule_daily_autopublish: created {created_queues} queue items")

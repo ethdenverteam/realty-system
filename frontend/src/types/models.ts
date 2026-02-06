@@ -183,13 +183,22 @@ export interface ObjectsListResponse {
 }
 
 // Autopublish types
+export interface AutopublishAccountConfig {
+  account_id: number;
+  chat_ids: (number | string)[];
+}
+
+export interface AutopublishAccountsConfig {
+  accounts: AutopublishAccountConfig[];
+}
+
 export interface AutopublishConfigDto {
   config_id: number;
   user_id: number;
   object_id: string;
   enabled: boolean;
   bot_enabled: boolean;
-  accounts_config_json?: Record<string, unknown> | null;
+  accounts_config_json?: AutopublishAccountsConfig | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
