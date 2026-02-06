@@ -23,6 +23,7 @@ import UserViewObject from './pages/user/ViewObject'
 import Autopublish from './pages/user/Autopublish'
 import Chats from './pages/user/Chats'
 import TelegramAccounts from './pages/user/TelegramAccounts'
+import ConnectTelegramAccount from './pages/user/ConnectTelegramAccount'
 import './App.css'
 
 export default function App(): JSX.Element {
@@ -194,6 +195,14 @@ export default function App(): JSX.Element {
               element={
                 <ProtectedRoute>
                   <TelegramAccounts />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user/dashboard/telegram-accounts/connect"
+              element={
+                <ProtectedRoute>
+                  <ConnectTelegramAccount />
                 </ProtectedRoute>
               }
             />

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { GlassCard } from '../../components/GlassCard'
 import api from '../../utils/api'
@@ -26,22 +27,12 @@ interface TelegramChat {
   members_count: number
 }
 
-type ConnectStep = 'phone' | 'code' | '2fa' | null
-
 export default function TelegramAccounts(): JSX.Element {
+  const navigate = useNavigate()
   const [accounts, setAccounts] = useState<TelegramAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  
-  // Connection modal state
-  const [showConnectModal, setShowConnectModal] = useState(false)
-  const [connectStep, setConnectStep] = useState<ConnectStep>(null)
-  const [connectPhone, setConnectPhone] = useState('')
-  const [connectCode, setConnectCode] = useState('')
-  const [connect2FA, setConnect2FA] = useState('')
-  const [connectCodeHash, setConnectCodeHash] = useState('')
-  const [connectLoading, setConnectLoading] = useState(false)
   
   // Chats state
   const [loadingChats, setLoadingChats] = useState<number | null>(null)
@@ -73,137 +64,6 @@ export default function TelegramAccounts(): JSX.Element {
     }
   }
 
-  const startConnection = async (): Promise<void> => {
-    if (!connectPhone.trim()) {
-      setError('Введите номер телефона')
-      return
-    }
-    
-    // Validate phone format
-    if (!connectPhone.startsWith('+')) {
-      setError('Номер должен начинаться с + (например, +79991234567)')
-      return
-    }
-
-    try {
-      setConnectLoading(true)
-      setError('')
-      const res = await api.post<{ success: boolean; code_hash?: string; account_id?: number; message?: string }>('/accounts/connect/start', {
-        phone: connectPhone.trim()
-      })
-      
-      if (res.data.success) {
-        if (res.data.account_id) {
-          // Already connected
-          setSuccess('Аккаунт уже подключен')
-          setShowConnectModal(false)
-          void loadAccounts()
-        } else if (res.data.code_hash) {
-          // Code sent
-          setConnectCodeHash(res.data.code_hash)
-          setConnectStep('code')
-          setSuccess('Код подтверждения отправлен в Telegram')
-        }
-      }
-    } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        setError(err.response?.data?.error || 'Ошибка подключения')
-      } else {
-        setError('Ошибка подключения')
-      }
-    } finally {
-      setConnectLoading(false)
-    }
-  }
-
-  const verifyCode = async (): Promise<void> => {
-    if (!connectCode.trim()) {
-      setError('Введите код подтверждения')
-      return
-    }
-
-    try {
-      setConnectLoading(true)
-      setError('')
-      const res = await api.post<{ success: boolean; requires_2fa?: boolean; account_id?: number; message?: string }>('/accounts/connect/verify-code', {
-        phone: connectPhone,
-        code: connectCode.trim(),
-        code_hash: connectCodeHash
-      })
-      
-      if (res.data.success) {
-        if (res.data.requires_2fa) {
-          setConnectStep('2fa')
-          setSuccess('Введите пароль 2FA')
-        } else {
-          setSuccess('Аккаунт успешно подключен')
-          setShowConnectModal(false)
-          resetConnectForm()
-          void loadAccounts()
-        }
-      }
-    } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        setError(err.response?.data?.error || 'Ошибка проверки кода')
-      } else {
-        setError('Ошибка проверки кода')
-      }
-    } finally {
-      setConnectLoading(false)
-    }
-  }
-
-  const verify2FA = async (): Promise<void> => {
-    if (!connect2FA.trim()) {
-      setError('Введите пароль 2FA')
-      return
-    }
-
-    try {
-      setConnectLoading(true)
-      setError('')
-      const res = await api.post<{ success: boolean; account_id?: number; message?: string }>('/accounts/connect/verify-2fa', {
-        phone: connectPhone,
-        password: connect2FA.trim()
-      })
-      
-      if (res.data.success) {
-        setSuccess('Аккаунт успешно подключен')
-        setShowConnectModal(false)
-        resetConnectForm()
-        void loadAccounts()
-      }
-    } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        setError(err.response?.data?.error || 'Ошибка проверки 2FA')
-      } else {
-        setError('Ошибка проверки 2FA')
-      }
-    } finally {
-      setConnectLoading(false)
-    }
-  }
-
-  const resetConnectForm = (): void => {
-    setConnectStep(null)
-    setConnectPhone('')
-    setConnectCode('')
-    setConnect2FA('')
-    setConnectCodeHash('')
-    setError('')
-    setSuccess('')
-  }
-
-  const openConnectModal = (): void => {
-    setShowConnectModal(true)
-    setConnectStep('phone')
-    resetConnectForm()
-  }
-
-  const closeConnectModal = (): void => {
-    setShowConnectModal(false)
-    resetConnectForm()
-  }
 
   const loadAccountChats = async (accountId: number): Promise<void> => {
     try {
@@ -288,7 +148,7 @@ export default function TelegramAccounts(): JSX.Element {
 
         <div className="accounts-header">
           <h2>Telegram аккаунты</h2>
-          <button className="btn btn-primary" onClick={openConnectModal}>
+          <button className="btn btn-primary" onClick={() => navigate('/user/dashboard/telegram-accounts/connect')}>
             + Подключить аккаунт
           </button>
         </div>
@@ -298,7 +158,7 @@ export default function TelegramAccounts(): JSX.Element {
         ) : accounts.length === 0 ? (
           <GlassCard className="empty-state">
             <p>Нет подключенных аккаунтов</p>
-            <button className="btn btn-primary" onClick={openConnectModal}>
+            <button className="btn btn-primary" onClick={() => navigate('/user/dashboard/telegram-accounts/connect')}>
               Подключить первый аккаунт
             </button>
           </GlassCard>
@@ -381,105 +241,6 @@ export default function TelegramAccounts(): JSX.Element {
                 </div>
               </GlassCard>
             ))}
-          </div>
-        )}
-
-        {/* Connect Modal */}
-        {showConnectModal && (
-          <div className="modal-overlay" onClick={closeConnectModal}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3>Подключение Telegram аккаунта</h3>
-                <button className="modal-close" onClick={closeConnectModal}>×</button>
-              </div>
-              
-              <div className="modal-body">
-                {connectStep === 'phone' && (
-                  <div className="connect-step">
-                    <label>
-                      Номер телефона (формат: +79991234567)
-                      <input
-                        type="tel"
-                        value={connectPhone}
-                        onChange={(e) => setConnectPhone(e.target.value)}
-                        placeholder="+79991234567"
-                        disabled={connectLoading}
-                      />
-                    </label>
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => void startConnection()}
-                      disabled={connectLoading}
-                    >
-                      {connectLoading ? 'Отправка...' : 'Отправить код'}
-                    </button>
-                  </div>
-                )}
-                
-                {connectStep === 'code' && (
-                  <div className="connect-step">
-                    <label>
-                      Код подтверждения из Telegram
-                      <input
-                        type="text"
-                        value={connectCode}
-                        onChange={(e) => setConnectCode(e.target.value)}
-                        placeholder="12345"
-                        maxLength={6}
-                        disabled={connectLoading}
-                      />
-                    </label>
-                    <div className="modal-actions">
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => setConnectStep('phone')}
-                        disabled={connectLoading}
-                      >
-                        Назад
-                      </button>
-                      <button
-                        className="btn btn-primary"
-                        onClick={() => void verifyCode()}
-                        disabled={connectLoading}
-                      >
-                        {connectLoading ? 'Проверка...' : 'Подтвердить'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                {connectStep === '2fa' && (
-                  <div className="connect-step">
-                    <label>
-                      Пароль 2FA
-                      <input
-                        type="password"
-                        value={connect2FA}
-                        onChange={(e) => setConnect2FA(e.target.value)}
-                        placeholder="Пароль 2FA"
-                        disabled={connectLoading}
-                      />
-                    </label>
-                    <div className="modal-actions">
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => setConnectStep('code')}
-                        disabled={connectLoading}
-                      >
-                        Назад
-                      </button>
-                      <button
-                        className="btn btn-primary"
-                        onClick={() => void verify2FA()}
-                        disabled={connectLoading}
-                      >
-                        {connectLoading ? 'Проверка...' : 'Подтвердить'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         )}
 

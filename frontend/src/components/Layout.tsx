@@ -264,6 +264,22 @@ export default function Layout({
               </svg>
               <span>Создать</span>
             </Link>
+            <Link
+              to="/user/dashboard/telegram-accounts"
+              className={`top-nav-item ${location.pathname.includes('/telegram-accounts') ? 'active' : ''}`}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M10 2C8.89543 2 8 2.89543 8 4C8 5.10457 8.89543 6 10 6C11.1046 6 12 5.10457 12 4C12 2.89543 11.1046 2 10 2Z"
+                  fill="currentColor"
+                />
+                <path
+                  d="M5 16C5 13.7909 7.23858 12 10 12C12.7614 12 15 13.7909 15 16V18H5V16Z"
+                  fill="currentColor"
+                />
+              </svg>
+              <span>Telegram</span>
+            </Link>
             {user?.web_role === 'admin' && (
               <Link to="/admin/dashboard" className="top-nav-item">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">

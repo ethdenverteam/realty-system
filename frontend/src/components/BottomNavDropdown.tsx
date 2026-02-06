@@ -167,16 +167,24 @@ export function createNavigationOptions(): DropdownOption[] {
       ),
     },
     {
-      label: 'Тг аккаунт',
+      label: 'Telegram аккаунты',
       value: '/user/dashboard/telegram-accounts',
       icon: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <path
-            d="M10 10C12.7614 10 15 7.76142 15 5C15 2.23858 12.7614 0 10 0C7.23858 0 5 2.23858 5 5C5 7.76142 7.23858 10 10 10Z"
+            d="M10 2C8.89543 2 8 2.89543 8 4C8 5.10457 8.89543 6 10 6C11.1046 6 12 5.10457 12 4C12 2.89543 11.1046 2 10 2Z"
             fill="currentColor"
           />
           <path
-            d="M10 12C5.58172 12 2 14.2386 2 17V20H18V17C18 14.2386 14.4183 12 10 12Z"
+            d="M5 16C5 13.7909 7.23858 12 10 12C12.7614 12 15 13.7909 15 16V18H5V16Z"
+            fill="currentColor"
+          />
+          <path
+            d="M16 8C16 9.10457 16.8954 10 18 10C19.1046 10 20 9.10457 20 8C20 6.89543 19.1046 6 18 6C16.8954 6 16 6.89543 16 8Z"
+            fill="currentColor"
+          />
+          <path
+            d="M13 14C13 12.3431 15.2386 11 18 11C20.7614 11 23 12.3431 23 14V16H13V14Z"
             fill="currentColor"
           />
         </svg>
