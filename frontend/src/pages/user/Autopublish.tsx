@@ -22,6 +22,19 @@ interface TelegramAccount {
   last_error?: string
 }
 
+interface ObjectChat {
+  chat_id: number
+  title: string
+  telegram_chat_id: string
+  account_id?: number
+  account_phone?: string
+}
+
+interface ObjectChatsResponse {
+  bot_chats: ObjectChat[]
+  user_chats: ObjectChat[]
+}
+
 export default function Autopublish(): JSX.Element {
   const [items, setItems] = useState<AutopublishItem[]>([])
   const [availableObjects, setAvailableObjects] = useState<RealtyObjectListItem[]>([])
@@ -34,7 +47,7 @@ export default function Autopublish(): JSX.Element {
   const [editingObjectId, setEditingObjectId] = useState<string | null>(null)
   const [editingConfig, setEditingConfig] = useState<AutopublishAccountsConfig | null>(null)
   const [loadingChatsForAccount, setLoadingChatsForAccount] = useState<number | null>(null)
-  const [objectChats, setObjectChats] = useState<Record<string, { bot_chats: Array<{ chat_id: number; title: string; telegram_chat_id: string }>; user_chats: Array<{ chat_id: number; title: string; telegram_chat_id: string; account_id?: number; account_phone?: string }> }>>({})
+  const [objectChats, setObjectChats] = useState<Record<string, ObjectChatsResponse>>({})
   const [loadingChatsForObject, setLoadingChatsForObject] = useState<string | null>(null)
 
   useEffect(() => {
@@ -238,7 +251,7 @@ export default function Autopublish(): JSX.Element {
   const loadChatsForObject = async (objectId: string): Promise<void> => {
     try {
       setLoadingChatsForObject(objectId)
-      const res = await api.get<{ bot_chats: Array<{ chat_id: number; title: string; telegram_chat_id: string }>; user_chats: Array<{ chat_id: number; title: string; telegram_chat_id: string; account_id?: number; account_phone?: string }> }>>(`/user/dashboard/autopublish/${objectId}/chats`)
+      const res = await api.get<ObjectChatsResponse>(`/user/dashboard/autopublish/${objectId}/chats`)
       setObjectChats((prev) => ({ ...prev, [objectId]: res.data }))
     } catch (err: unknown) {
       if (axios.isAxiosError<ApiErrorResponse>(err)) {
