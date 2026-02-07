@@ -14,6 +14,14 @@ import type {
 } from '../../types/models'
 import './Autopublish.css'
 
+interface TelegramAccount {
+  account_id: number
+  phone: string
+  is_active: boolean
+  last_used?: string
+  last_error?: string
+}
+
 export default function Autopublish(): JSX.Element {
   const [items, setItems] = useState<AutopublishItem[]>([])
   const [availableObjects, setAvailableObjects] = useState<RealtyObjectListItem[]>([])
@@ -26,6 +34,8 @@ export default function Autopublish(): JSX.Element {
   const [editingObjectId, setEditingObjectId] = useState<string | null>(null)
   const [editingConfig, setEditingConfig] = useState<AutopublishAccountsConfig | null>(null)
   const [loadingChatsForAccount, setLoadingChatsForAccount] = useState<number | null>(null)
+  const [objectChats, setObjectChats] = useState<Record<string, { bot_chats: Array<{ chat_id: number; title: string; telegram_chat_id: string }>; user_chats: Array<{ chat_id: number; title: string; telegram_chat_id: string; account_id?: number; account_phone?: string }> }>>({})
+  const [loadingChatsForObject, setLoadingChatsForObject] = useState<string | null>(null)
 
   useEffect(() => {
     void loadData()
@@ -225,6 +235,48 @@ export default function Autopublish(): JSX.Element {
     }
   }
 
+  const loadChatsForObject = async (objectId: string): Promise<void> => {
+    try {
+      setLoadingChatsForObject(objectId)
+      const res = await api.get<{ bot_chats: Array<{ chat_id: number; title: string; telegram_chat_id: string }>; user_chats: Array<{ chat_id: number; title: string; telegram_chat_id: string; account_id?: number; account_phone?: string }> }>>(`/user/dashboard/autopublish/${objectId}/chats`)
+      setObjectChats((prev) => ({ ...prev, [objectId]: res.data }))
+    } catch (err: unknown) {
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+        console.error('Error loading chats:', err.response?.data || err.message)
+      } else {
+        console.error('Error loading chats:', err)
+      }
+    } finally {
+      setLoadingChatsForObject(null)
+    }
+  }
+
+  const handleToggleBotEnabled = async (objectId: string, currentValue: boolean): Promise<void> => {
+    try {
+      setSaving(true)
+      setError('')
+      const res = await api.put<{ success: boolean }>(`/user/dashboard/autopublish/${objectId}`, {
+        bot_enabled: !currentValue,
+      })
+      if (res.data.success) {
+        await loadData()
+        // Reload chats if they were loaded
+        if (objectChats[objectId]) {
+          await loadChatsForObject(objectId)
+        }
+      }
+    } catch (err: unknown) {
+      setError('Ошибка изменения настройки автопубликации')
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+        console.error(err.response?.data || err.message)
+      } else {
+        console.error(err)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <Layout title="Автопубликация">
       <div className="autopublish-page">
@@ -275,9 +327,15 @@ export default function Autopublish(): JSX.Element {
                       <span className={`badge ${cfg.enabled ? 'badge-success' : 'badge-secondary'}`}>
                         {cfg.enabled ? 'Включено' : 'Выключено'}
                       </span>
-                      <span className="badge badge-secondary">
-                        Бот: {cfg.bot_enabled ? 'да (по фильтрам чатов)' : 'нет'}
-                      </span>
+                      <button
+                        className={`badge ${cfg.bot_enabled ? 'badge-primary' : 'badge-secondary'}`}
+                        onClick={() => void handleToggleBotEnabled(obj.object_id as string, cfg.bot_enabled)}
+                        disabled={saving}
+                        style={{ cursor: 'pointer', border: 'none', padding: '4px 8px' }}
+                        title={cfg.bot_enabled ? 'Отключить автопубликацию через бота' : 'Включить автопубликацию через бота'}
+                      >
+                        Бот: {cfg.bot_enabled ? 'да' : 'нет'}
+                      </button>
                       {totalAccounts > 0 && (
                         <span className="badge badge-secondary">
                           Аккаунты: {totalAccounts}, чатов: {totalChats}
@@ -306,7 +364,49 @@ export default function Autopublish(): JSX.Element {
                       >
                         Аккаунты и чаты
                       </button>
+                      <button
+                        className="btn btn-small btn-secondary"
+                        type="button"
+                        onClick={() => {
+                          if (!objectChats[obj.object_id as string]) {
+                            void loadChatsForObject(obj.object_id as string)
+                          }
+                        }}
+                        disabled={loadingChatsForObject === obj.object_id}
+                      >
+                        {loadingChatsForObject === obj.object_id ? 'Загрузка...' : 'Список чатов'}
+                      </button>
                     </div>
+                    {objectChats[obj.object_id as string] && (
+                      <div className="autopublish-chats-preview">
+                        <div className="chats-preview-section">
+                          <strong>Админские чаты (бот):</strong>
+                          {objectChats[obj.object_id as string].bot_chats.length > 0 ? (
+                            <ul className="chats-list">
+                              {objectChats[obj.object_id as string].bot_chats.map((chat) => (
+                                <li key={chat.chat_id}>{chat.title}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div className="text-muted">Нет подходящих чатов</div>
+                          )}
+                        </div>
+                        <div className="chats-preview-section">
+                          <strong>Пользовательские чаты:</strong>
+                          {objectChats[obj.object_id as string].user_chats.length > 0 ? (
+                            <ul className="chats-list">
+                              {objectChats[obj.object_id as string].user_chats.map((chat) => (
+                                <li key={chat.chat_id}>
+                                  {chat.title} {chat.account_phone && `(${chat.account_phone})`}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div className="text-muted">Нет выбранных чатов</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               })}

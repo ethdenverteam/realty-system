@@ -1711,3 +1711,78 @@ def admin_publish_object_to_chat(chat_id, current_user):
         log_error(e, 'admin_publish_object_failed', current_user.user_id, {'chat_id': chat_id, 'object_id': object_id})
         return jsonify({'error': str(e)}), 500
 
+
+@admin_routes_bp.route('/dashboard/publication-queues', methods=['GET'])
+@jwt_required
+@role_required('admin')
+def admin_publication_queues_data(current_user):
+    """Get publication queues data"""
+    from app.models.publication_queue import PublicationQueue
+    from app.models.object import Object
+    from app.models.chat import Chat
+    from app.models.telegram_account import TelegramAccount
+    
+    queue_type = request.args.get('type', 'all')  # 'bot', 'user', 'all'
+    status = request.args.get('status', 'all')  # 'pending', 'processing', 'completed', 'failed', 'all'
+    limit = request.args.get('limit', 100, type=int)
+    offset = request.args.get('offset', 0, type=int)
+    
+    try:
+        query = PublicationQueue.query
+        
+        # Filter by type
+        if queue_type == 'bot':
+            query = query.filter_by(type='bot')
+        elif queue_type == 'user':
+            query = query.filter_by(type='user')
+        
+        # Filter by status
+        if status != 'all':
+            query = query.filter_by(status=status)
+        
+        # Order by created_at desc
+        query = query.order_by(desc(PublicationQueue.created_at))
+        
+        # Get total count
+        total = query.count()
+        
+        # Get paginated results
+        queues = query.offset(offset).limit(limit).all()
+        
+        # Get related data
+        queue_data = []
+        for queue in queues:
+            obj = Object.query.get(queue.object_id)
+            chat = Chat.query.get(queue.chat_id)
+            account = TelegramAccount.query.get(queue.account_id) if queue.account_id else None
+            
+            queue_dict = queue.to_dict()
+            queue_dict['object'] = {
+                'object_id': obj.object_id if obj else None,
+                'rooms_type': obj.rooms_type if obj else None,
+                'price': obj.price if obj else None,
+                'status': obj.status if obj else None,
+            } if obj else None
+            queue_dict['chat'] = {
+                'chat_id': chat.chat_id if chat else None,
+                'title': chat.title if chat else None,
+                'telegram_chat_id': chat.telegram_chat_id if chat else None,
+            } if chat else None
+            queue_dict['account'] = {
+                'account_id': account.account_id if account else None,
+                'phone': account.phone if account else None,
+            } if account else None
+            
+            queue_data.append(queue_dict)
+        
+        return jsonify({
+            'success': True,
+            'queues': queue_data,
+            'total': total,
+            'offset': offset,
+            'limit': limit
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting publication queues: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500

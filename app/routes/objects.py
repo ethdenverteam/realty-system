@@ -461,20 +461,29 @@ def publish_object_via_account(current_user):
         publication_text = format_publication_text(bot_obj, bot_user, is_preview=False)
         
         # Send message via telethon
-        success, error_msg, message_id = run_async(
-            send_object_message(
-                account.phone,
-                chat.telegram_chat_id,
-                publication_text,
-                obj.photos_json or []
+        logger.info(f"Attempting to publish object {object_id} via account {account_id} to chat {chat_id} (telegram_chat_id: {chat.telegram_chat_id})")
+        try:
+            success, error_msg, message_id = run_async(
+                send_object_message(
+                    account.phone,
+                    chat.telegram_chat_id,
+                    publication_text,
+                    obj.photos_json or []
+                )
             )
-        )
+        except Exception as send_error:
+            logger.error(f"Exception in run_async(send_object_message): {send_error}", exc_info=True)
+            account.last_error = str(send_error)
+            account.last_used = datetime.utcnow()
+            db.session.commit()
+            return jsonify({'error': f'Ошибка при отправке сообщения: {str(send_error)}'}), 500
         
         if not success:
+            logger.error(f"Failed to publish object {object_id} via account {account_id}: {error_msg}")
             account.last_error = error_msg
             account.last_used = datetime.utcnow()
             db.session.commit()
-            return jsonify({'error': error_msg}), 500
+            return jsonify({'error': error_msg or 'Ошибка публикации объекта'}), 500
         
         # Update chat statistics
         chat.total_publications = (chat.total_publications or 0) + 1

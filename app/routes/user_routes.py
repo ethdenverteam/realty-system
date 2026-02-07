@@ -122,6 +122,140 @@ def get_autopublish_config(current_user):
     })
 
 
+@user_routes_bp.route('/dashboard/autopublish/<string:object_id>/chats', methods=['GET'])
+@jwt_required
+def get_autopublish_chats_for_object(object_id, current_user):
+    """Get list of chats where object will be published (bot chats and user account chats)"""
+    from app.models.chat import Chat
+    from app.models.telegram_account import TelegramAccount
+    from bot.utils import get_districts_config
+    from bot.models import Chat as BotChat
+    from bot.database import get_db as get_bot_db
+    
+    obj = Object.query.filter_by(object_id=object_id, user_id=current_user.user_id).first()
+    if not obj:
+        return jsonify({'error': 'Object not found'}), 404
+    
+    cfg = AutopublishConfig.query.filter_by(
+        user_id=current_user.user_id,
+        object_id=object_id
+    ).first()
+    
+    result = {
+        'bot_chats': [],
+        'user_chats': []
+    }
+    
+    # Get bot chats that match object filters
+    if cfg and cfg.bot_enabled:
+        rooms_type = obj.rooms_type or ""
+        districts = obj.districts_json or []
+        price = obj.price or 0
+        
+        districts_config = get_districts_config()
+        all_districts = set(districts)
+        for district in districts:
+            if isinstance(district, str) and district in districts_config:
+                parent_districts = districts_config[district]
+                if isinstance(parent_districts, list):
+                    all_districts.update(parent_districts)
+        
+        bot_db = get_bot_db()
+        try:
+            bot_chats = bot_db.query(BotChat).filter_by(owner_type='bot', is_active=True).all()
+            
+            for bot_chat in bot_chats:
+                matches = False
+                
+                # Check filters_json
+                if bot_chat.filters_json:
+                    filters = bot_chat.filters_json
+                    rooms_match = True
+                    districts_match = True
+                    price_match = True
+                    
+                    rooms_types = filters.get('rooms_types', [])
+                    if rooms_types and rooms_type not in rooms_types:
+                        rooms_match = False
+                    
+                    filter_districts = filters.get('districts', [])
+                    if filter_districts:
+                        if not any(d in all_districts for d in filter_districts):
+                            districts_match = False
+                    
+                    price_min = filters.get('price_min')
+                    price_max = filters.get('price_max')
+                    if price_min is not None or price_max is not None:
+                        price_min = price_min or 0
+                        price_max = price_max if price_max is not None else float('inf')
+                        price_match = price_min <= price < price_max
+                    
+                    if rooms_match and districts_match and price_match:
+                        matches = True
+                else:
+                    # Legacy category support
+                    category = bot_chat.category or ""
+                    if category.startswith("rooms_") and category.replace("rooms_", "") == rooms_type:
+                        matches = True
+                    if category.startswith("district_"):
+                        district_name = category.replace("district_", "")
+                        if district_name in all_districts:
+                            matches = True
+                    if category.startswith("price_"):
+                        try:
+                            parts = category.replace("price_", "").split("_")
+                            if len(parts) == 2:
+                                min_price = float(parts[0])
+                                max_price = float(parts[1])
+                                if min_price <= price < max_price:
+                                    matches = True
+                        except:
+                            pass
+                
+                if matches:
+                    web_chat = Chat.query.filter_by(telegram_chat_id=bot_chat.telegram_chat_id, owner_type='bot').first()
+                    if web_chat:
+                        result['bot_chats'].append({
+                            'chat_id': web_chat.chat_id,
+                            'title': web_chat.title,
+                            'telegram_chat_id': web_chat.telegram_chat_id,
+                            'type': 'bot'
+                        })
+        finally:
+            bot_db.close()
+    
+    # Get user account chats from config
+    if cfg and cfg.accounts_config_json:
+        accounts_cfg = cfg.accounts_config_json
+        accounts_list = accounts_cfg.get('accounts') if isinstance(accounts_cfg, dict) else []
+        
+        if isinstance(accounts_list, list):
+            for acc_entry in accounts_list:
+                account_id = acc_entry.get('account_id')
+                chat_ids = acc_entry.get('chat_ids', [])
+                
+                if account_id and chat_ids:
+                    account = TelegramAccount.query.get(account_id)
+                    if account and account.owner_id == current_user.user_id:
+                        chats = Chat.query.filter(
+                            Chat.chat_id.in_(chat_ids),
+                            Chat.owner_type == 'user',
+                            Chat.owner_account_id == account_id
+                        ).all()
+                        
+                        for chat in chats:
+                            result['user_chats'].append({
+                                'chat_id': chat.chat_id,
+                                'title': chat.title,
+                                'telegram_chat_id': chat.telegram_chat_id,
+                                'type': 'user',
+                                'account_id': account_id,
+                                'account_phone': account.phone
+                            })
+    
+    return jsonify(result)
+
+
 @user_routes_bp.route('/dashboard/autopublish', methods=['POST'])
 @jwt_required
 def create_or_update_autopublish_config(current_user):

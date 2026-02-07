@@ -170,6 +170,15 @@ export default function Layout({
               <span>Логи</span>
             </Link>
             <Link
+              to="/admin/dashboard/publication-queues"
+              className={`top-nav-item ${location.pathname.includes('/publication-queues') ? 'active' : ''}`}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M2 4L10 8L18 4M2 12L10 16L18 12M2 8L10 12L18 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Очереди</span>
+            </Link>
+            <Link
               to="/admin/dashboard/database-schema"
               className={`top-nav-item ${location.pathname.includes('/database-schema') ? 'active' : ''}`}
             >
@@ -367,6 +376,15 @@ export default function Layout({
               <path d="M4 8H16M4 12H12" stroke="currentColor" strokeWidth="2" />
             </svg>
             <span>Логи</span>
+          </Link>
+          <Link
+            to="/admin/dashboard/publication-queues"
+            className={`nav-item ${location.pathname.includes('/publication-queues') ? 'active' : ''}`}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M2 4L10 8L18 4M2 12L10 16L18 12M2 8L10 12L18 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>Очереди</span>
           </Link>
           <Link
             to="/admin/dashboard/users"
