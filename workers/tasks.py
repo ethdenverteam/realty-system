@@ -53,33 +53,101 @@ def publish_to_telegram(queue_id: int):
             db.commit()
             return False
         
-        # TODO: Implement actual Telegram publishing
-        # This is a placeholder
-        logger.info(f"Publishing object {obj.object_id} to chat {chat.telegram_chat_id}")
+        # Реализация публикации через Telegram API
+        import requests
+        import os
+        from bot.config import BOT_TOKEN
+        from bot.utils import format_publication_text
+        from bot.models import User as BotUser
         
-        # Simulate success
-        queue.status = 'completed'
-        queue.completed_at = datetime.utcnow()
-        queue.message_id = '12345'  # Placeholder
+        if not BOT_TOKEN:
+            logger.error("BOT_TOKEN is not configured")
+            queue.status = 'failed'
+            queue.error_message = 'BOT_TOKEN is not configured'
+            db.commit()
+            return False
         
-        # Create history entry
-        history = PublicationHistory(
-            queue_id=queue_id,
-            object_id=obj.object_id,
-            chat_id=chat.chat_id,
-            account_id=queue.account_id,
-            published_at=datetime.utcnow(),
-            message_id=queue.message_id
-        )
-        db.add(history)
+        # Получаем пользователя бота для форматирования текста
+        bot_user = None
+        if obj.user_id:
+            bot_user = db.query(BotUser).filter_by(user_id=obj.user_id).first()
         
-        # Update chat stats
-        chat.total_publications += 1
-        chat.last_publication = datetime.utcnow()
+        # Форматируем текст публикации
+        publication_text = format_publication_text(obj, bot_user, is_preview=False)
         
-        db.commit()
+        # Отправляем сообщение
+        url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
+        payload = {
+            'chat_id': chat.telegram_chat_id,
+            'text': publication_text,
+            'parse_mode': 'HTML'
+        }
         
-        return True
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+            response.raise_for_status()
+            result = response.json()
+            
+            if not result.get('ok'):
+                error_description = result.get('description', 'Unknown error')
+                logger.error(f"Failed to publish: {error_description}")
+                queue.status = 'failed'
+                queue.error_message = error_description
+                db.commit()
+                return False
+            
+            message_id = result.get('result', {}).get('message_id')
+            
+            # Успешная публикация
+            queue.status = 'completed'
+            queue.completed_at = datetime.utcnow()
+            queue.message_id = str(message_id) if message_id else None
+            
+            # Создаем запись в истории
+            history = PublicationHistory(
+                queue_id=queue_id,
+                object_id=obj.object_id,
+                chat_id=chat.chat_id,
+                account_id=queue.account_id,
+                published_at=datetime.utcnow(),
+                message_id=queue.message_id
+            )
+            db.add(history)
+            
+            # Обновляем статистику чата
+            chat.total_publications = (chat.total_publications or 0) + 1
+            chat.last_publication = datetime.utcnow()
+            
+            db.commit()
+            
+            # Создаем задачу на следующий день для автопубликации
+            if queue.mode == 'autopublish':
+                tomorrow = datetime.utcnow() + timedelta(days=1)
+                # Создаем новую задачу на следующий день
+                next_queue = PublicationQueue(
+                    object_id=obj.object_id,
+                    chat_id=chat.chat_id,
+                    account_id=queue.account_id,
+                    user_id=queue.user_id,
+                    type=queue.type,
+                    mode='autopublish',
+                    status='pending',
+                    scheduled_time=tomorrow,
+                    created_at=datetime.utcnow(),
+                )
+                db.add(next_queue)
+                db.commit()
+                logger.info(f"Created next day autopublish task for object {obj.object_id} to chat {chat.chat_id}")
+            
+            logger.info(f"Successfully published object {obj.object_id} to chat {chat.telegram_chat_id}")
+            return True
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error sending message to Telegram: {e}")
+            queue.status = 'failed'
+            queue.error_message = str(e)
+            db.commit()
+            return False
         
     except Exception as e:
         logger.error(f"Error publishing to Telegram: {e}")

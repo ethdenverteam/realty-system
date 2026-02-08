@@ -375,9 +375,23 @@ export default function Autopublish(): JSX.Element {
                             type="radio"
                             name={`mode_${obj.object_id}`}
                             checked={publishMode === 'bot'}
-                            onChange={() => {
-                              // Отключаем аккаунты
-                              void saveAccountsConfigForObject(obj.object_id as string, { accounts: [] })
+                            onChange={async () => {
+                              // Отключаем аккаунты - очищаем accounts_config_json
+                              try {
+                                setSaving(true)
+                                await api.put<{ success: boolean }>(`/user/dashboard/autopublish/${obj.object_id}`, {
+                                  accounts_config_json: { accounts: [] },
+                                })
+                                await loadData()
+                              } catch (err: unknown) {
+                                if (axios.isAxiosError<ApiErrorResponse>(err)) {
+                                  setError(err.response?.data?.error || 'Ошибка изменения режима')
+                                } else {
+                                  setError('Ошибка изменения режима')
+                                }
+                              } finally {
+                                setSaving(false)
+                              }
                             }}
                             disabled={saving}
                             className="toggle-radio"

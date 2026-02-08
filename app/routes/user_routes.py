@@ -318,33 +318,66 @@ def create_or_update_autopublish_config(current_user):
         if cfg.enabled:
             from workers.tasks import _get_matching_bot_chats_for_object
             from app.models.chat import Chat as WebChat
-            from app.database import get_db
+            from bot.database import get_db as get_bot_db
+            from bot.models import Object as BotObject, Chat as BotChat
             
             # Создаем очередь для бота (всегда включен)
-            worker_db = get_db()
+            worker_db = get_bot_db()
             try:
-                bot_chats = _get_matching_bot_chats_for_object(worker_db, obj)
-                for chat in bot_chats:
-                    # Проверяем, нет ли уже такой очереди
-                    existing = PublicationQueue.query.filter_by(
-                        object_id=object_id,
-                        chat_id=chat.chat_id,
-                        type='bot',
-                        mode='autopublish',
-                        status='pending'
+                # Получаем или создаем объект в базе бота
+                bot_obj = worker_db.query(BotObject).filter_by(object_id=object_id).first()
+                if not bot_obj:
+                    bot_obj = BotObject(
+                        object_id=obj.object_id,
+                        user_id=None,
+                        rooms_type=obj.rooms_type,
+                        price=obj.price,
+                        districts_json=obj.districts_json,
+                        region=obj.region,
+                        city=obj.city,
+                        photos_json=obj.photos_json,
+                        area=obj.area,
+                        floor=obj.floor,
+                        address=obj.address,
+                        renovation=obj.renovation,
+                        comment=obj.comment,
+                        contact_name=obj.contact_name,
+                        show_username=obj.show_username,
+                        phone_number=obj.phone_number,
+                        status=obj.status,
+                        source='web'
+                    )
+                    worker_db.add(bot_obj)
+                    worker_db.commit()
+                
+                bot_chats = _get_matching_bot_chats_for_object(worker_db, bot_obj)
+                for bot_chat in bot_chats:
+                    # Находим соответствующий чат в веб-базе
+                    web_chat = WebChat.query.filter_by(
+                        telegram_chat_id=bot_chat.telegram_chat_id,
+                        owner_type='bot'
                     ).first()
-                    if not existing:
-                        queue = PublicationQueue(
+                    if web_chat:
+                        # Проверяем, нет ли уже такой очереди
+                        existing = PublicationQueue.query.filter_by(
                             object_id=object_id,
-                            chat_id=chat.chat_id,
-                            account_id=None,
-                            user_id=current_user.user_id,
+                            chat_id=web_chat.chat_id,
                             type='bot',
                             mode='autopublish',
-                            status='pending',
-                            created_at=datetime.utcnow(),
-                        )
-                        db.session.add(queue)
+                            status='pending'
+                        ).first()
+                        if not existing:
+                            queue = PublicationQueue(
+                                object_id=object_id,
+                                chat_id=web_chat.chat_id,
+                                account_id=None,
+                                user_id=current_user.user_id,
+                                type='bot',
+                                mode='autopublish',
+                                status='pending',
+                                created_at=datetime.utcnow(),
+                            )
+                            db.session.add(queue)
             finally:
                 worker_db.close()
             
@@ -442,33 +475,66 @@ def update_autopublish_config(object_id, current_user):
         if obj and cfg.enabled:
             from workers.tasks import _get_matching_bot_chats_for_object
             from app.models.chat import Chat as WebChat
-            from app.database import get_db
+            from bot.database import get_db as get_bot_db
+            from bot.models import Object as BotObject, Chat as BotChat
             
             # Создаем очередь для бота (всегда включен)
-            worker_db = get_db()
+            worker_db = get_bot_db()
             try:
-                bot_chats = _get_matching_bot_chats_for_object(worker_db, obj)
-                for chat in bot_chats:
-                    # Проверяем, нет ли уже такой очереди
-                    existing = PublicationQueue.query.filter_by(
-                        object_id=object_id,
-                        chat_id=chat.chat_id,
-                        type='bot',
-                        mode='autopublish',
-                        status='pending'
+                # Получаем или создаем объект в базе бота
+                bot_obj = worker_db.query(BotObject).filter_by(object_id=object_id).first()
+                if not bot_obj:
+                    bot_obj = BotObject(
+                        object_id=obj.object_id,
+                        user_id=None,
+                        rooms_type=obj.rooms_type,
+                        price=obj.price,
+                        districts_json=obj.districts_json,
+                        region=obj.region,
+                        city=obj.city,
+                        photos_json=obj.photos_json,
+                        area=obj.area,
+                        floor=obj.floor,
+                        address=obj.address,
+                        renovation=obj.renovation,
+                        comment=obj.comment,
+                        contact_name=obj.contact_name,
+                        show_username=obj.show_username,
+                        phone_number=obj.phone_number,
+                        status=obj.status,
+                        source='web'
+                    )
+                    worker_db.add(bot_obj)
+                    worker_db.commit()
+                
+                bot_chats = _get_matching_bot_chats_for_object(worker_db, bot_obj)
+                for bot_chat in bot_chats:
+                    # Находим соответствующий чат в веб-базе
+                    web_chat = WebChat.query.filter_by(
+                        telegram_chat_id=bot_chat.telegram_chat_id,
+                        owner_type='bot'
                     ).first()
-                    if not existing:
-                        queue = PublicationQueue(
+                    if web_chat:
+                        # Проверяем, нет ли уже такой очереди
+                        existing = PublicationQueue.query.filter_by(
                             object_id=object_id,
-                            chat_id=chat.chat_id,
-                            account_id=None,
-                            user_id=current_user.user_id,
+                            chat_id=web_chat.chat_id,
                             type='bot',
                             mode='autopublish',
-                            status='pending',
-                            created_at=datetime.utcnow(),
-                        )
-                        db.session.add(queue)
+                            status='pending'
+                        ).first()
+                        if not existing:
+                            queue = PublicationQueue(
+                                object_id=object_id,
+                                chat_id=web_chat.chat_id,
+                                account_id=None,
+                                user_id=current_user.user_id,
+                                type='bot',
+                                mode='autopublish',
+                                status='pending',
+                                created_at=datetime.utcnow(),
+                            )
+                            db.session.add(queue)
             finally:
                 worker_db.close()
             
