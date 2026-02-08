@@ -31,6 +31,13 @@ interface RealtyObject {
   status: string
 }
 
+interface ChatGroup {
+  group_id: number
+  name: string
+  description?: string
+  chat_ids: number[]
+}
+
 export default function Chats(): JSX.Element {
   const [accounts, setAccounts] = useState<TelegramAccount[]>([])
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
@@ -46,6 +53,11 @@ export default function Chats(): JSX.Element {
   const [objects, setObjects] = useState<RealtyObject[]>([])
   const [publishing, setPublishing] = useState(false)
   const [search, setSearch] = useState('')
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false)
+  const [selectedChatsForGroup, setSelectedChatsForGroup] = useState<number[]>([])
+  const [groupName, setGroupName] = useState('')
+  const [groupDescription, setGroupDescription] = useState('')
+  const [creatingGroup, setCreatingGroup] = useState(false)
 
   useEffect(() => {
     void loadAccounts()
@@ -204,6 +216,52 @@ export default function Chats(): JSX.Element {
     }
   }
 
+  const openCreateGroupModal = (): void => {
+    setSelectedChatsForGroup([])
+    setGroupName('')
+    setGroupDescription('')
+    setShowCreateGroupModal(true)
+  }
+
+  const createChatGroup = async (): Promise<void> => {
+    if (!groupName.trim()) {
+      setError('Введите название группы')
+      return
+    }
+    if (selectedChatsForGroup.length === 0) {
+      setError('Выберите хотя бы один чат')
+      return
+    }
+
+    try {
+      setCreatingGroup(true)
+      setError('')
+      const res = await api.post<{ success: boolean; group: ChatGroup }>('/chats/groups', {
+        name: groupName.trim(),
+        description: groupDescription.trim() || undefined,
+        chat_ids: selectedChatsForGroup
+      })
+      if (res.data.success) {
+        setSuccess('Группа чатов создана')
+        setTimeout(() => {
+          setSuccess('')
+          setShowCreateGroupModal(false)
+          setSelectedChatsForGroup([])
+          setGroupName('')
+          setGroupDescription('')
+        }, 3000)
+      }
+    } catch (err: unknown) {
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+        setError(err.response?.data?.error || 'Ошибка создания группы')
+      } else {
+        setError('Ошибка создания группы')
+      }
+    } finally {
+      setCreatingGroup(false)
+    }
+  }
+
   return (
     <Layout title="Чаты">
       <div className="chats-page">
@@ -242,13 +300,22 @@ export default function Chats(): JSX.Element {
                   ))}
                 </select>
                 {selectedAccountId && (
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => void refreshChats()}
-                    disabled={refreshing}
-                  >
-                    {refreshing ? 'Обновление...' : 'Обновить чаты'}
-                  </button>
+                  <>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => void refreshChats()}
+                      disabled={refreshing}
+                    >
+                      {refreshing ? 'Обновление...' : 'Обновить чаты'}
+                    </button>
+                    <button
+                      className="btn btn-primary"
+                      onClick={openCreateGroupModal}
+                      disabled={chats.length === 0}
+                    >
+                      Создать группу
+                    </button>
+                  </>
                 )}
               </div>
               {selectedAccountId && (
@@ -280,6 +347,20 @@ export default function Chats(): JSX.Element {
               {chats.map(chat => (
                 <div key={chat.chat_id} className="object-card compact chat-item">
                   <div className="object-details-compact single-line">
+                    <label className="chat-select-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedChatsForGroup.includes(chat.chat_id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedChatsForGroup(prev => [...prev, chat.chat_id])
+                          } else {
+                            setSelectedChatsForGroup(prev => prev.filter(id => id !== chat.chat_id))
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </label>
                     <span className="object-detail-item">
                       {chat.title}
                     </span>
@@ -337,6 +418,68 @@ export default function Chats(): JSX.Element {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showCreateGroupModal && (
+          <div className="modal-overlay" onClick={() => setShowCreateGroupModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Создать группу чатов</h3>
+                <button className="modal-close" onClick={() => setShowCreateGroupModal(false)}>×</button>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">Название группы *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    placeholder="Например: Основные чаты"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Описание (необязательно)</label>
+                  <textarea
+                    className="form-control"
+                    value={groupDescription}
+                    onChange={(e) => setGroupDescription(e.target.value)}
+                    placeholder="Описание группы"
+                    rows={3}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Выбранные чаты: {selectedChatsForGroup.length}</label>
+                  {selectedChatsForGroup.length === 0 ? (
+                    <p className="text-muted">Выберите чаты из списка выше</p>
+                  ) : (
+                    <ul className="selected-chats-list">
+                      {chats.filter(c => selectedChatsForGroup.includes(c.chat_id)).map(chat => (
+                        <li key={chat.chat_id}>
+                          {chat.title}
+                          <button
+                            type="button"
+                            className="btn btn-small btn-link"
+                            onClick={() => setSelectedChatsForGroup(prev => prev.filter(id => id !== chat.chat_id))}
+                          >
+                            Убрать
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button className="btn btn-secondary" onClick={() => setShowCreateGroupModal(false)} disabled={creatingGroup}>
+                  Отмена
+                </button>
+                <button className="btn btn-primary" onClick={() => void createChatGroup()} disabled={creatingGroup || !groupName.trim() || selectedChatsForGroup.length === 0}>
+                  {creatingGroup ? 'Создание...' : 'Создать группу'}
+                </button>
               </div>
             </div>
           </div>
