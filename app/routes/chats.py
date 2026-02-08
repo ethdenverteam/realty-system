@@ -4,6 +4,8 @@ Chats routes
 from flask import Blueprint, request, jsonify
 from app.database import db
 from app.models.chat import Chat
+from app.models.chat_group import ChatGroup
+from app.models.telegram_account import TelegramAccount
 from app.utils.decorators import jwt_required, role_required
 from app.utils.logger import log_action, log_error
 from datetime import datetime
@@ -329,4 +331,141 @@ def delete_chat(chat_id, current_user):
     )
     
     return jsonify({'message': 'Chat deleted'})
+
+
+@chats_bp.route('/groups', methods=['GET'])
+@jwt_required
+def list_chat_groups(current_user):
+    """Get list of chat groups for current user"""
+    try:
+        groups = ChatGroup.query.filter_by(user_id=current_user.user_id).all()
+        return jsonify([group.to_dict() for group in groups])
+    except Exception as e:
+        logger.error(f"Error listing chat groups: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@chats_bp.route('/groups', methods=['POST'])
+@jwt_required
+def create_chat_group(current_user):
+    """Create a new chat group"""
+    data = request.get_json() or {}
+    name = data.get('name')
+    description = data.get('description', '')
+    chat_ids = data.get('chat_ids', [])
+    
+    if not name:
+        return jsonify({'error': 'name is required'}), 400
+    
+    if not isinstance(chat_ids, list) or len(chat_ids) == 0:
+        return jsonify({'error': 'chat_ids must be a non-empty list'}), 400
+    
+    # Проверяем, что все чаты принадлежат пользователю
+    user_chats = Chat.query.filter(
+        Chat.chat_id.in_(chat_ids),
+        Chat.owner_type == 'user',
+        Chat.owner_account_id.in_(
+            db.session.query(TelegramAccount.account_id).filter_by(owner_id=current_user.user_id)
+        )
+    ).all()
+    
+    if len(user_chats) != len(chat_ids):
+        return jsonify({'error': 'Some chats do not belong to user'}), 400
+    
+    try:
+        group = ChatGroup(
+            user_id=current_user.user_id,
+            name=name,
+            description=description,
+            chat_ids=chat_ids
+        )
+        db.session.add(group)
+        db.session.commit()
+        
+        log_action(
+            action='chat_group_created',
+            user_id=current_user.user_id,
+            details={'group_id': group.group_id, 'name': name, 'chat_count': len(chat_ids)}
+        )
+        
+        return jsonify({'success': True, 'group': group.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error creating chat group: {e}", exc_info=True)
+        log_error(e, 'chat_group_creation_failed', current_user.user_id, {'name': name})
+        return jsonify({'error': str(e)}), 500
+
+
+@chats_bp.route('/groups/<int:group_id>', methods=['PUT'])
+@jwt_required
+def update_chat_group(group_id, current_user):
+    """Update a chat group"""
+    group = ChatGroup.query.filter_by(group_id=group_id, user_id=current_user.user_id).first()
+    if not group:
+        return jsonify({'error': 'Group not found'}), 404
+    
+    data = request.get_json() or {}
+    
+    if 'name' in data:
+        group.name = data['name']
+    if 'description' in data:
+        group.description = data.get('description', '')
+    if 'chat_ids' in data:
+        chat_ids = data['chat_ids']
+        if not isinstance(chat_ids, list):
+            return jsonify({'error': 'chat_ids must be a list'}), 400
+        
+        # Проверяем, что все чаты принадлежат пользователю
+        user_chats = Chat.query.filter(
+            Chat.chat_id.in_(chat_ids),
+            Chat.owner_type == 'user',
+            Chat.owner_account_id.in_(
+                db.session.query(TelegramAccount.account_id).filter_by(owner_id=current_user.user_id)
+            )
+        ).all()
+        
+        if len(user_chats) != len(chat_ids):
+            return jsonify({'error': 'Some chats do not belong to user'}), 400
+        
+        group.chat_ids = chat_ids
+    
+    try:
+        db.session.commit()
+        
+        log_action(
+            action='chat_group_updated',
+            user_id=current_user.user_id,
+            details={'group_id': group_id}
+        )
+        
+        return jsonify({'success': True, 'group': group.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating chat group: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@chats_bp.route('/groups/<int:group_id>', methods=['DELETE'])
+@jwt_required
+def delete_chat_group(group_id, current_user):
+    """Delete a chat group"""
+    group = ChatGroup.query.filter_by(group_id=group_id, user_id=current_user.user_id).first()
+    if not group:
+        return jsonify({'error': 'Group not found'}), 404
+    
+    try:
+        db.session.delete(group)
+        db.session.commit()
+        
+        log_action(
+            action='chat_group_deleted',
+            user_id=current_user.user_id,
+            details={'group_id': group_id}
+        )
+        
+        return jsonify({'success': True, 'message': 'Group deleted'})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting chat group: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 

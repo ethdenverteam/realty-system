@@ -198,6 +198,14 @@ export default function Autopublish(): JSX.Element {
 
   const saveAccountsConfig = async (): Promise<void> => {
     if (!editingObjectId || !editingConfig) return
+    
+    // Проверяем, что есть хотя бы один аккаунт с выбранными чатами
+    const hasValidAccounts = editingConfig.accounts.some(acc => acc.chat_ids && acc.chat_ids.length > 0)
+    if (!hasValidAccounts) {
+      setError('Сначала выберите чаты для аккаунтов')
+      return
+    }
+    
     try {
       setSaving(true)
       setError('')
@@ -211,11 +219,14 @@ export default function Autopublish(): JSX.Element {
         await loadData()
       }
     } catch (err: unknown) {
-      setError('Ошибка сохранения настроек аккаунтов')
       if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error(err.response?.data || err.message)
+        const errorMsg = err.response?.data?.error || 'Ошибка сохранения настроек аккаунтов'
+        setError(errorMsg)
+        if (errorMsg.includes('Сначала выберите чаты')) {
+          setError('Сначала выберите чаты для аккаунтов. Нельзя включить автопубликацию через аккаунты без выбранных чатов.')
+        }
       } else {
-        console.error(err)
+        setError('Ошибка сохранения настроек аккаунтов')
       }
     } finally {
       setSaving(false)
@@ -264,31 +275,7 @@ export default function Autopublish(): JSX.Element {
     }
   }
 
-  const handleToggleBotEnabled = async (objectId: string, currentValue: boolean): Promise<void> => {
-    try {
-      setSaving(true)
-      setError('')
-      const res = await api.put<{ success: boolean }>(`/user/dashboard/autopublish/${objectId}`, {
-        bot_enabled: !currentValue,
-      })
-      if (res.data.success) {
-        await loadData()
-        // Reload chats if they were loaded
-        if (objectChats[objectId]) {
-          await loadChatsForObject(objectId)
-        }
-      }
-    } catch (err: unknown) {
-      setError('Ошибка изменения настройки автопубликации')
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error(err.response?.data || err.message)
-      } else {
-        console.error(err)
-      }
-    } finally {
-      setSaving(false)
-    }
-  }
+  // Удалена функция handleToggleBotEnabled - бот всегда включен
 
   return (
     <Layout title="Автопубликация">
@@ -337,21 +324,19 @@ export default function Autopublish(): JSX.Element {
                       )}
                     </div>
                     <div className="autopublish-flags">
-                      <span className={`badge ${cfg.enabled ? 'badge-success' : 'badge-secondary'}`}>
-                        {cfg.enabled ? 'Включено' : 'Выключено'}
+                      <span className="badge badge-success">
+                        Включено
                       </span>
-                      <button
-                        className={`badge ${cfg.bot_enabled ? 'badge-primary' : 'badge-secondary'}`}
-                        onClick={() => void handleToggleBotEnabled(obj.object_id as string, cfg.bot_enabled)}
-                        disabled={saving}
-                        style={{ cursor: 'pointer', border: 'none', padding: '4px 8px' }}
-                        title={cfg.bot_enabled ? 'Отключить автопубликацию через бота' : 'Включить автопубликацию через бота'}
-                      >
-                        Бот: {cfg.bot_enabled ? 'да' : 'нет'}
-                      </button>
-                      {totalAccounts > 0 && (
-                        <span className="badge badge-secondary">
+                      <span className="badge badge-primary">
+                        Бот: всегда включен
+                      </span>
+                      {totalAccounts > 0 && totalChats > 0 ? (
+                        <span className="badge badge-success">
                           Аккаунты: {totalAccounts}, чатов: {totalChats}
+                        </span>
+                      ) : (
+                        <span className="badge badge-secondary">
+                          Аккаунты: не выбраны
                         </span>
                       )}
                     </div>

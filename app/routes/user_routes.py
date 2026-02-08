@@ -9,6 +9,7 @@ from app.models.publication_history import PublicationHistory
 from app.models.telegram_account import TelegramAccount
 from app.models.quick_access import QuickAccess
 from app.models.autopublish_config import AutopublishConfig
+from app.models.chat_group import ChatGroup
 from app.utils.decorators import jwt_required
 from app.utils.logger import log_action, log_error
 from sqlalchemy import func
@@ -284,20 +285,104 @@ def create_or_update_autopublish_config(current_user):
         )
         db.session.add(cfg)
 
-    cfg.bot_enabled = bot_enabled
+    # Бот всегда включен для автопубликации
+    cfg.bot_enabled = True
+    
     # Сохраняем настройки аккаунтов, если переданы
     if isinstance(accounts_config, dict):
-        cfg.accounts_config_json = accounts_config
+        # Проверяем, что есть хотя бы один аккаунт с выбранными чатами
+        accounts_list = accounts_config.get('accounts', [])
+        has_valid_accounts = False
+        for acc_entry in accounts_list:
+            chat_ids = acc_entry.get('chat_ids', [])
+            if chat_ids and len(chat_ids) > 0:
+                has_valid_accounts = True
+                break
+        
+        if has_valid_accounts:
+            cfg.accounts_config_json = accounts_config
+        else:
+            # Если нет выбранных чатов, очищаем конфигурацию аккаунтов
+            cfg.accounts_config_json = None
     elif accounts_config is None:
         # Не затираем существующие настройки, если ключ не передан
         pass
-
-    # Включено, если включен бот или есть конфигурация аккаунтов
-    has_accounts = bool(getattr(cfg, 'accounts_config_json', None))
-    cfg.enabled = bool(bot_enabled or has_accounts)
+    
+    # Автопубликация всегда включена (бот всегда включен)
+    cfg.enabled = True
 
     try:
         db.session.commit()
+        
+        # Создаем очередь публикации сразу для объекта (если включена автопубликация)
+        if cfg.enabled:
+            from workers.tasks import _get_matching_bot_chats_for_object
+            from app.models.chat import Chat as WebChat
+            from app.database import get_db
+            
+            # Создаем очередь для бота (всегда включен)
+            worker_db = get_db()
+            try:
+                bot_chats = _get_matching_bot_chats_for_object(worker_db, obj)
+                for chat in bot_chats:
+                    # Проверяем, нет ли уже такой очереди
+                    existing = PublicationQueue.query.filter_by(
+                        object_id=object_id,
+                        chat_id=chat.chat_id,
+                        type='bot',
+                        mode='autopublish',
+                        status='pending'
+                    ).first()
+                    if not existing:
+                        queue = PublicationQueue(
+                            object_id=object_id,
+                            chat_id=chat.chat_id,
+                            account_id=None,
+                            user_id=current_user.user_id,
+                            type='bot',
+                            mode='autopublish',
+                            status='pending',
+                            created_at=datetime.utcnow(),
+                        )
+                        db.session.add(queue)
+            finally:
+                worker_db.close()
+            
+            # Создаем очередь для аккаунтов пользователей
+            accounts_cfg = cfg.accounts_config_json or {}
+            accounts_list = accounts_cfg.get('accounts') if isinstance(accounts_cfg, dict) else []
+            if isinstance(accounts_list, list):
+                for acc_entry in accounts_list:
+                    account_id = acc_entry.get('account_id')
+                    chat_ids = acc_entry.get('chat_ids', [])
+                    if account_id and chat_ids:
+                        account = TelegramAccount.query.get(account_id)
+                        if account and account.owner_id == current_user.user_id and account.is_active:
+                            for chat_id in chat_ids:
+                                chat = WebChat.query.get(chat_id)
+                                if chat and chat.owner_type == 'user' and chat.owner_account_id == account_id:
+                                    # Проверяем, нет ли уже такой очереди
+                                    existing = PublicationQueue.query.filter_by(
+                                        object_id=object_id,
+                                        chat_id=chat_id,
+                                        type='user',
+                                        mode='autopublish',
+                                        status='pending'
+                                    ).first()
+                                    if not existing:
+                                        queue = PublicationQueue(
+                                            object_id=object_id,
+                                            chat_id=chat_id,
+                                            account_id=account_id,
+                                            user_id=current_user.user_id,
+                                            type='user',
+                                            mode='autopublish',
+                                            status='pending',
+                                            created_at=datetime.utcnow(),
+                                        )
+                                        db.session.add(queue)
+            
+            db.session.commit()
         return jsonify({'success': True, 'config': cfg.to_dict()})
     except Exception as e:
         db.session.rollback()
@@ -319,22 +404,110 @@ def update_autopublish_config(object_id, current_user):
 
     data = request.get_json() or {}
 
-    if 'enabled' in data:
-        cfg.enabled = bool(data['enabled'])
-    if 'bot_enabled' in data:
-        cfg.bot_enabled = bool(data['bot_enabled'])
+    # Бот всегда включен - игнорируем bot_enabled из запроса
+    cfg.bot_enabled = True
+    
     if 'accounts_config_json' in data or 'accounts_config' in data:
         accounts_config = data.get('accounts_config_json') or data.get('accounts_config')
         if isinstance(accounts_config, dict):
-            cfg.accounts_config_json = accounts_config
+            # Проверяем, что есть хотя бы один аккаунт с выбранными чатами
+            accounts_list = accounts_config.get('accounts', [])
+            has_valid_accounts = False
+            for acc_entry in accounts_list:
+                chat_ids = acc_entry.get('chat_ids', [])
+                if chat_ids and len(chat_ids) > 0:
+                    has_valid_accounts = True
+                    break
+            
+            if has_valid_accounts:
+                cfg.accounts_config_json = accounts_config
+            else:
+                # Если нет выбранных чатов, очищаем конфигурацию аккаунтов
+                cfg.accounts_config_json = None
+                return jsonify({
+                    'error': 'Сначала выберите чаты для аккаунтов',
+                    'details': 'Нельзя включить автопубликацию через аккаунты без выбранных чатов'
+                }), 400
+        elif accounts_config is None:
+            cfg.accounts_config_json = None
 
-    # Пересчёт enabled: включено, если включен бот или есть аккаунты
-    has_accounts = bool(getattr(cfg, 'accounts_config_json', None))
-    if 'enabled' not in data:
-        cfg.enabled = bool(cfg.bot_enabled or has_accounts)
+    # Автопубликация всегда включена (бот всегда включен)
+    cfg.enabled = True
 
     try:
         db.session.commit()
+        
+        # Создаем/обновляем очередь публикации для объекта
+        obj = Object.query.filter_by(object_id=object_id, user_id=current_user.user_id).first()
+        if obj and cfg.enabled:
+            from workers.tasks import _get_matching_bot_chats_for_object
+            from app.models.chat import Chat as WebChat
+            from app.database import get_db
+            
+            # Создаем очередь для бота (всегда включен)
+            worker_db = get_db()
+            try:
+                bot_chats = _get_matching_bot_chats_for_object(worker_db, obj)
+                for chat in bot_chats:
+                    # Проверяем, нет ли уже такой очереди
+                    existing = PublicationQueue.query.filter_by(
+                        object_id=object_id,
+                        chat_id=chat.chat_id,
+                        type='bot',
+                        mode='autopublish',
+                        status='pending'
+                    ).first()
+                    if not existing:
+                        queue = PublicationQueue(
+                            object_id=object_id,
+                            chat_id=chat.chat_id,
+                            account_id=None,
+                            user_id=current_user.user_id,
+                            type='bot',
+                            mode='autopublish',
+                            status='pending',
+                            created_at=datetime.utcnow(),
+                        )
+                        db.session.add(queue)
+            finally:
+                worker_db.close()
+            
+            # Создаем очередь для аккаунтов пользователей
+            accounts_cfg = cfg.accounts_config_json or {}
+            accounts_list = accounts_cfg.get('accounts') if isinstance(accounts_cfg, dict) else []
+            if isinstance(accounts_list, list):
+                for acc_entry in accounts_list:
+                    account_id = acc_entry.get('account_id')
+                    chat_ids = acc_entry.get('chat_ids', [])
+                    if account_id and chat_ids:
+                        account = TelegramAccount.query.get(account_id)
+                        if account and account.owner_id == current_user.user_id and account.is_active:
+                            for chat_id in chat_ids:
+                                chat = WebChat.query.get(chat_id)
+                                if chat and chat.owner_type == 'user' and chat.owner_account_id == account_id:
+                                    # Проверяем, нет ли уже такой очереди
+                                    existing = PublicationQueue.query.filter_by(
+                                        object_id=object_id,
+                                        chat_id=chat_id,
+                                        type='user',
+                                        mode='autopublish',
+                                        status='pending'
+                                    ).first()
+                                    if not existing:
+                                        queue = PublicationQueue(
+                                            object_id=object_id,
+                                            chat_id=chat_id,
+                                            account_id=account_id,
+                                            user_id=current_user.user_id,
+                                            type='user',
+                                            mode='autopublish',
+                                            status='pending',
+                                            created_at=datetime.utcnow(),
+                                        )
+                                        db.session.add(queue)
+            
+            db.session.commit()
+        
         return jsonify({'success': True, 'config': cfg.to_dict()})
     except Exception as e:
         db.session.rollback()
