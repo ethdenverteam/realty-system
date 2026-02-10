@@ -128,11 +128,8 @@ export default function UserObjects(): JSX.Element {
                 <option value="3к">3к</option>
                 <option value="4+к">4+к</option>
                 <option value="Дом">Дом</option>
-                <option value="1евро">1евро</option>
                 <option value="евро1к">евро1к</option>
-                <option value="2евро">2евро</option>
                 <option value="евро2к">евро2к</option>
-                <option value="3евро">3евро</option>
                 <option value="евро3к">евро3к</option>
               </select>
               <select

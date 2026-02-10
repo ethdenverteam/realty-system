@@ -5,6 +5,8 @@ from flask import Blueprint, request, jsonify
 from app.database import db
 from app.models.telegram_account import TelegramAccount
 from app.models.chat import Chat
+from app.models.publication_queue import PublicationQueue
+from app.models.publication_history import PublicationHistory
 from app.utils.decorators import jwt_required, role_required
 from app.utils.logger import log_action, log_error
 from app.utils.telethon_client import (
@@ -22,6 +24,7 @@ from datetime import datetime
 import logging
 import os
 import re
+from sqlalchemy import or_
 
 accounts_bp = Blueprint('accounts', __name__)
 logger = logging.getLogger(__name__)
@@ -511,9 +514,37 @@ def delete_account(account_id, current_user):
             except Exception as e:
                 logger.warning(f"Failed to delete session file {session_path}: {e}")
 
-        # Delete all chats associated with this account (user-owned chats)
-        Chat.query.filter_by(owner_type='user', owner_account_id=account_id).delete(synchronize_session=False)
+        # Find all chats associated with this account (user-owned chats)
+        account_chats = Chat.query.filter_by(owner_type='user', owner_account_id=account_id).all()
+        chat_ids = [chat.chat_id for chat in account_chats]
+
+        # Delete related publication history records (for this account and its chats)
+        if chat_ids:
+            PublicationHistory.query.filter(
+                or_(
+                    PublicationHistory.account_id == account_id,
+                    PublicationHistory.chat_id.in_(chat_ids),
+                )
+            ).delete(synchronize_session=False)
+        else:
+            PublicationHistory.query.filter_by(account_id=account_id).delete(synchronize_session=False)
+
+        # Delete related publication queue records (for this account and its chats)
+        if chat_ids:
+            PublicationQueue.query.filter(
+                or_(
+                    PublicationQueue.account_id == account_id,
+                    PublicationQueue.chat_id.in_(chat_ids),
+                )
+            ).delete(synchronize_session=False)
+        else:
+            PublicationQueue.query.filter_by(account_id=account_id).delete(synchronize_session=False)
+
+        # Now delete all chats associated with this account (user-owned chats)
+        for chat in account_chats:
+            db.session.delete(chat)
         
+        # Finally, delete the Telegram account itself
         db.session.delete(account)
         db.session.commit()
         
