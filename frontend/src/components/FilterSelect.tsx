@@ -34,6 +34,10 @@ interface FilterSelectProps {
    * Размер (sm для маленьких, по умолчанию обычный)
    */
   size?: 'sm' | 'md'
+  /**
+   * Обязательное поле
+   */
+  required?: boolean
 }
 
 /**
@@ -47,12 +51,14 @@ export function FilterSelect({
   placeholder = 'Все',
   className = '',
   size = 'md',
+  required = false,
 }: FilterSelectProps): JSX.Element {
   return (
     <select
       className={`filter-select form-input ${size === 'sm' ? 'form-input-sm' : ''} ${className}`}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      required={required}
     >
       {placeholder && <option value="">{placeholder}</option>}
       {options.map((option) => (

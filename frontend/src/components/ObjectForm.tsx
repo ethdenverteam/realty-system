@@ -1,7 +1,8 @@
 import { type ChangeEvent, type FormEvent, useState, useEffect } from 'react'
-import type { ObjectFormData, RoomsType, RenovationType } from '../types/models'
+import type { ObjectFormData } from '../types/models'
 import api from '../utils/api'
-import Dropdown, { type DropdownOption } from './Dropdown'
+import { FilterSelect } from './FilterSelect'
+import { ROOMS_TYPES, RENOVATION_TYPES } from '../utils/constants'
 import './ObjectForm.css'
 
 interface ObjectFormProps {
@@ -14,40 +15,6 @@ interface ObjectFormProps {
   onCancel?: () => void
   error?: string
 }
-
-const ROOMS_OPTIONS: RoomsType[] = [
-  'Студия',
-  '1к',
-  '2к',
-  '3к',
-  '4+к',
-  'Дом',
-  'евро1к',
-  'евро2к',
-  'евро3к',
-]
-
-const RENOVATION_OPTIONS: RenovationType[] = [
-  'Черновая',
-  'ПЧО',
-  'Ремонт требует освежения',
-  'Хороший ремонт',
-  'Инстаграмный',
-]
-
-// Преобразование в формат для Dropdown
-const ROOMS_DROPDOWN_OPTIONS: DropdownOption[] = ROOMS_OPTIONS.map((option) => ({
-  label: option,
-  value: option,
-}))
-
-const RENOVATION_DROPDOWN_OPTIONS: DropdownOption[] = [
-  { label: 'Не указано', value: '' },
-  ...RENOVATION_OPTIONS.map((option) => ({
-    label: option,
-    value: option,
-  })),
-]
 
 export default function ObjectForm({
   formData,
@@ -128,14 +95,13 @@ export default function ObjectForm({
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Тип комнат *</label>
-              <Dropdown
-                options={ROOMS_DROPDOWN_OPTIONS}
-                defaultText="Выберите тип"
-                onChange={(value) => handleChange('rooms_type', String(value))}
+              <FilterSelect
                 value={formData.rooms_type}
+                onChange={(value) => handleChange('rooms_type', value)}
+                options={ROOMS_TYPES.map((type) => ({ value: type, label: type }))}
+                placeholder="Выберите тип"
+                size="md"
                 required
-                variant="form"
-                className="form-input-dropdown"
               />
             </div>
             <div className="form-group">
@@ -220,13 +186,12 @@ export default function ObjectForm({
           </div>
           <div className="form-group">
             <label className="form-label">Состояние ремонта</label>
-            <Dropdown
-              options={RENOVATION_DROPDOWN_OPTIONS}
-              defaultText="Не указано"
-              onChange={(value) => handleChange('renovation', String(value))}
+            <FilterSelect
               value={formData.renovation}
-              variant="form"
-              className="form-input-dropdown"
+              onChange={(value) => handleChange('renovation', value)}
+              options={RENOVATION_TYPES.map((type) => ({ value: type, label: type }))}
+              placeholder="Не указано"
+              size="md"
             />
           </div>
         </div>
