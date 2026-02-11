@@ -1,5 +1,7 @@
 """
-Celery tasks for background processing
+Фоновые задачи Celery для обработки публикаций
+Цель: асинхронная публикация объектов в Telegram, обработка очередей, автопубликация
+Логика: все задачи логируются для отслеживания выполнения и диагностики ошибок
 """
 from workers.celery_app import celery_app
 from bot.database import get_db
@@ -14,7 +16,11 @@ logger = logging.getLogger(__name__)
 
 @celery_app.task(name='workers.tasks.publish_to_telegram')
 def publish_to_telegram(queue_id: int):
-    """Publish object to Telegram chat"""
+    """
+    Публикация объекта недвижимости в Telegram чат
+    Логика: проверка дубликатов (24 часа), форматирование текста, отправка через API, создание истории
+    Все этапы логируются для отслеживания процесса публикации
+    """
     db = get_db()
     try:
         queue = db.query(PublicationQueue).get(queue_id)

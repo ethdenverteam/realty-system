@@ -62,16 +62,9 @@ def setup_logging():
     # Clear existing handlers
     root_logger.handlers.clear()
     
-    # Formatters
-    detailed_formatter = logging.Formatter(
-        '%(asctime)s | %(levelname)-8s | %(name)-25s | %(funcName)-30s | %(lineno)-4d | %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    
-    simple_formatter = logging.Formatter(
-        '[%(asctime)s] | %(levelname)-8s | %(name)s | %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
+    # Используем общие форматтеры (единый стандарт для всего проекта)
+    from app.utils.log_formatters import get_log_formatters
+    detailed_formatter, simple_formatter = get_log_formatters()
     
     # Console handler (INFO and above)
     console_handler = logging.StreamHandler(sys.stdout)

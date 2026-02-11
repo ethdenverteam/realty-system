@@ -1,77 +1,67 @@
-import axios from 'axios'
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { GlassCard } from '../../components/GlassCard'
+import { FilterCard } from '../../components/FilterCard'
+import { FilterSelect } from '../../components/FilterSelect'
+import { useApiData } from '../../hooks/useApiData'
 import api from '../../utils/api'
-import type { RealtyObjectListItem, ObjectsListResponse, ApiErrorResponse } from '../../types/models'
+import { ROOMS_TYPES, OBJECT_STATUSES, OBJECT_SORT_OPTIONS } from '../../utils/constants'
+import type { RealtyObjectListItem, ObjectsListResponse } from '../../types/models'
 import './Objects.css'
 
 export default function UserObjects(): JSX.Element {
   const navigate = useNavigate()
-  const [objects, setObjects] = useState<RealtyObjectListItem[]>([])
-  const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
   const [sortBy, setSortBy] = useState('creation_date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [roomsTypeFilter, setRoomsTypeFilter] = useState('')
   const [districtFilter, setDistrictFilter] = useState('')
-  const [districts, setDistricts] = useState<string[]>([])
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedObjects, setSelectedObjects] = useState<Set<number | string>>(new Set())
-  const [listDisplayTypes, setListDisplayTypes] = useState<string[]>([])
 
-  useEffect(() => {
-    void loadDistricts()
-    void loadSettings()
-  }, [])
+  // Загрузка районов
+  const { data: districtsData } = useApiData<{ districts: string[] }>({
+    url: '/user/dashboard/districts',
+    errorContext: 'Loading districts',
+    defaultErrorMessage: 'Ошибка загрузки районов',
+  })
+  const districts = districtsData?.districts || []
 
-  const loadSettings = async (): Promise<void> => {
-    try {
-      const res = await api.get<{ object_list_display_types?: string[] }>('/user/dashboard/settings/data')
-      setListDisplayTypes(res.data.object_list_display_types || [])
-    } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error('Error loading settings:', err.response?.data || err.message)
+  // Загрузка настроек отображения
+  const { data: settingsData } = useApiData<{ object_list_display_types?: string[] }>({
+    url: '/user/dashboard/settings/data',
+    errorContext: 'Loading settings',
+    defaultErrorMessage: 'Ошибка загрузки настроек',
+  })
+  const listDisplayTypes = settingsData?.object_list_display_types || []
+
+  // Загрузка объектов с фильтрами
+  const { data: objectsData, loading } = useApiData<ObjectsListResponse>({
+    url: '/user/dashboard/objects/list',
+    params: {
+      ...(statusFilter && { status: statusFilter }),
+      ...(sortBy && { sort_by: sortBy }),
+      ...(sortOrder && { sort_order: sortOrder }),
+      ...(roomsTypeFilter && { rooms_type: roomsTypeFilter }),
+      ...(districtFilter && { district: districtFilter }),
+    },
+    deps: [statusFilter, sortBy, sortOrder, roomsTypeFilter, districtFilter],
+    errorContext: 'Loading objects',
+    defaultErrorMessage: 'Ошибка загрузки объектов',
+  })
+  const objects = objectsData?.objects || []
+
+  // Обработка изменения сортировки
+  const handleSortChange = (value: string): void => {
+    const lastUnderscoreIndex = value.lastIndexOf('_')
+    if (lastUnderscoreIndex > 0 && lastUnderscoreIndex < value.length - 1) {
+      const newSortBy = value.substring(0, lastUnderscoreIndex)
+      const newSortOrder = value.substring(lastUnderscoreIndex + 1) as 'asc' | 'desc'
+      if (newSortBy !== sortBy || newSortOrder !== sortOrder) {
+        setSortBy(newSortBy)
+        setSortOrder(newSortOrder)
       }
-    }
-  }
-
-  useEffect(() => {
-    void loadObjects()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, sortBy, sortOrder, roomsTypeFilter, districtFilter])
-
-  const loadDistricts = async (): Promise<void> => {
-    try {
-      const res = await api.get<{ districts: string[] }>('/user/dashboard/districts')
-      setDistricts(res.data.districts || [])
-    } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error('Error loading districts:', err.response?.data || err.message)
-      }
-    }
-  }
-
-  const loadObjects = async (): Promise<void> => {
-    try {
-      setLoading(true)
-      const params: { status?: string; sort_by?: string; sort_order?: string; rooms_type?: string; district?: string } = {}
-      if (statusFilter) params.status = statusFilter
-      if (sortBy) params.sort_by = sortBy
-      if (sortOrder) params.sort_order = sortOrder
-      if (roomsTypeFilter) params.rooms_type = roomsTypeFilter
-      if (districtFilter) params.district = districtFilter
-      const res = await api.get<ObjectsListResponse>('/user/dashboard/objects/list', { params })
-      setObjects(res.data.objects || [])
-    } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error('Error loading objects:', err.response?.data || err.message)
-      } else {
-        console.error('Error loading objects:', err)
-      }
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -88,9 +78,8 @@ export default function UserObjects(): JSX.Element {
     >
       <div className="objects-page">
         {/* Фильтры в отдельном стеклянном блоке */}
-        <GlassCard className="filters-card">
-          <div className="filters-header">
-            <h2 className="filters-title">Фильтры</h2>
+        <FilterCard
+          headerActions={
             <button
               type="button"
               className={`selection-toggle ${selectionMode ? 'active' : ''}`}
@@ -103,72 +92,37 @@ export default function UserObjects(): JSX.Element {
             >
               {selectionMode ? 'Отменить выбор' : 'Выбрать'}
             </button>
-          </div>
-          <div className="filters-row">
-              <select
-                className="form-input form-input-sm"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="">Все статусы</option>
-                <option value="черновик">Черновики</option>
-                <option value="опубликовано">Опубликованные</option>
-                <option value="запланировано">Запланированные</option>
-                <option value="архив">Архив</option>
-              </select>
-              <select
-                className="form-input form-input-sm"
-                value={roomsTypeFilter}
-                onChange={(e) => setRoomsTypeFilter(e.target.value)}
-              >
-                <option value="">Все типы комнат</option>
-                <option value="Студия">Студия</option>
-                <option value="1к">1к</option>
-                <option value="2к">2к</option>
-                <option value="3к">3к</option>
-                <option value="4+к">4+к</option>
-                <option value="Дом">Дом</option>
-                <option value="евро1к">евро1к</option>
-                <option value="евро2к">евро2к</option>
-                <option value="евро3к">евро3к</option>
-              </select>
-              <select
-                className="form-input form-input-sm"
-                value={districtFilter}
-                onChange={(e) => setDistrictFilter(e.target.value)}
-              >
-                <option value="">Все районы</option>
-                {districts.map((district) => (
-                  <option key={district} value={district}>
-                    {district}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="form-input form-input-sm"
-                value={`${sortBy}_${sortOrder}`}
-                onChange={(e) => {
-                  const value = e.target.value
-                  // Split from the end to handle sort_by values that contain underscores (like 'creation_date')
-                  const lastUnderscoreIndex = value.lastIndexOf('_')
-                  if (lastUnderscoreIndex > 0 && lastUnderscoreIndex < value.length - 1) {
-                    const newSortBy = value.substring(0, lastUnderscoreIndex)
-                    const newSortOrder = value.substring(lastUnderscoreIndex + 1) as 'asc' | 'desc'
-                    // Update both values separately to ensure React sees the change
-                    if (newSortBy !== sortBy || newSortOrder !== sortOrder) {
-                      setSortBy(newSortBy)
-                      setSortOrder(newSortOrder)
-                    }
-                  }
-                }}
-              >
-                <option value="creation_date_desc">Новые сначала</option>
-                <option value="creation_date_asc">Старые сначала</option>
-                <option value="price_desc">Цена: дороже</option>
-                <option value="price_asc">Цена: дешевле</option>
-              </select>
-          </div>
-        </GlassCard>
+          }
+        >
+          <FilterSelect
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={OBJECT_STATUSES.map((status) => ({ value: status, label: status }))}
+            placeholder="Все статусы"
+            size="sm"
+          />
+          <FilterSelect
+            value={roomsTypeFilter}
+            onChange={setRoomsTypeFilter}
+            options={ROOMS_TYPES.map((type) => ({ value: type, label: type }))}
+            placeholder="Все типы комнат"
+            size="sm"
+          />
+          <FilterSelect
+            value={districtFilter}
+            onChange={setDistrictFilter}
+            options={districts.map((district) => ({ value: district, label: district }))}
+            placeholder="Все районы"
+            size="sm"
+          />
+          <FilterSelect
+            value={`${sortBy}_${sortOrder}`}
+            onChange={handleSortChange}
+            options={OBJECT_SORT_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+            placeholder=""
+            size="sm"
+          />
+        </FilterCard>
 
         {/* Список объектов в отдельном блоке */}
         {loading ? (

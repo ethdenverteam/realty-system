@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
 import Layout from '../../components/Layout'
-import api from '../../utils/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import Dropdown, { type DropdownOption } from '../../components/Dropdown'
-import type { ApiErrorResponse } from '../../types/models'
+import { useApiData } from '../../hooks/useApiData'
+import { useApiMutation } from '../../hooks/useApiMutation'
+import { PHONE_PATTERN, PHONE_ERROR_MESSAGE } from '../../utils/constants'
 import './Settings.css'
 
 interface UserSettings {
@@ -19,15 +19,29 @@ interface UserSettings {
 export default function UserSettings(): JSX.Element {
   const { logout } = useAuth()
   const { theme, setTheme, availableThemes } = useTheme()
-  const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string>('')
   const [success, setSuccess] = useState<string>('')
+
+  // Загрузка настроек
+  const { data: settingsData, loading: loadingSettings } = useApiData<UserSettings>({
+    url: '/user/dashboard/settings/data',
+    errorContext: 'Loading settings',
+    defaultErrorMessage: 'Ошибка загрузки настроек',
+  })
+  
   const [settings, setSettings] = useState<UserSettings>({
     phone: '',
     contact_name: '',
     default_show_username: false,
     object_card_display_types: [],
     object_list_display_types: [],
+  })
+
+  // Применение загруженных настроек
+  useState(() => {
+    if (settingsData) {
+      setSettings(settingsData)
+    }
   })
 
   // Поля объекта для отображения
@@ -48,55 +62,38 @@ export default function UserSettings(): JSX.Element {
     }
   }
 
+  // Применение загруженных настроек
   useEffect(() => {
-    void loadSettings()
-  }, [])
-
-  const loadSettings = async (): Promise<void> => {
-    try {
-      setLoading(true)
-      setError('')
-      const response = await api.get<UserSettings>('/user/dashboard/settings/data')
-      setSettings(response.data)
-    } catch (err: unknown) {
-      let message = 'Ошибка загрузки настроек'
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        message = err.response?.data?.error || err.message || message
-      }
-      setError(message)
-    } finally {
-      setLoading(false)
+    if (settingsData) {
+      setSettings(settingsData)
     }
-  }
+  }, [settingsData])
+
+  // Сохранение настроек
+  const { mutate: saveSettings, loading: saving } = useApiMutation<UserSettings, unknown>({
+    url: '/user/dashboard/settings/data',
+    method: 'PUT',
+    errorContext: 'Saving settings',
+    defaultErrorMessage: 'Ошибка сохранения настроек',
+    onSuccess: () => {
+      setSuccess('Настройки успешно сохранены!')
+    },
+  })
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault()
     setError('')
     setSuccess('')
     
-    // Validate phone number format if provided
+    // Валидация телефона
     if (settings.phone && settings.phone.trim()) {
-      const phonePattern = /^8\d{10}$/
-      if (!phonePattern.test(settings.phone.trim())) {
-        setError('Номер телефона должен быть в формате 89693386969 (11 цифр, начинается с 8)')
+      if (!PHONE_PATTERN.test(settings.phone.trim())) {
+        setError(PHONE_ERROR_MESSAGE)
         return
       }
     }
     
-    setLoading(true)
-
-    try {
-      await api.put('/user/dashboard/settings/data', settings)
-      setSuccess('Настройки успешно сохранены!')
-    } catch (err: unknown) {
-      let message = 'Ошибка сохранения настроек'
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        message = err.response?.data?.error || err.response?.data?.details || err.message || message
-      }
-      setError(message)
-    } finally {
-      setLoading(false)
-    }
+    await saveSettings(settings)
   }
 
   const handleChange = (field: keyof UserSettings, value: string | boolean | string[]): void => {
@@ -219,8 +216,8 @@ export default function UserSettings(): JSX.Element {
             </div>
 
             <div className="form-actions">
-              <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-                {loading ? 'Сохранение...' : 'Сохранить настройки'}
+              <button type="submit" className="btn btn-primary btn-block" disabled={saving || loadingSettings}>
+                {saving ? 'Сохранение...' : 'Сохранить настройки'}
               </button>
             </div>
           </form>

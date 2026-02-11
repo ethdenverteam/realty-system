@@ -1,10 +1,11 @@
-import axios from 'axios'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import ObjectForm from '../../components/ObjectForm'
-import api from '../../utils/api'
-import type { ObjectFormData, CreateObjectRequest, CreateObjectResponse, ApiErrorResponse } from '../../types/models'
+import { useApiData } from '../../hooks/useApiData'
+import { useApiMutation } from '../../hooks/useApiMutation'
+import { PHONE_PATTERN, PHONE_ERROR_MESSAGE } from '../../utils/constants'
+import type { ObjectFormData, CreateObjectRequest, CreateObjectResponse } from '../../types/models'
 import './CreateObject.css'
 
 const initialFormData: ObjectFormData = {
@@ -29,84 +30,77 @@ interface UserSettings {
 
 export default function UserCreateObject(): JSX.Element {
   const navigate = useNavigate()
-  const [loading, setLoading] = useState<boolean>(false)
-  const [error, setError] = useState<string>('')
   const [formData, setFormData] = useState<ObjectFormData>(initialFormData)
 
-  useEffect(() => {
-    void loadUserSettings()
-  }, [])
+  // Загрузка настроек пользователя
+  const { data: settingsData } = useApiData<UserSettings>({
+    url: '/user/dashboard/settings/data',
+    errorContext: 'Loading user settings',
+    defaultErrorMessage: 'Ошибка загрузки настроек',
+    autoLoad: true,
+  })
 
-  const loadUserSettings = async (): Promise<void> => {
-    try {
-      const response = await api.get<UserSettings>('/user/dashboard/settings/data')
+  // Применение настроек к форме
+  useEffect(() => {
+    if (settingsData) {
       setFormData((prev) => ({
         ...prev,
-        phone_number: response.data.phone || '',
-        contact_name: response.data.contact_name || '',
-        show_username: response.data.default_show_username || false,
+        phone_number: settingsData.phone || '',
+        contact_name: settingsData.contact_name || '',
+        show_username: settingsData.default_show_username || false,
       }))
-    } catch (err: unknown) {
-      // Silently fail - settings are optional
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error('Failed to load user settings:', err.response?.data || err.message)
-      }
     }
-  }
+  }, [settingsData])
+
+  // Мутация для создания объекта
+  const { mutate: createObject, loading, error, clearError } = useApiMutation<CreateObjectRequest, CreateObjectResponse>({
+    url: '/objects/',
+    method: 'POST',
+    errorContext: 'Creating object',
+    defaultErrorMessage: 'Ошибка при создании объекта',
+    onSuccess: (data) => {
+      if (data.success || data.object_id) {
+        navigate('/user/dashboard/objects', { replace: true })
+      }
+    },
+  })
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault()
-    setError('')
-    
-    // Validate phone number if provided
+    clearError()
+
+    // Валидация телефона
     if (formData.phone_number && formData.phone_number.trim()) {
-      const phonePattern = /^8\d{10}$/
-      if (!phonePattern.test(formData.phone_number.trim())) {
-        setError('Номер телефона должен быть в формате 89693386969 (11 цифр, начинается с 8)')
+      if (!PHONE_PATTERN.test(formData.phone_number.trim())) {
+        clearError()
+        // Устанавливаем ошибку через состояние (можно улучшить через setError в хуке)
         return
       }
     }
-    
-    setLoading(true)
 
-    try {
-      const districts = formData.districts
-        ? formData.districts
-            .split(',')
-            .map((d) => d.trim())
-            .filter((d) => d.length > 0)
-        : []
+    // Подготовка данных
+    const districts = formData.districts
+      ? formData.districts
+          .split(',')
+          .map((d) => d.trim())
+          .filter((d) => d.length > 0)
+      : []
 
-      const requestData: CreateObjectRequest = {
-        rooms_type: formData.rooms_type,
-        price: parseFloat(formData.price),
-        area: formData.area ? parseFloat(formData.area) : null,
-        floor: formData.floor || null,
-        districts_json: districts,
-        comment: formData.comment || null,
-        address: formData.address || null,
-        renovation: formData.renovation || null,
-        contact_name: formData.contact_name || null,
-        phone_number: formData.phone_number?.trim() || null,
-        show_username: formData.show_username,
-      }
-
-      const response = await api.post<CreateObjectResponse>('/objects/', requestData)
-
-      if (response.data.success || response.data.object_id) {
-        navigate('/user/dashboard/objects', { replace: true })
-      } else {
-        setError('Ошибка при создании объекта')
-      }
-    } catch (err: unknown) {
-      let message = 'Ошибка при создании объекта'
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        message = err.response?.data?.error || err.message || message
-      }
-      setError(message)
-    } finally {
-      setLoading(false)
+    const requestData: CreateObjectRequest = {
+      rooms_type: formData.rooms_type,
+      price: parseFloat(formData.price),
+      area: formData.area ? parseFloat(formData.area) : null,
+      floor: formData.floor || null,
+      districts_json: districts,
+      comment: formData.comment || null,
+      address: formData.address || null,
+      renovation: formData.renovation || null,
+      contact_name: formData.contact_name || null,
+      phone_number: formData.phone_number?.trim() || null,
+      show_username: formData.show_username,
     }
+
+    await createObject(requestData)
   }
 
   const handleCancel = (): void => {
@@ -124,7 +118,7 @@ export default function UserCreateObject(): JSX.Element {
           submitLabel="Создать объект"
           cancelLabel="Отмена"
           onCancel={handleCancel}
-          error={error}
+          error={error || (formData.phone_number && formData.phone_number.trim() && !PHONE_PATTERN.test(formData.phone_number.trim()) ? PHONE_ERROR_MESSAGE : '')}
         />
       </div>
     </Layout>

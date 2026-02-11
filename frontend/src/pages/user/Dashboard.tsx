@@ -1,37 +1,19 @@
-import axios from 'axios'
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../contexts/AuthContext'
-import api from '../../utils/api'
-import type { UserStats, ApiErrorResponse } from '../../types/models'
+import { useApiData } from '../../hooks/useApiData'
+import type { UserStats } from '../../types/models'
 import './Dashboard.css'
 
 export default function UserDashboard(): JSX.Element {
   const { user } = useAuth()
-  const [stats, setStats] = useState<UserStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
 
-  useEffect(() => {
-    void loadStats()
-  }, [])
-
-  const loadStats = async (): Promise<void> => {
-    try {
-      const res = await api.get<UserStats>('/user/dashboard/stats')
-      setStats(res.data)
-    } catch (err: unknown) {
-      setError('Ошибка загрузки данных')
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error(err.response?.data || err.message)
-      } else {
-        console.error(err)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Загрузка статистики
+  const { data: stats, loading, error } = useApiData<UserStats>({
+    url: '/user/dashboard/stats',
+    errorContext: 'Loading dashboard stats',
+    defaultErrorMessage: 'Ошибка загрузки данных',
+  })
 
   return (
     <Layout title="Моя панель">

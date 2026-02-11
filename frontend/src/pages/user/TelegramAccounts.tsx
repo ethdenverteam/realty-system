@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { GlassCard } from '../../components/GlassCard'
+import { useApiData } from '../../hooks/useApiData'
+import { useApiMutation } from '../../hooks/useApiMutation'
+import { getErrorMessage, logError } from '../../utils/errorHandler'
 import api from '../../utils/api'
-import axios from 'axios'
-import type { ApiErrorResponse } from '../../types/models'
 import './TelegramAccounts.css'
 
 interface TelegramAccount {
@@ -29,8 +30,6 @@ interface TelegramChat {
 
 export default function TelegramAccounts(): JSX.Element {
   const navigate = useNavigate()
-  const [accounts, setAccounts] = useState<TelegramAccount[]>([])
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   
@@ -42,29 +41,16 @@ export default function TelegramAccounts(): JSX.Element {
   const [testMessageAccount, setTestMessageAccount] = useState<number | null>(null)
   const [testMessageChatId, setTestMessageChatId] = useState('')
   const [testMessageText, setTestMessageText] = useState('Тестовое сообщение')
-  const [sendingTestMessage, setSendingTestMessage] = useState(false)
 
-  useEffect(() => {
-    void loadAccounts()
-  }, [])
-
-  const loadAccounts = async (): Promise<void> => {
-    try {
-      setLoading(true)
-      setError('')
-      const res = await api.get<TelegramAccount[]>('/accounts')
-      setAccounts(res.data)
-    } catch (err: unknown) {
-      setError('Ошибка загрузки аккаунтов')
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error(err.response?.data || err.message)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Загрузка аккаунтов
+  const { data: accounts, loading, reload: reloadAccounts } = useApiData<TelegramAccount[]>({
+    url: '/accounts',
+    errorContext: 'Loading accounts',
+    defaultErrorMessage: 'Ошибка загрузки аккаунтов',
+  })
 
 
+  // Загрузка чатов для аккаунта
   const loadAccountChats = async (accountId: number): Promise<void> => {
     try {
       setLoadingChats(accountId)
@@ -79,17 +65,17 @@ export default function TelegramAccounts(): JSX.Element {
         setSuccess(`Загружено чатов: ${res.data.chats.length}`)
       }
     } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        setError(err.response?.data?.error || 'Ошибка загрузки чатов')
-      } else {
-        setError('Ошибка загрузки чатов')
-      }
+      const message = getErrorMessage(err, 'Ошибка загрузки чатов')
+      setError(message)
+      logError(err, 'Loading account chats')
     } finally {
       setLoadingChats(null)
     }
   }
 
-  const sendTestMessage = async (accountId: number): Promise<void> => {
+  // Отправка тестового сообщения
+  const [sendingTestMessage, setSendingTestMessage] = useState(false)
+  const handleSendTestMessage = async (accountId: number): Promise<void> => {
     if (!testMessageChatId.trim()) {
       setError('Введите ID чата')
       return
@@ -100,39 +86,40 @@ export default function TelegramAccounts(): JSX.Element {
       setError('')
       const res = await api.post<{ success: boolean; message_id?: number; message?: string }>(`/accounts/${accountId}/test-message`, {
         chat_id: testMessageChatId.trim(),
-        message: testMessageText.trim() || 'Тестовое сообщение'
+        message: testMessageText.trim() || 'Тестовое сообщение',
       })
       
       if (res.data.success) {
-        setSuccess(`Тестовое сообщение отправлено (ID: ${res.data.message_id})`)
+        setSuccess(`Тестовое сообщение отправлено (ID: ${res.data.message_id || 'N/A'})`)
         setTestMessageAccount(null)
         setTestMessageChatId('')
-        void loadAccounts()
+        void reloadAccounts()
       }
     } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        setError(err.response?.data?.error || 'Ошибка отправки сообщения')
-      } else {
-        setError('Ошибка отправки сообщения')
-      }
+      const message = getErrorMessage(err, 'Ошибка отправки сообщения')
+      setError(message)
+      logError(err, 'Sending test message')
     } finally {
       setSendingTestMessage(false)
     }
   }
 
-  const toggleAccountActive = async (accountId: number, isActive: boolean): Promise<void> => {
+  // Переключение активности аккаунта
+  const handleToggleAccountActive = async (accountId: number, isActive: boolean): Promise<void> => {
     try {
+      setError('')
       await api.put(`/accounts/${accountId}`, { is_active: !isActive })
-      void loadAccounts()
       setSuccess('Настройки аккаунта обновлены')
+      void reloadAccounts()
     } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        setError(err.response?.data?.error || 'Ошибка обновления')
-      }
+      const message = getErrorMessage(err, 'Ошибка обновления')
+      setError(message)
+      logError(err, 'Toggling account active')
     }
   }
 
-  const deleteAccount = async (accountId: number): Promise<void> => {
+  // Удаление аккаунта
+  const handleDeleteAccount = async (accountId: number): Promise<void> => {
     const confirmed = window.confirm(
       'Вы уверены, что хотите ПОЛНОСТЬЮ УДАЛИТЬ аккаунт? Будет удалена сессия и все связанные с ним чаты.'
     )
@@ -146,13 +133,11 @@ export default function TelegramAccounts(): JSX.Element {
         return
       }
       setSuccess('Аккаунт и связанные с ним чаты успешно удалены')
-      void loadAccounts()
+      void reloadAccounts()
     } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        setError(err.response?.data?.error || 'Ошибка удаления аккаунта')
-      } else {
-        setError('Ошибка удаления аккаунта')
-      }
+      const message = getErrorMessage(err, 'Ошибка удаления аккаунта')
+      setError(message)
+      logError(err, 'Deleting account')
     }
   }
 
@@ -179,7 +164,7 @@ export default function TelegramAccounts(): JSX.Element {
 
         {loading ? (
           <div className="loading">Загрузка...</div>
-        ) : accounts.length === 0 ? (
+        ) : !accounts || accounts.length === 0 ? (
           <GlassCard className="empty-state">
             <p>Нет подключенных аккаунтов</p>
             <button className="btn btn-primary" onClick={() => navigate('/user/dashboard/telegram-accounts/connect')}>
@@ -204,13 +189,13 @@ export default function TelegramAccounts(): JSX.Element {
                   <div className="account-actions">
                     <button
                       className={`btn btn-small ${account.is_active ? 'btn-warning' : 'btn-success'}`}
-                      onClick={() => void toggleAccountActive(account.account_id, account.is_active)}
+                      onClick={() => handleToggleAccountActive(account.account_id, account.is_active)}
                     >
                       {account.is_active ? 'Деактивировать' : 'Активировать'}
                     </button>
                     <button
                       className="btn btn-small btn-danger"
-                      onClick={() => void deleteAccount(account.account_id)}
+                      onClick={() => handleDeleteAccount(account.account_id)}
                     >
                       ПОЛНОСТЬЮ УДАЛИТЬ
                     </button>
@@ -314,8 +299,8 @@ export default function TelegramAccounts(): JSX.Element {
                   </button>
                   <button
                     className="btn btn-primary"
-                    onClick={() => void sendTestMessage(testMessageAccount)}
-                    disabled={sendingTestMessage}
+                    onClick={() => testMessageAccount && handleSendTestMessage(testMessageAccount)}
+                    disabled={sendingTestMessage || !testMessageAccount}
                   >
                     {sendingTestMessage ? 'Отправка...' : 'Отправить'}
                   </button>

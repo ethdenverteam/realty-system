@@ -1,13 +1,14 @@
-import { useEffect, useState, useRef } from 'react'
-import axios from 'axios'
+import { useState, useRef, useEffect } from 'react'
 import Layout from '../../components/Layout'
 import { GlassCard } from '../../components/GlassCard'
+import { useApiData } from '../../hooks/useApiData'
+import { useApiMutation } from '../../hooks/useApiMutation'
+import { getErrorMessage, logError } from '../../utils/errorHandler'
 import api from '../../utils/api'
 import type {
   AutopublishItem,
   AutopublishListResponse,
   RealtyObjectListItem,
-  ApiErrorResponse,
   AutopublishAccountsConfig,
   AutopublishAccountConfig,
   BotChatListItem,
@@ -43,12 +44,6 @@ interface ChatGroup {
 }
 
 export default function Autopublish(): JSX.Element {
-  const [items, setItems] = useState<AutopublishItem[]>([])
-  const [availableObjects, setAvailableObjects] = useState<RealtyObjectListItem[]>([])
-  const [accounts, setAccounts] = useState<TelegramAccount[]>([])
-  const [accountChats, setAccountChats] = useState<Record<number, BotChatListItem[]>>({})
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [editingObjectId, setEditingObjectId] = useState<string | null>(null)
@@ -56,63 +51,38 @@ export default function Autopublish(): JSX.Element {
   const [loadingChatsForAccount, setLoadingChatsForAccount] = useState<number | null>(null)
   const [objectChats, setObjectChats] = useState<Record<string, ObjectChatsResponse>>({})
   const [loadingChatsForObject, setLoadingChatsForObject] = useState<string | null>(null)
-  const [chatGroups, setChatGroups] = useState<ChatGroup[]>([])
   const [showChatsModal, setShowChatsModal] = useState<string | null>(null)
   const [showEditChatsModal, setShowEditChatsModal] = useState<string | null>(null)
   const [editingChats, setEditingChats] = useState<number[]>([])
 
-  useEffect(() => {
-    void loadData()
-    void loadAccounts()
-    void loadChatGroups()
-  }, [])
+  // Загрузка данных автопубликации
+  const { data: autopublishData, loading, reload: reloadAutopublish } = useApiData<AutopublishListResponse>({
+    url: '/user/dashboard/autopublish',
+    errorContext: 'Loading autopublish data',
+    defaultErrorMessage: 'Ошибка загрузки настроек автопубликации',
+  })
+  const items = autopublishData?.autopublish_items || []
+  const availableObjects = autopublishData?.available_objects || []
 
-  const loadChatGroups = async (): Promise<void> => {
-    try {
-      const res = await api.get<ChatGroup[]>('/chats/groups')
-      setChatGroups(res.data)
-    } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error('Error loading chat groups:', err.response?.data || err.message)
-      } else {
-        console.error('Error loading chat groups:', err)
-      }
-    }
-  }
+  // Загрузка аккаунтов
+  const { data: accountsData } = useApiData<TelegramAccount[]>({
+    url: '/accounts',
+    errorContext: 'Loading accounts',
+    defaultErrorMessage: 'Ошибка загрузки аккаунтов',
+  })
+  const accounts = (accountsData || []).filter((a) => a.is_active)
 
-  const loadData = async (): Promise<void> => {
-    try {
-      setLoading(true)
-      setError('')
-      const res = await api.get<AutopublishListResponse>('/user/dashboard/autopublish')
-      setItems(res.data.autopublish_items || [])
-      setAvailableObjects(res.data.available_objects || [])
-    } catch (err: unknown) {
-      setError('Ошибка загрузки настроек автопубликации')
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error(err.response?.data || err.message)
-      } else {
-        console.error(err)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Загрузка групп чатов
+  const { data: chatGroupsData } = useApiData<ChatGroup[]>({
+    url: '/chats/groups',
+    errorContext: 'Loading chat groups',
+    defaultErrorMessage: 'Ошибка загрузки групп чатов',
+  })
+  const chatGroups = chatGroupsData || []
 
-  const loadAccounts = async (): Promise<void> => {
-    try {
-      const res = await api.get<TelegramAccount[]>('/accounts')
-      // Берём только активные аккаунты пользователя
-      setAccounts(res.data.filter((a) => a.is_active))
-    } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error('Error loading accounts:', err.response?.data || err.message)
-      } else {
-        console.error('Error loading accounts:', err)
-      }
-    }
-  }
+  const [accountChats, setAccountChats] = useState<Record<number, BotChatListItem[]>>({})
 
+  // Загрузка чатов для аккаунта
   const loadChatsForAccount = async (accountId: number): Promise<void> => {
     try {
       setLoadingChatsForAccount(accountId)
@@ -121,43 +91,33 @@ export default function Autopublish(): JSX.Element {
       })
       setAccountChats((prev) => ({ ...prev, [accountId]: res.data }))
     } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error('Error loading chats:', err.response?.data || err.message)
-      } else {
-        console.error('Error loading chats:', err)
-      }
+      logError(err, 'Loading chats for account')
     } finally {
       setLoadingChatsForAccount(null)
     }
   }
 
-  const handleAddObject = async (objectId: string): Promise<void> => {
-    try {
-      setSaving(true)
-      setError('')
-      // Просто включаем автопубликацию для объекта (бот всегда включен)
-      const res = await api.post<{ success: boolean }>('/user/dashboard/autopublish', {
-        object_id: objectId,
-        bot_enabled: true,
-      })
-      if (res.data.success) {
-        setSuccess('Автопубликация включена для объекта')
-        setTimeout(() => setSuccess(''), 3000)
-        await loadData()
-      }
-    } catch (err: unknown) {
-      const errorMessage = axios.isAxiosError<ApiErrorResponse>(err) 
-        ? (err.response?.data?.error || err.message || 'Ошибка включения автопубликации')
-        : 'Ошибка включения автопубликации'
-      setError(errorMessage)
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error(err.response?.data || err.message)
-      } else {
-        console.error(err)
-      }
-    } finally {
-      setSaving(false)
-    }
+  // Состояние сохранения (используется в нескольких местах)
+  const [saving, setSaving] = useState(false)
+
+  // Добавление объекта в автопубликацию
+  const { mutate: addObject, loading: addingObject } = useApiMutation<{ object_id: string; bot_enabled: boolean }, { success: boolean }>({
+    url: '/user/dashboard/autopublish',
+    method: 'POST',
+    errorContext: 'Adding object to autopublish',
+    defaultErrorMessage: 'Ошибка включения автопубликации',
+    onSuccess: () => {
+      setSuccess('Автопубликация включена для объекта')
+      setTimeout(() => setSuccess(''), 3000)
+      void reloadAutopublish()
+    },
+  })
+
+  const handleAddObject = (objectId: string): void => {
+    void addObject({
+      object_id: objectId,
+      bot_enabled: true,
+    })
   }
 
   // Удалена функция handleToggleEnabled - автопубликация всегда включена
@@ -205,6 +165,7 @@ export default function Autopublish(): JSX.Element {
     setEditingConfig({ accounts: accountsCopy })
   }
 
+  // Сохранение конфигурации аккаунтов
   const saveAccountsConfig = async (): Promise<void> => {
     if (!editingObjectId || !editingConfig) return
     
@@ -215,6 +176,7 @@ export default function Autopublish(): JSX.Element {
       return
     }
     
+    // Используем прямую мутацию с динамическим URL
     try {
       setSaving(true)
       setError('')
@@ -225,23 +187,20 @@ export default function Autopublish(): JSX.Element {
         setSuccess('Настройки аккаунтов для автопубликации сохранены')
         setTimeout(() => setSuccess(''), 3000)
         closeAccountsModal()
-        await loadData()
+        void reloadAutopublish()
       }
     } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        const errorMsg = err.response?.data?.error || 'Ошибка сохранения настроек аккаунтов'
-        setError(errorMsg)
-        if (errorMsg.includes('Сначала выберите чаты')) {
-          setError('Сначала выберите чаты для аккаунтов. Нельзя включить автопубликацию через аккаунты без выбранных чатов.')
-        }
-      } else {
-        setError('Ошибка сохранения настроек аккаунтов')
-      }
+      const errorMsg = getErrorMessage(err, 'Ошибка сохранения настроек аккаунтов')
+      setError(errorMsg.includes('Сначала выберите чаты') 
+        ? 'Сначала выберите чаты для аккаунтов. Нельзя включить автопубликацию через аккаунты без выбранных чатов.'
+        : errorMsg)
+      logError(err, 'Saving accounts config')
     } finally {
       setSaving(false)
     }
   }
 
+  // Сохранение конфигурации для объекта
   const saveAccountsConfigForObject = async (objectId: string, config: AutopublishAccountsConfig): Promise<void> => {
     try {
       setSaving(true)
@@ -250,56 +209,45 @@ export default function Autopublish(): JSX.Element {
         accounts_config_json: config,
       })
       if (res.data.success) {
-        await loadData()
+        void reloadAutopublish()
       }
     } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        setError(err.response?.data?.error || 'Ошибка сохранения настроек')
-      } else {
-        setError('Ошибка сохранения настроек')
-      }
+      const message = getErrorMessage(err, 'Ошибка сохранения настроек')
+      setError(message)
+      logError(err, 'Saving accounts config for object')
     } finally {
       setSaving(false)
     }
   }
 
-
+  // Удаление объекта из автопубликации
   const handleDelete = async (objectId: string): Promise<void> => {
     const confirmed = window.confirm('Убрать объект из автопубликации?')
     if (!confirmed) return
 
     try {
-      setSaving(true)
       setError('')
       const res = await api.delete<{ success: boolean }>(`/user/dashboard/autopublish/${objectId}`)
       if (res.data.success) {
         setSuccess('Объект удален из автопубликации')
         setTimeout(() => setSuccess(''), 3000)
-        await loadData()
+        void reloadAutopublish()
       }
     } catch (err: unknown) {
-      setError('Ошибка удаления объекта из автопубликации')
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error(err.response?.data || err.message)
-      } else {
-        console.error(err)
-      }
-    } finally {
-      setSaving(false)
+      const message = getErrorMessage(err, 'Ошибка удаления объекта из автопубликации')
+      setError(message)
+      logError(err, 'Deleting object from autopublish')
     }
   }
 
+  // Загрузка чатов для объекта
   const loadChatsForObject = async (objectId: string): Promise<void> => {
     try {
       setLoadingChatsForObject(objectId)
       const res = await api.get<ObjectChatsResponse>(`/user/dashboard/autopublish/${objectId}/chats`)
       setObjectChats((prev) => ({ ...prev, [objectId]: res.data }))
     } catch (err: unknown) {
-      if (axios.isAxiosError<ApiErrorResponse>(err)) {
-        console.error('Error loading chats:', err.response?.data || err.message)
-      } else {
-        console.error('Error loading chats:', err)
-      }
+      logError(err, 'Loading chats for object')
     } finally {
       setLoadingChatsForObject(null)
     }
@@ -363,7 +311,7 @@ export default function Autopublish(): JSX.Element {
                             type="checkbox"
                             checked={true}
                             onChange={() => void handleDelete(obj.object_id as string)}
-                            disabled={saving}
+                            disabled={saving || addingObject}
                             className="toggle-switch"
                           />
                         </label>
@@ -378,22 +326,18 @@ export default function Autopublish(): JSX.Element {
                             onChange={async () => {
                               // Отключаем аккаунты - очищаем accounts_config_json
                               try {
-                                setSaving(true)
+                                setError('')
                                 await api.put<{ success: boolean }>(`/user/dashboard/autopublish/${obj.object_id}`, {
                                   accounts_config_json: { accounts: [] },
                                 })
-                                await loadData()
+                                void reloadAutopublish()
                               } catch (err: unknown) {
-                                if (axios.isAxiosError<ApiErrorResponse>(err)) {
-                                  setError(err.response?.data?.error || 'Ошибка изменения режима')
-                                } else {
-                                  setError('Ошибка изменения режима')
-                                }
-                              } finally {
-                                setSaving(false)
+                                const message = getErrorMessage(err, 'Ошибка изменения режима')
+                                setError(message)
+                                logError(err, 'Changing publish mode')
                               }
                             }}
-                            disabled={saving}
+                            disabled={saving || addingObject}
                             className="toggle-radio"
                           />
                         </label>
@@ -407,7 +351,7 @@ export default function Autopublish(): JSX.Element {
                               // Открываем модальное окно для выбора аккаунтов
                               openAccountsModal(item)
                             }}
-                            disabled={saving}
+                            disabled={saving || addingObject}
                             className="toggle-radio"
                           />
                         </label>
@@ -461,7 +405,7 @@ export default function Autopublish(): JSX.Element {
                   type="button"
                   className="object-card compact autopublish-available-item"
                   onClick={() => void handleAddObject(obj.object_id as string)}
-                  disabled={saving}
+                  disabled={saving || addingObject}
                 >
                   <div className="object-details-compact single-line">
                     <span className="object-detail-item">{obj.object_id}</span>

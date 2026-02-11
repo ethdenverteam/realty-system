@@ -151,28 +151,8 @@ export interface ApiErrorResponse {
   message?: string;
 }
 
-// Rooms types
-export type RoomsType = 
-  | 'Студия'
-  | '1к'
-  | '2к'
-  | '3к'
-  | '4+к'
-  | 'Дом'
-  | 'евро1к'
-  | 'евро2к'
-  | 'евро3к';
-
-// Renovation types
-export type RenovationType = 
-  | 'Черновая'
-  | 'ПЧО'
-  | 'Ремонт требует освежения'
-  | 'Хороший ремонт'
-  | 'Инстаграмный';
-
-// Object status types
-export type ObjectStatus = 'черновик' | 'опубликовано' | 'архив';
+// Импортируем типы из констант (единый источник истины)
+export type { RoomsType, RenovationType, ObjectStatus } from '../utils/constants'
 
 // API Response types
 export interface ObjectsListResponse {

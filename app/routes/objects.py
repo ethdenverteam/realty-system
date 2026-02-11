@@ -1,5 +1,6 @@
 """
-Objects routes
+API роуты для работы с объектами недвижимости
+Цель: CRUD операции для объектов, логирование всех действий пользователя
 """
 from flask import Blueprint, request, jsonify, current_app, render_template
 from app.database import db
@@ -30,72 +31,137 @@ def list_objects_page(current_user):
 @objects_bp.route('/', methods=['GET'])
 @jwt_required
 def list_objects(current_user):
-    """Get list of objects"""
-    # Get query parameters
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
-    status = request.args.get('status')
-    rooms_type = request.args.get('rooms_type')
-    search = request.args.get('search')
-    sort_by = request.args.get('sort_by', 'creation_date')
-    sort_order = request.args.get('sort_order', 'desc')
-    
-    # Build query
-    query = Object.query.filter_by(user_id=current_user.user_id)
-    
-    # Apply filters
-    if status:
-        query = query.filter(Object.status == status)
-    
-    if rooms_type:
-        query = query.filter(Object.rooms_type == rooms_type)
-    
-    if search:
-        search_filter = or_(
-            Object.object_id.ilike(f'%{search}%'),
-            Object.address.ilike(f'%{search}%'),
-            Object.comment.ilike(f'%{search}%')
+    """
+    Получение списка объектов недвижимости пользователя
+    Логика: фильтрация, поиск, сортировка, пагинация - все действия логируются
+    """
+    try:
+        # Получаем параметры запроса
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        status = request.args.get('status')
+        rooms_type = request.args.get('rooms_type')
+        search = request.args.get('search')
+        sort_by = request.args.get('sort_by', 'creation_date')
+        sort_order = request.args.get('sort_order', 'desc')
+        
+        logger.info(f"User {current_user.user_id} requested objects list: page={page}, filters={{status={status}, rooms={rooms_type}, search={search}}}")
+        
+        # Строим запрос с фильтром по пользователю
+        query = Object.query.filter_by(user_id=current_user.user_id)
+        
+        # Применяем фильтры
+        if status:
+            query = query.filter(Object.status == status)
+        
+        if rooms_type:
+            query = query.filter(Object.rooms_type == rooms_type)
+        
+        # Поиск по ID, адресу или комментарию
+        if search:
+            search_filter = or_(
+                Object.object_id.ilike(f'%{search}%'),
+                Object.address.ilike(f'%{search}%'),
+                Object.comment.ilike(f'%{search}%')
+            )
+            query = query.filter(search_filter)
+        
+        # Применяем сортировку
+        if sort_by == 'price':
+            order_by = Object.price.desc() if sort_order == 'desc' else Object.price.asc()
+        elif sort_by == 'publication_date':
+            order_by = Object.publication_date.desc() if sort_order == 'desc' else Object.publication_date.asc()
+        else:  # creation_date (по умолчанию)
+            order_by = Object.creation_date.desc() if sort_order == 'desc' else Object.creation_date.asc()
+        
+        query = query.order_by(order_by)
+        
+        # Пагинация
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        # Логируем успешное получение списка
+        log_action(
+            action='objects_list_viewed',
+            user_id=current_user.user_id,
+            details={
+                'page': page,
+                'per_page': per_page,
+                'total': pagination.total,
+                'filters': {
+                    'status': status,
+                    'rooms_type': rooms_type,
+                    'search': search,
+                    'sort_by': sort_by,
+                    'sort_order': sort_order
+                }
+            }
         )
-        query = query.filter(search_filter)
-    
-    # Apply sorting
-    if sort_by == 'price':
-        order_by = Object.price.desc() if sort_order == 'desc' else Object.price.asc()
-    elif sort_by == 'publication_date':
-        order_by = Object.publication_date.desc() if sort_order == 'desc' else Object.publication_date.asc()
-    else:  # creation_date
-        order_by = Object.creation_date.desc() if sort_order == 'desc' else Object.creation_date.asc()
-    
-    query = query.order_by(order_by)
-    
-    # Paginate
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    
-    return jsonify({
-        'objects': [obj.to_dict() for obj in pagination.items],
-        'total': pagination.total,
-        'page': page,
-        'per_page': per_page,
-        'pages': pagination.pages
-    })
+        
+        return jsonify({
+            'objects': [obj.to_dict() for obj in pagination.items],
+            'total': pagination.total,
+            'page': page,
+            'per_page': per_page,
+            'pages': pagination.pages
+        })
+    except Exception as e:
+        logger.error(f"Error listing objects for user {current_user.user_id}: {e}", exc_info=True)
+        log_error(
+            error=e,
+            action='objects_list_viewed',
+            user_id=current_user.user_id
+        )
+        return jsonify({'error': 'Failed to retrieve objects'}), 500
 
 
 @objects_bp.route('/<object_id>', methods=['GET'])
 @jwt_required
 def get_object(object_id, current_user):
-    """Get single object"""
-    obj = Object.query.filter_by(object_id=object_id, user_id=current_user.user_id).first()
-    
-    if not obj:
-        return jsonify({'error': 'Object not found'}), 404
-    
-    return jsonify(obj.to_dict())
+    """
+    Получение одного объекта недвижимости
+    Логика: проверка прав доступа (только свои объекты), логирование просмотра
+    """
+    try:
+        logger.info(f"User {current_user.user_id} requested object {object_id}")
+        
+        obj = Object.query.filter_by(object_id=object_id, user_id=current_user.user_id).first()
+        
+        if not obj:
+            logger.warning(f"Object {object_id} not found for user {current_user.user_id}")
+            log_action(
+                action='object_view_failed',
+                user_id=current_user.user_id,
+                details={'object_id': object_id, 'reason': 'not_found'}
+            )
+            return jsonify({'error': 'Object not found'}), 404
+        
+        # Логируем успешный просмотр объекта
+        log_action(
+            action='object_viewed',
+            user_id=current_user.user_id,
+            details={'object_id': object_id, 'status': obj.status}
+        )
+        
+        return jsonify(obj.to_dict())
+    except Exception as e:
+        logger.error(f"Error getting object {object_id} for user {current_user.user_id}: {e}", exc_info=True)
+        log_error(
+            error=e,
+            action='object_viewed',
+            user_id=current_user.user_id,
+            details={'object_id': object_id}
+        )
+        return jsonify({'error': 'Failed to retrieve object'}), 500
 
 
 @objects_bp.route('/', methods=['POST'])
 @jwt_required
 def create_object(current_user):
-    """Create new object"""
+    """
+    Создание нового объекта недвижимости
+    Логика: поддержка multipart/form-data (загрузка файлов) и JSON, генерация уникального ID, сохранение в БД
+    Все создания объектов логируются для аудита
+    """
     from werkzeug.utils import secure_filename
     import os
     import json
