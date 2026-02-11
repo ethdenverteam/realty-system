@@ -74,7 +74,7 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-md);
-  color: var(--color-text-secondary);
+  color: var(--glass-icon-color, var(--color-text-secondary));
   transition: all var(--transition-fast);
   cursor: pointer;
   background: transparent;
@@ -82,9 +82,21 @@
 
 .header-icon-btn:hover {
   background: var(--glass-bg, rgba(255, 255, 255, 0.12));
-  color: var(--color-text);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  color: var(--glass-icon-color, var(--color-text));
+  backdrop-filter: blur(var(--glass-blur, 2px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 2px));
+}
+
+/* Общие правила тонировки иконок для header и bottom nav */
+.header-icon-btn svg,
+.bottom-nav-icon-btn svg {
+  color: var(--glass-icon-color, var(--color-accent));
+}
+
+.header-icon-btn img,
+.bottom-nav-icon-btn img {
+  /* Превращаем иконку в монохром и заливаем цветом glass-icon-color */
+  filter: brightness(0) saturate(100%) drop-shadow(0 0 0 var(--glass-icon-color, #ff1744));
 }
 
 /* Main content */
@@ -254,30 +266,15 @@
     height: 44px;
   }
 
-  /* Icon colors - всегда красные для дашборд, настройки и объекты */
-  [data-theme="dark"] .mobile-header-actions .header-icon-btn,
-  [data-theme="light"] .mobile-header-actions .header-icon-btn,
-  [data-theme="dark-lines"] .mobile-header-actions .header-icon-btn,
-  [data-theme="light-lines"] .mobile-header-actions .header-icon-btn,
-  [data-theme="dark-random-lines"] .mobile-header-actions .header-icon-btn {
-    color: #ff1744;
+  .mobile-header-actions .header-icon-btn {
+    color: var(--glass-icon-color, var(--color-accent));
   }
   
-  /* Иконки дашборд, настройки и объекты всегда красные */
-  .mobile-header-actions .header-icon-btn img[alt="Объекты"],
-  .mobile-header-actions .header-icon-btn img[alt="Настройки"] {
-    filter: brightness(0) saturate(100%) invert(27%) sepia(94%) saturate(7151%) hue-rotate(337deg) brightness(101%) contrast(101%);
-  }
-
-  [data-theme="dark"] .mobile-header-actions .header-icon-btn:hover,
-  [data-theme="light"] .mobile-header-actions .header-icon-btn:hover,
-  [data-theme="dark-lines"] .mobile-header-actions .header-icon-btn:hover,
-  [data-theme="light-lines"] .mobile-header-actions .header-icon-btn:hover,
-  [data-theme="dark-random-lines"] .mobile-header-actions .header-icon-btn:hover {
-    color: #ff5252;
-    background: rgba(255, 255, 255, 0.12);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+  .mobile-header-actions .header-icon-btn:hover {
+    color: var(--glass-icon-color, var(--color-accent));
+    background: var(--glass-bg, rgba(255, 255, 255, 0.12));
+    backdrop-filter: blur(var(--glass-blur, 2px));
+    -webkit-backdrop-filter: blur(var(--glass-blur, 2px));
   }
 
   /* Mobile bottom nav */
@@ -317,18 +314,8 @@
     height: 24px;
   }
 
-  /* Icon colors for bottom nav - всегда красные для дашборд */
-  [data-theme="dark"] .bottom-nav-icon-btn svg,
-  [data-theme="light"] .bottom-nav-icon-btn svg,
-  [data-theme="dark-lines"] .bottom-nav-icon-btn svg,
-  [data-theme="light-lines"] .bottom-nav-icon-btn svg,
-  [data-theme="dark-random-lines"] .bottom-nav-icon-btn svg {
-    color: #ff1744;
-  }
-  
-  /* Иконка дашборд всегда красная */
-  .bottom-nav-icon-btn img[alt="Главная"] {
-    filter: brightness(0) saturate(100%) invert(27%) sepia(94%) saturate(7151%) hue-rotate(337deg) brightness(101%) contrast(101%);
+  .bottom-nav-icon-btn {
+    color: var(--glass-icon-color, var(--color-accent));
   }
 
   [data-theme="dark"] .mobile-menu-button {

@@ -103,12 +103,18 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
     const hue = Math.floor(Math.random() * 241) // 0-240 (от красного до синего)
     const saturation = 70
     const lightness = 80
-    const alpha = 0.12 // примерно как #96dce31f
+    const alpha = 0.02 // более прозрачное стекло
 
-    const hslaColor = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`
+    const glassColor = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`
 
-    // Один цвет для всех стекол до перезагрузки страницы / смены темы
-    document.documentElement.style.setProperty('--glass-bg', hslaColor)
+    // Инвертированный тон для иконок (противоположный hue)
+    const invertedHue = (hue + 180) % 360
+    const iconLightness = 30 // иконка темнее, чтобы быть читаемой
+    const iconColor = `hsl(${invertedHue}, ${saturation}%, ${iconLightness}%)`
+
+    // Один цвет для всех стекол и иконок до перезагрузки страницы / смены темы
+    document.documentElement.style.setProperty('--glass-bg', glassColor)
+    document.documentElement.style.setProperty('--glass-icon-color', iconColor)
   }
 
   const toggleTheme = () => {

@@ -18,15 +18,15 @@
 
 /* Варианты стекла: прозрачное, затемненное, осветленное */
 .glass-card.glass-transparent {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.02));
 }
 
 .glass-card.glass-darkened {
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.02));
 }
 
 .glass-card.glass-lightened {
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.02));
 }
 
 /* Варианты размытия */
@@ -93,15 +93,15 @@
 
 /* Варианты стекла для кнопок */
 .glass-button.glass-transparent {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.02));
 }
 
 .glass-button.glass-darkened {
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.02));
 }
 
 .glass-button.glass-lightened {
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.02));
 }
 
 .glass-button.glass-no-blur {
