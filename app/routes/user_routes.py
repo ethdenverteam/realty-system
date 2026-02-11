@@ -1007,12 +1007,126 @@ def user_publish_object_via_bot(current_user):
             'errors': errors if errors else None,
             'message': f'Объект успешно опубликован в {published_count} из {len(target_chats)} чатов'
         }), 200
+
+
+@user_routes_bp.route('/dashboard/objects/<object_id>/preview', methods=['POST'])
+@jwt_required
+def user_preview_object_in_bot(object_id, current_user):
+    """Send preview of object to user via bot"""
+    import requests
+    from bot.config import BOT_TOKEN
+    from bot.utils import format_publication_text
+    from bot.models import User as BotUser, Object as BotObject
+    from bot.database import get_db as get_bot_db
+    
+    # Get object
+    obj = Object.query.filter_by(object_id=object_id, user_id=current_user.user_id).first()
+    if not obj:
+        return jsonify({'error': 'Object not found'}), 404
+    
+    # Check if user has telegram_id
+    if not hasattr(current_user, 'telegram_id') or not current_user.telegram_id:
+        return jsonify({
+            'error': 'Telegram ID not found',
+            'details': 'Please connect your Telegram account first'
+        }), 400
+    
+    if not BOT_TOKEN:
+        return jsonify({'error': 'BOT_TOKEN is not configured'}), 500
+    
+    try:
+        # Get bot user
+        bot_user = None
+        bot_db = get_bot_db()
+        try:
+            bot_user = bot_db.query(BotUser).filter_by(telegram_id=int(current_user.telegram_id)).first()
+        finally:
+            bot_db.close()
         
+        # Get or create bot object
+        bot_db = get_bot_db()
+        try:
+            bot_obj = bot_db.query(BotObject).filter_by(object_id=object_id).first()
+            if not bot_obj:
+                # Create bot object from web object
+                bot_obj = BotObject(
+                    object_id=obj.object_id,
+                    user_id=bot_user.user_id if bot_user else None,
+                    rooms_type=obj.rooms_type,
+                    price=obj.price,
+                    districts_json=obj.districts_json,
+                    region=obj.region,
+                    city=obj.city,
+                    photos_json=obj.photos_json,
+                    area=obj.area,
+                    floor=obj.floor,
+                    address=obj.address,
+                    renovation=obj.renovation,
+                    comment=obj.comment,
+                    contact_name=obj.contact_name,
+                    show_username=obj.show_username,
+                    phone_number=obj.phone_number,
+                    status=obj.status,
+                    source='web'
+                )
+                bot_db.add(bot_obj)
+                bot_db.commit()
+        finally:
+            bot_db.close()
+        
+        # Format publication text with preview flag
+        publication_text = format_publication_text(bot_obj, bot_user, is_preview=True)
+        
+        # Send message to user via bot
+        url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
+        payload = {
+            'chat_id': int(current_user.telegram_id),
+            'text': publication_text,
+            'parse_mode': 'HTML'
+        }
+        
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+        result = response.json()
+        
+        if not result.get('ok'):
+            error_description = result.get('description', 'Unknown error')
+            return jsonify({
+                'error': f'Failed to send preview: {error_description}',
+                'details': 'Make sure you have started a conversation with the bot'
+            }), 500
+        
+        message_id = result.get('result', {}).get('message_id')
+        
+        # Log action
+        log_action(
+            action='web_object_preview_sent',
+            user_id=current_user.user_id,
+            details={
+                'object_id': object_id,
+                'message_id': message_id
+            }
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Превью отправлено в Telegram',
+            'message_id': message_id
+        }), 200
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error sending preview: {e}", exc_info=True)
+        return jsonify({
+            'error': 'Failed to send preview',
+            'details': str(e)
+        }), 500
     except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error publishing object via bot: {e}", exc_info=True)
-        log_error(e, 'web_object_publish_via_bot_failed', current_user.user_id, {'object_id': object_id})
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error in preview: {e}", exc_info=True)
+        log_error(e, 'user_preview_object_failed', current_user.user_id, {'object_id': object_id})
+        return jsonify({
+            'error': 'Internal server error',
+            'details': str(e)
+        }), 500
 
 
 @user_routes_bp.route('/dashboard/settings', methods=['GET'])

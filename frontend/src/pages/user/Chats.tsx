@@ -64,7 +64,7 @@ export default function Chats(): JSX.Element {
 
   // Автоматический выбор первого аккаунта
   useEffect(() => {
-    if (accounts.length > 0 && !selectedAccountId) {
+    if (accounts.length > 0 && !selectedAccountId && accounts[0]) {
       setSelectedAccountId(accounts[0].account_id)
     }
   }, [accounts, selectedAccountId])
@@ -211,7 +211,7 @@ export default function Chats(): JSX.Element {
           <div className="card-header-row">
             <h2 className="card-title">
               Чаты из аккаунтов
-              {selectedAccountId && !loading && (
+              {selectedAccountId && !loadingChats && (
                 <span className="chats-count"> ({chats.length})</span>
               )}
             </h2>
@@ -259,15 +259,23 @@ export default function Chats(): JSX.Element {
             </div>
           </div>
 
-          {(loadingAccounts || loadingChats) && <div className="loading">Загрузка...</div>}
-
-          {!loadingAccounts && !loadingChats && selectedAccountId && chats.length === 0 && (
+          {loadingAccounts ? (
+            <div className="loading">Загрузка аккаунтов...</div>
+          ) : accounts.length === 0 ? (
+            <div className="empty-state">
+              <p>Нет активных аккаунтов. Подключите аккаунт в настройках Telegram аккаунтов.</p>
+            </div>
+          ) : !selectedAccountId ? (
+            <div className="empty-state">
+              <p>Выберите аккаунт для просмотра чатов.</p>
+            </div>
+          ) : loadingChats ? (
+            <div className="loading">Загрузка чатов...</div>
+          ) : chats.length === 0 ? (
             <div className="empty-state">
               <p>Чаты не найдены. Нажмите "Обновить чаты" для загрузки или измените параметры поиска.</p>
             </div>
-          )}
-
-          {!loadingAccounts && !loadingChats && chats.length > 0 && (
+          ) : (
             <div className="objects-list chats-list">
               {chats.map(chat => (
                 <div key={chat.chat_id} className="object-card compact chat-item">
@@ -331,7 +339,7 @@ export default function Chats(): JSX.Element {
                 ) : (
                   <div className="objects-list">
                     {objects.map(obj => (
-                      <div key={obj.object_id} className="object-item" onClick={() => void publishObject(obj.object_id)}>
+                      <div key={obj.object_id} className="object-item">
                         <div className="object-info">
                           <strong>{obj.object_id}</strong>
                           {obj.rooms_type && <span>{obj.rooms_type}</span>}

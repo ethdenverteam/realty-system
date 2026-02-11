@@ -22,6 +22,9 @@ export default function ViewObject(): JSX.Element {
   const [chats, setChats] = useState<Array<{ chat_id: number; title: string }>>([])
   const [selectedChatId, setSelectedChatId] = useState<number | null>(null)
   const [publishingViaAccount, setPublishingViaAccount] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+  const [previewError, setPreviewError] = useState('')
+  const [previewSuccess, setPreviewSuccess] = useState(false)
 
   const loadObject = useCallback(async () => {
     if (!objectId) return
@@ -140,6 +143,12 @@ export default function ViewObject(): JSX.Element {
         {publishSuccess && (
           <div className="alert alert-success">
             Объект успешно опубликован через бота! Проверьте Telegram для подтверждения.
+          </div>
+        )}
+        {previewError && <div className="alert alert-error">{previewError}</div>}
+        {previewSuccess && (
+          <div className="alert alert-success">
+            Превью отправлено в Telegram! Проверьте бота.
           </div>
         )}
 
@@ -274,6 +283,33 @@ export default function ViewObject(): JSX.Element {
             >
               Редактировать
             </Link>
+            <button
+              onClick={async () => {
+                try {
+                  setPreviewing(true)
+                  setPreviewError('')
+                  setPreviewSuccess(false)
+                  const res = await api.post<{ success: boolean; message?: string }>(`/user/dashboard/objects/${objectId}/preview`)
+                  if (res.data.success) {
+                    setPreviewSuccess(true)
+                    setTimeout(() => setPreviewSuccess(false), 5000)
+                  }
+                } catch (err: unknown) {
+                  let message = 'Ошибка отправки превью'
+                  if (axios.isAxiosError<ApiErrorResponse>(err)) {
+                    message = err.response?.data?.error || err.response?.data?.details || err.message || message
+                  }
+                  setPreviewError(message)
+                  setTimeout(() => setPreviewError(''), 5000)
+                } finally {
+                  setPreviewing(false)
+                }
+              }}
+              disabled={previewing}
+              className="btn btn-secondary"
+            >
+              {previewing ? 'Отправка...' : 'Превью в боте'}
+            </button>
             <button
               onClick={async () => {
                 try {
