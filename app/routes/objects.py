@@ -175,6 +175,7 @@ def create_object(current_user):
         floor = request.form.get('floor', '')
         comment = request.form.get('comment', '')
         address = request.form.get('address', '')
+        residential_complex = request.form.get('residential_complex', '')
         renovation = request.form.get('renovation', '')
         contact_name = request.form.get('contact_name', '')
         phone_number = request.form.get('phone_number', '')
@@ -213,6 +214,7 @@ def create_object(current_user):
         floor = data.get('floor', '')
         comment = data.get('comment', '')
         address = data.get('address', '')
+        residential_complex = data.get('residential_complex', '')
         renovation = data.get('renovation', '')
         contact_name = data.get('contact_name', '')
         phone_number = data.get('phone_number', '')
@@ -259,6 +261,7 @@ def create_object(current_user):
         area=area,
         floor=floor,
         address=address,
+        residential_complex=residential_complex if residential_complex else None,
         renovation=renovation,
         comment=comment,
         contact_name=contact_name,
@@ -322,6 +325,8 @@ def update_object(object_id, current_user):
         obj.floor = data['floor']
     if 'address' in data:
         obj.address = data['address']
+    if 'residential_complex' in data:
+        obj.residential_complex = data['residential_complex'] if data['residential_complex'] else None
     if 'renovation' in data:
         obj.renovation = data['renovation']
     if 'comment' in data:
@@ -510,6 +515,7 @@ def publish_object_via_account(current_user):
                     area=obj.area,
                     floor=obj.floor,
                     address=obj.address,
+                    residential_complex=obj.residential_complex,
                     renovation=obj.renovation,
                     comment=obj.comment,
                     contact_name=obj.contact_name,
@@ -686,6 +692,7 @@ def publish_object_via_bot(current_user):
                     area=obj.area,
                     floor=obj.floor,
                     address=obj.address,
+                    residential_complex=obj.residential_complex,
                     renovation=obj.renovation,
                     comment=obj.comment,
                     contact_name=obj.contact_name,

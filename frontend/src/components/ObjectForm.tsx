@@ -175,6 +175,16 @@ export default function ObjectForm({
             />
           </div>
           <div className="form-group">
+            <label className="form-label">ЖК (жилой комплекс)</label>
+            <input
+              type="text"
+              className="form-input"
+              value={formData.residential_complex}
+              onChange={handleInputChange('residential_complex')}
+              placeholder="Название жилого комплекса"
+            />
+          </div>
+          <div className="form-group">
             <label className="form-label">Адрес</label>
             <input
               type="text"

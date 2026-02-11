@@ -288,22 +288,35 @@ def create_or_update_autopublish_config(current_user):
     # Бот всегда включен для автопубликации
     cfg.bot_enabled = True
     
-    # Сохраняем настройки аккаунтов, если переданы
+        # Сохраняем настройки аккаунтов, если переданы
     if isinstance(accounts_config, dict):
-        # Проверяем, что есть хотя бы один аккаунт с выбранными чатами
+        # Разрешаем сохранение формата публикации даже без выбранных чатов
+        # Проверяем, что есть хотя бы один аккаунт с выбранными чатами только если есть аккаунты
         accounts_list = accounts_config.get('accounts', [])
         has_valid_accounts = False
-        for acc_entry in accounts_list:
-            chat_ids = acc_entry.get('chat_ids', [])
-            if chat_ids and len(chat_ids) > 0:
-                has_valid_accounts = True
-                break
+        if accounts_list:
+            for acc_entry in accounts_list:
+                chat_ids = acc_entry.get('chat_ids', [])
+                if chat_ids and len(chat_ids) > 0:
+                    has_valid_accounts = True
+                    break
         
-        if has_valid_accounts:
+        # Сохраняем конфигурацию если есть валидные аккаунты или если есть только формат публикации
+        if has_valid_accounts or accounts_config.get('publication_format'):
             cfg.accounts_config_json = accounts_config
+        elif accounts_list and len(accounts_list) > 0:
+            # Если есть аккаунты, но нет выбранных чатов, очищаем конфигурацию аккаунтов
+            # Но сохраняем формат публикации, если он есть
+            if accounts_config.get('publication_format'):
+                cfg.accounts_config_json = {'publication_format': accounts_config.get('publication_format'), 'accounts': []}
+            else:
+                cfg.accounts_config_json = None
         else:
-            # Если нет выбранных чатов, очищаем конфигурацию аккаунтов
-            cfg.accounts_config_json = None
+            # Если нет аккаунтов, но есть формат публикации, сохраняем только формат
+            if accounts_config.get('publication_format'):
+                cfg.accounts_config_json = {'publication_format': accounts_config.get('publication_format'), 'accounts': []}
+            else:
+                cfg.accounts_config_json = None
     elif accounts_config is None:
         # Не затираем существующие настройки, если ключ не передан
         pass
@@ -339,6 +352,7 @@ def create_or_update_autopublish_config(current_user):
                         area=obj.area,
                         floor=obj.floor,
                         address=obj.address,
+                        residential_complex=obj.residential_complex,
                         renovation=obj.renovation,
                         comment=obj.comment,
                         contact_name=obj.contact_name,
@@ -496,6 +510,7 @@ def update_autopublish_config(object_id, current_user):
                         area=obj.area,
                         floor=obj.floor,
                         address=obj.address,
+                        residential_complex=obj.residential_complex,
                         renovation=obj.renovation,
                         comment=obj.comment,
                         contact_name=obj.contact_name,
@@ -795,6 +810,7 @@ def user_publish_object_via_bot(current_user):
                     area=obj.area,
                     floor=obj.floor,
                     address=obj.address,
+                    residential_complex=obj.residential_complex,
                     renovation=obj.renovation,
                     comment=obj.comment,
                     contact_name=obj.contact_name,
@@ -1079,6 +1095,7 @@ def user_preview_object_in_bot(object_id, current_user):
                     area=obj.area,
                     floor=obj.floor,
                     address=obj.address,
+                    residential_complex=obj.residential_complex,
                     renovation=obj.renovation,
                     comment=obj.comment,
                     contact_name=obj.contact_name,

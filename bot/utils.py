@@ -413,20 +413,8 @@ def _format_publication_text_compact(obj: Object, user: User = None, is_preview:
     """
     lines = []
     
-    # Извлекаем ЖК из адреса (если есть упоминание "ЖК" или "жк")
-    residential_complex = ""
-    if obj.address:
-        address_lower = obj.address.lower()
-        # Ищем упоминание ЖК в адресе
-        if "жк" in address_lower:
-            # Пытаемся извлечь название ЖК
-            import re
-            match = re.search(r'жк\s*[«"]?([^,»"]+)', address_lower, re.IGNORECASE)
-            if match:
-                residential_complex = match.group(1).strip()
-            else:
-                # Если не нашли конкретное название, просто "ЖК"
-                residential_complex = "ЖК"
+    # ЖК из базы данных
+    residential_complex = getattr(obj, 'residential_complex', None) or ""
     
     # Районы
     districts = obj.districts_json or []
@@ -438,14 +426,14 @@ def _format_publication_text_compact(obj: Object, user: User = None, is_preview:
     # 1 строка: ЖК, Районы, Адрес
     first_line_parts = []
     if residential_complex:
-        first_line_parts.append(f"ЖК {residential_complex}")
+        first_line_parts.append(residential_complex)
     if districts_str:
         first_line_parts.append(districts_str)
     if address_str:
         first_line_parts.append(address_str)
     
     if first_line_parts:
-        lines.append(" | ".join(first_line_parts))
+        lines.append(" ".join(first_line_parts))
     else:
         lines.append("")
     
@@ -460,7 +448,7 @@ def _format_publication_text_compact(obj: Object, user: User = None, is_preview:
         second_line_parts.append(f"{area_str} м²")
     
     if second_line_parts:
-        lines.append(" | ".join(second_line_parts))
+        lines.append(" ".join(second_line_parts))
     else:
         lines.append("")
     
@@ -479,7 +467,7 @@ def _format_publication_text_compact(obj: Object, user: User = None, is_preview:
     price = obj.price or 0
     if price > 0:
         price_str = replace_digits_with_special(str(int(price)) if isinstance(price, float) else str(price))
-        lines.append(f"ЦЕНА: {price_str}тр")
+        lines.append(f"{price_str}тр")
     lines.append("")  # Перенос
     
     # 6 строка: контакты
@@ -498,7 +486,7 @@ def _format_publication_text_compact(obj: Object, user: User = None, is_preview:
         contact_parts.append(f"@{username_str}")
     
     if contact_parts:
-        lines.append(" | ".join(contact_parts))
+        lines.append(" ".join(contact_parts))
     
     return "\n".join(lines)
 

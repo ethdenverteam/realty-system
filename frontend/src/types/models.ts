@@ -106,6 +106,7 @@ export interface ObjectFormData {
   districts: string;
   comment: string;
   address: string;
+  residential_complex: string;
   renovation: string;
   contact_name: string;
   phone_number: string;
@@ -120,6 +121,7 @@ export interface CreateObjectRequest {
   districts_json: string[];
   comment?: string | null;
   address?: string | null;
+  residential_complex?: string | null;
   renovation?: string | null;
   contact_name?: string | null;
   phone_number?: string | null;
@@ -134,6 +136,7 @@ export interface UpdateObjectRequest {
   districts_json: string[];
   comment?: string | null;
   address?: string | null;
+  residential_complex?: string | null;
   renovation?: string | null;
   contact_name?: string | null;
   phone_number?: string | null;

@@ -22,6 +22,7 @@ class Object(db.Model):
     area = Column(Float, nullable=True)  # Area in m²
     floor = Column(String(20), nullable=True)  # Floor like "6/9"
     address = Column(String(255), nullable=True)
+    residential_complex = Column(String(255), nullable=True)  # ЖК (жилой комплекс)
     renovation = Column(String(50), nullable=True)  # Renovation state
     comment = Column(Text, nullable=True)
     contact_name = Column(String(100), nullable=True)
@@ -56,6 +57,7 @@ class Object(db.Model):
             'area': self.area,
             'floor': self.floor,
             'address': self.address,
+            'residential_complex': self.residential_complex,
             'renovation': self.renovation,
             'comment': self.comment,
             'contact_name': self.contact_name,

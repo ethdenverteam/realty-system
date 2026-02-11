@@ -172,11 +172,14 @@ export default function Autopublish(): JSX.Element {
   const saveAccountsConfig = async (): Promise<void> => {
     if (!editingObjectId || !editingConfig) return
     
-    // Проверяем, что есть хотя бы один аккаунт с выбранными чатами
-    const hasValidAccounts = editingConfig.accounts.some(acc => acc.chat_ids && acc.chat_ids.length > 0)
-    if (!hasValidAccounts) {
-      setError('Сначала выберите чаты для аккаунтов')
-      return
+    // Разрешаем сохранение даже без выбранных чатов (для сохранения формата публикации)
+    // Проверяем, что есть хотя бы один аккаунт с выбранными чатами только если есть аккаунты
+    if (editingConfig.accounts.length > 0) {
+      const hasValidAccounts = editingConfig.accounts.some(acc => acc.chat_ids && acc.chat_ids.length > 0)
+      if (!hasValidAccounts) {
+        setError('Сначала выберите чаты для аккаунтов')
+        return
+      }
     }
     
     // Используем прямую мутацию с динамическим URL
