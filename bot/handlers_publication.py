@@ -272,8 +272,24 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
     user = update.effective_user
     user_obj = get_user(str(user.id))
     
+    # Получаем формат публикации из конфигурации автопубликации
+    publication_format = 'default'
+    try:
+        from app.database import db as web_db
+        from app.models.autopublish_config import AutopublishConfig
+        web_cfg = web_db.session.query(AutopublishConfig).filter_by(
+            object_id=object_id
+        ).first()
+        if web_cfg and web_cfg.accounts_config_json:
+            accounts_cfg = web_cfg.accounts_config_json
+            if isinstance(accounts_cfg, dict):
+                publication_format = accounts_cfg.get('publication_format', 'default')
+    except Exception:
+        # Если не удалось получить конфигурацию, используем формат по умолчанию
+        pass
+    
     # Format publication text
-    publication_text = format_publication_text(obj, user_obj, is_preview=False)
+    publication_text = format_publication_text(obj, user_obj, is_preview=False, publication_format=publication_format)
     
     # Get target chats
     target_chats = await get_target_chats_for_object(obj)

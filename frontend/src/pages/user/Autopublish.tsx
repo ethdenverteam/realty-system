@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Layout from '../../components/Layout'
 import { GlassCard } from '../../components/GlassCard'
+import { GlassButton } from '../../components/GlassButton'
 import { useApiData } from '../../hooks/useApiData'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { getErrorMessage, logError } from '../../utils/errorHandler'
@@ -14,6 +15,7 @@ import type {
   BotChatListItem,
 } from '../../types/models'
 import './Autopublish.css'
+import '../../components/GlassMenuButton.css'
 
 interface TelegramAccount {
   account_id: number
@@ -53,7 +55,7 @@ export default function Autopublish(): JSX.Element {
   const [loadingChatsForObject, setLoadingChatsForObject] = useState<string | null>(null)
   const [showChatsModal, setShowChatsModal] = useState<string | null>(null)
   const [showEditChatsModal, setShowEditChatsModal] = useState<string | null>(null)
-  const [editingChats, setEditingChats] = useState<number[]>([])
+  const [editingChats, setEditingChats] = useState<(number | string)[]>([])
 
   // Загрузка данных автопубликации
   const { data: autopublishData, loading, reload: reloadAutopublish } = useApiData<AutopublishListResponse>({
@@ -129,6 +131,7 @@ export default function Autopublish(): JSX.Element {
         account_id: a.account_id,
         chat_ids: [...a.chat_ids],
       })),
+      publication_format: baseConfig.publication_format || 'default',
     })
   }
 
@@ -356,6 +359,40 @@ export default function Autopublish(): JSX.Element {
                           />
                         </label>
                       </div>
+                      <div className="autopublish-format-row">
+                        <label className="format-label">Формат публикации:</label>
+                        <div className="glass-select-button-wrapper">
+                          <GlassButton className="glass-select-button">
+                            {accCfg?.publication_format === 'compact' ? 'Компактный' : 'Стандартный'}
+                          </GlassButton>
+                          <select
+                            className="glass-select-native"
+                            value={accCfg?.publication_format || 'default'}
+                            onChange={async (e) => {
+                              const newFormat = e.target.value as 'default' | 'compact'
+                              try {
+                                setError('')
+                                const currentConfig = accCfg || { accounts: [] }
+                                await api.put<{ success: boolean }>(`/user/dashboard/autopublish/${obj.object_id}`, {
+                                  accounts_config_json: {
+                                    ...currentConfig,
+                                    publication_format: newFormat,
+                                  },
+                                })
+                                void reloadAutopublish()
+                              } catch (err: unknown) {
+                                const message = getErrorMessage(err, 'Ошибка изменения формата')
+                                setError(message)
+                                logError(err, 'Changing publication format')
+                              }
+                            }}
+                            disabled={saving || addingObject}
+                          >
+                            <option value="default">Стандартный</option>
+                            <option value="compact">Компактный</option>
+                          </select>
+                        </div>
+                      </div>
                       <div className="autopublish-chats-row">
                         <button
                           className="btn btn-small btn-secondary"
@@ -474,7 +511,7 @@ export default function Autopublish(): JSX.Element {
                                     {chatGroups.length > 0 ? (
                                       <div className="chat-groups-list">
                                         {chatGroups.map((group) => {
-                                          const groupChats = chats.filter(c => group.chat_ids.includes(c.chat_id))
+                                          const groupChats = chats.filter(c => group.chat_ids.map(String).includes(String(c.chat_id)))
                                           const allSelected = groupChats.length > 0 && groupChats.every(c => 
                                             selectedAccountCfg?.chat_ids.map(String).includes(String(c.chat_id))
                                           )
@@ -660,11 +697,11 @@ export default function Autopublish(): JSX.Element {
                                 {chatGroups.length > 0 ? (
                                   <div className="chat-groups-list">
                                     {chatGroups.map((group) => {
-                                      const groupChats = chats.filter(c => group.chat_ids.includes(c.chat_id))
+                                      const groupChats = chats.filter(c => group.chat_ids.map(String).includes(String(c.chat_id)))
                                       const allSelected = groupChats.length > 0 && groupChats.every(c => 
-                                        editingChats.includes(c.chat_id)
+                                        editingChats.map(String).includes(String(c.chat_id))
                                       )
-                                      const someSelected = groupChats.some(c => editingChats.includes(c.chat_id))
+                                      const someSelected = groupChats.some(c => editingChats.map(String).includes(String(c.chat_id)))
                                       const checkboxRef = useRef<HTMLInputElement>(null)
                                       useEffect(() => {
                                         if (checkboxRef.current) {
@@ -679,9 +716,9 @@ export default function Autopublish(): JSX.Element {
                                             checked={allSelected}
                                             onChange={() => {
                                               if (allSelected) {
-                                                setEditingChats(prev => prev.filter(id => !groupChats.some(c => c.chat_id === id)))
+                                                setEditingChats(prev => prev.filter(id => !groupChats.some(c => String(c.chat_id) === String(id))))
                                               } else {
-                                                const newIds = groupChats.map(c => c.chat_id).filter(id => !editingChats.includes(id))
+                                                const newIds = groupChats.map(c => c.chat_id).filter(id => !editingChats.map(String).includes(String(id)))
                                                 setEditingChats(prev => [...prev, ...newIds])
                                               }
                                             }}
@@ -698,7 +735,7 @@ export default function Autopublish(): JSX.Element {
                               <div className="chats-individual-section">
                                 <strong>Отдельные чаты:</strong>
                                 {chats.map((chat) => {
-                                  const checked = editingChats.includes(chat.chat_id)
+                                  const checked = editingChats.map(String).includes(String(chat.chat_id))
                                   return (
                                     <label key={chat.chat_id} className="autopublish-chat-item">
                                       <input
@@ -706,7 +743,7 @@ export default function Autopublish(): JSX.Element {
                                         checked={checked}
                                         onChange={() => {
                                           if (checked) {
-                                            setEditingChats(prev => prev.filter(id => id !== chat.chat_id))
+                                            setEditingChats(prev => prev.filter(id => String(id) !== String(chat.chat_id)))
                                           } else {
                                             setEditingChats(prev => [...prev, chat.chat_id])
                                           }

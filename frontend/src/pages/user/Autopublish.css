@@ -135,3 +135,26 @@
   font-style: italic;
 }
 
+.autopublish-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.autopublish-toggle-row,
+.autopublish-mode-row,
+.autopublish-format-row,
+.autopublish-chats-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.format-label {
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+}
+

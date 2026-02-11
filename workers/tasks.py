@@ -78,8 +78,24 @@ def publish_to_telegram(queue_id: int):
         if obj.user_id:
             bot_user = db.query(BotUser).filter_by(user_id=obj.user_id).first()
         
+        # Получаем формат публикации из конфигурации автопубликации
+        publication_format = 'default'
+        try:
+            from app.database import db as web_db
+            from app.models.autopublish_config import AutopublishConfig as WebAutopublishConfig
+            web_cfg = web_db.session.query(WebAutopublishConfig).filter_by(
+                object_id=obj.object_id
+            ).first()
+            if web_cfg and web_cfg.accounts_config_json:
+                accounts_cfg = web_cfg.accounts_config_json
+                if isinstance(accounts_cfg, dict):
+                    publication_format = accounts_cfg.get('publication_format', 'default')
+        except Exception:
+            # Если не удалось получить конфигурацию, используем формат по умолчанию
+            pass
+        
         # Форматируем текст публикации
-        publication_text = format_publication_text(obj, bot_user, is_preview=False)
+        publication_text = format_publication_text(obj, bot_user, is_preview=False, publication_format=publication_format)
         
         # Отправляем сообщение
         url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'

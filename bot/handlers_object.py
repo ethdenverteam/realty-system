@@ -479,8 +479,24 @@ async def show_object_preview_with_menu(update: Update, context: ContextTypes.DE
                 await update.message.reply_text("Ошибка: объект не найден.")
             return ConversationHandler.END
         
+        # Получаем формат публикации из конфигурации автопубликации
+        publication_format = 'default'
+        try:
+            from app.database import db as web_db
+            from app.models.autopublish_config import AutopublishConfig
+            web_cfg = web_db.session.query(AutopublishConfig).filter_by(
+                object_id=object_id
+            ).first()
+            if web_cfg and web_cfg.accounts_config_json:
+                accounts_cfg = web_cfg.accounts_config_json
+                if isinstance(accounts_cfg, dict):
+                    publication_format = accounts_cfg.get('publication_format', 'default')
+        except Exception:
+            # Если не удалось получить конфигурацию, используем формат по умолчанию
+            pass
+        
         # Format text
-        text = format_publication_text(obj, user_obj, is_preview=True)
+        text = format_publication_text(obj, user_obj, is_preview=True, publication_format=publication_format)
         
         # Add media count
         photos_count = len(obj.photos_json) if obj.photos_json else 0

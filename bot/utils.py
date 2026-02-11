@@ -401,8 +401,123 @@ def generate_price_range_hashtag(range_name: str, suffix: str = "_ф") -> str:
     return f"#_{range_key}{suffix}"
 
 
-def format_publication_text(obj: Object, user: User = None, is_preview: bool = False) -> str:
-    """Сформировать текст публикации объекта"""
+def _format_publication_text_compact(obj: Object, user: User = None, is_preview: bool = False) -> str:
+    """
+    Компактный формат публикации:
+    1 строка: ЖК, Районы, Адрес
+    2 строка: тип, этаж, площадь
+    3 строка: ремонт
+    4 строка: комментарий + перенос
+    5 строка: ЦЕНА + перенос
+    6 строка: контакты
+    """
+    lines = []
+    
+    # Извлекаем ЖК из адреса (если есть упоминание "ЖК" или "жк")
+    residential_complex = ""
+    if obj.address:
+        address_lower = obj.address.lower()
+        # Ищем упоминание ЖК в адресе
+        if "жк" in address_lower:
+            # Пытаемся извлечь название ЖК
+            import re
+            match = re.search(r'жк\s*[«"]?([^,»"]+)', address_lower, re.IGNORECASE)
+            if match:
+                residential_complex = match.group(1).strip()
+            else:
+                # Если не нашли конкретное название, просто "ЖК"
+                residential_complex = "ЖК"
+    
+    # Районы
+    districts = obj.districts_json or []
+    districts_str = ", ".join(districts) if districts else ""
+    
+    # Адрес
+    address_str = obj.address or ""
+    
+    # 1 строка: ЖК, Районы, Адрес
+    first_line_parts = []
+    if residential_complex:
+        first_line_parts.append(f"ЖК {residential_complex}")
+    if districts_str:
+        first_line_parts.append(districts_str)
+    if address_str:
+        first_line_parts.append(address_str)
+    
+    if first_line_parts:
+        lines.append(" | ".join(first_line_parts))
+    else:
+        lines.append("")
+    
+    # 2 строка: тип, этаж, площадь
+    second_line_parts = []
+    if obj.rooms_type:
+        second_line_parts.append(obj.rooms_type)
+    if obj.floor:
+        second_line_parts.append(f"этаж {obj.floor}")
+    if obj.area:
+        area_str = replace_digits_with_special(str(obj.area))
+        second_line_parts.append(f"{area_str} м²")
+    
+    if second_line_parts:
+        lines.append(" | ".join(second_line_parts))
+    else:
+        lines.append("")
+    
+    # 3 строка: ремонт
+    if obj.renovation:
+        lines.append(obj.renovation)
+    else:
+        lines.append("")
+    
+    # 4 строка: комментарий + перенос
+    if obj.comment:
+        lines.append(obj.comment)
+    lines.append("")  # Перенос
+    
+    # 5 строка: ЦЕНА + перенос
+    price = obj.price or 0
+    if price > 0:
+        price_str = replace_digits_with_special(str(int(price)) if isinstance(price, float) else str(price))
+        lines.append(f"ЦЕНА: {price_str}тр")
+    lines.append("")  # Перенос
+    
+    # 6 строка: контакты
+    contact_parts = []
+    phone = obj.phone_number or (user.phone if user else None)
+    contact_name = obj.contact_name or ""
+    show_username = obj.show_username or False
+    
+    if contact_name:
+        contact_name_str = replace_digits_with_special(contact_name)
+        contact_parts.append(contact_name_str)
+    if phone:
+        contact_parts.append(phone)
+    if show_username and user and user.username:
+        username_str = replace_digits_with_special(user.username)
+        contact_parts.append(f"@{username_str}")
+    
+    if contact_parts:
+        lines.append(" | ".join(contact_parts))
+    
+    return "\n".join(lines)
+
+
+def format_publication_text(obj: Object, user: User = None, is_preview: bool = False, publication_format: str = 'default') -> str:
+    """
+    Сформировать текст публикации объекта
+    
+    Args:
+        obj: Объект недвижимости
+        user: Пользователь (для контактов и футера)
+        is_preview: Если True, футер не будет показан
+        publication_format: 'default' - стандартный формат, 'compact' - компактный формат
+    """
+    # Если формат компактный, используем новый формат
+    if publication_format == 'compact':
+        return _format_publication_text_compact(obj, user, is_preview)
+    
+    # Стандартный формат (как было)
     lines = []
     
     # Цена: 🔑¦ 𝟲𝟲𝟲

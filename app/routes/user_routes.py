@@ -808,8 +808,20 @@ def user_publish_object_via_bot(current_user):
         finally:
             bot_db.close()
         
+        # Получаем формат публикации из конфигурации автопубликации
+        publication_format = 'default'
+        from app.models.autopublish_config import AutopublishConfig
+        autopublish_cfg = AutopublishConfig.query.filter_by(
+            object_id=object_id,
+            user_id=current_user.user_id
+        ).first()
+        if autopublish_cfg and autopublish_cfg.accounts_config_json:
+            accounts_cfg = autopublish_cfg.accounts_config_json
+            if isinstance(accounts_cfg, dict):
+                publication_format = accounts_cfg.get('publication_format', 'default')
+        
         # Format publication text
-        publication_text = format_publication_text(bot_obj, bot_user, is_preview=False)
+        publication_text = format_publication_text(bot_obj, bot_user, is_preview=False, publication_format=publication_format)
         
         # Get target chats (reuse logic from bot)
         target_chats = []
@@ -1080,8 +1092,20 @@ def user_preview_object_in_bot(object_id, current_user):
         finally:
             bot_db.close()
         
+        # Получаем формат публикации из конфигурации автопубликации
+        publication_format = 'default'
+        from app.models.autopublish_config import AutopublishConfig
+        autopublish_cfg = AutopublishConfig.query.filter_by(
+            object_id=object_id,
+            user_id=current_user.user_id
+        ).first()
+        if autopublish_cfg and autopublish_cfg.accounts_config_json:
+            accounts_cfg = autopublish_cfg.accounts_config_json
+            if isinstance(accounts_cfg, dict):
+                publication_format = accounts_cfg.get('publication_format', 'default')
+        
         # Format publication text with preview flag
-        publication_text = format_publication_text(bot_obj, bot_user, is_preview=True)
+        publication_text = format_publication_text(bot_obj, bot_user, is_preview=True, publication_format=publication_format)
         
         # Send message to user via bot
         url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'

@@ -1623,9 +1623,20 @@ def admin_publish_object_to_chat(chat_id, current_user):
         if not BOT_TOKEN:
             return jsonify({'error': 'BOT_TOKEN is not configured'}), 500
         
+        # Получаем формат публикации из конфигурации автопубликации
+        publication_format = 'default'
+        from app.models.autopublish_config import AutopublishConfig
+        autopublish_cfg = AutopublishConfig.query.filter_by(
+            object_id=object_id
+        ).first()
+        if autopublish_cfg and autopublish_cfg.accounts_config_json:
+            accounts_cfg = autopublish_cfg.accounts_config_json
+            if isinstance(accounts_cfg, dict):
+                publication_format = accounts_cfg.get('publication_format', 'default')
+        
         # Format publication text
         user = obj.user
-        publication_text = format_publication_text(obj, user, is_preview=False)
+        publication_text = format_publication_text(obj, user, is_preview=False, publication_format=publication_format)
         
         # Send message via Telegram API
         url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'

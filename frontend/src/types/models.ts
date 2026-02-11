@@ -170,6 +170,7 @@ export interface AutopublishAccountConfig {
 
 export interface AutopublishAccountsConfig {
   accounts: AutopublishAccountConfig[];
+  publication_format?: 'default' | 'compact'; // 'default' - как сейчас, 'compact' - новый формат
 }
 
 export interface AutopublishConfigDto {
