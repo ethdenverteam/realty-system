@@ -99,10 +99,11 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
 
   const generateRandomGlassTint = (): void => {
     // Рандомный тон стекла в диапазоне от красных до синих оттенков
-    // Генерируем hex цвет с альфой в формате #rrggbbaa
+    // Генерируем цвет в формате rgba для совместимости с backdrop-filter
     const hue = Math.floor(Math.random() * 241) // 0-240 (от красного до синего)
     const saturation = 70
     const lightness = 80
+    const alpha = 0.08 // прозрачность для backdrop-filter (примерно как #rrggbb14)
     
     // Конвертируем HSL в RGB
     const h = hue / 360
@@ -130,15 +131,20 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
       b = hue2rgb(p, q, h - 1/3)
     }
     
-    // Конвертируем в hex (0-255)
-    const rHex = Math.round(r * 255).toString(16).padStart(2, '0')
-    const gHex = Math.round(g * 255).toString(16).padStart(2, '0')
-    const bHex = Math.round(b * 255).toString(16).padStart(2, '0')
-    // Альфа в hex: 0x14 = 20 в десятичной = 20/255 ≈ 0.08 прозрачности (формат #rrggbbaa)
-    const alphaHex = '14'
+    // Конвертируем в RGB значения (0-255)
+    const rInt = Math.round(r * 255)
+    const gInt = Math.round(g * 255)
+    const bInt = Math.round(b * 255)
     
-    // Формат #rrggbbaa
-    const glassColorHex = `#${rHex}${gHex}${bHex}${alphaHex}`
+    // Формат rgba для совместимости с backdrop-filter
+    const glassColorRgba = `rgba(${rInt}, ${gInt}, ${bInt}, ${alpha})`
+    
+    // Также создаем hex версию для справки (без альфы, т.к. альфа в rgba)
+    const rHex = rInt.toString(16).padStart(2, '0')
+    const gHex = gInt.toString(16).padStart(2, '0')
+    const bHex = bInt.toString(16).padStart(2, '0')
+    const alphaHex = Math.round(alpha * 255).toString(16).padStart(2, '0')
+    const glassColorHex = `#${rHex}${gHex}${bHex}${alphaHex}` // для справки
 
     // Инвертированный тон для иконок (противоположный hue)
     const invertedHue = (hue + 180) % 360
@@ -174,7 +180,8 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
     const iconColorHex = `#${iconRHex}${iconGHex}${iconBHex}`
 
     // Один цвет для всех стекол и иконок до перезагрузки страницы / смены темы
-    document.documentElement.style.setProperty('--glass-bg-flex', glassColorHex)
+    // Используем rgba формат для совместимости с backdrop-filter
+    document.documentElement.style.setProperty('--glass-bg-flex', glassColorRgba)
     document.documentElement.style.setProperty('--glass-icon-color', iconColorHex)
   }
 
