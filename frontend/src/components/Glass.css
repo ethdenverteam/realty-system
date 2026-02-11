@@ -1,7 +1,7 @@
 /* Единый стиль стекла для карточки и кнопки */
 /* Сильное искривление по краям, опциональное размытие внутри */
 .glass-card {
-  background: var(--glass-bg, rgba(255, 255, 255, 0.12));
+  background: var(--glass-bg-flex, rgba(255, 255, 255, 0.12));
   border-radius: 24px; /* Округлая форма */
   border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
@@ -16,17 +16,17 @@
   margin-right: auto;
 }
 
-/* Варианты стекла: прозрачное, затемненное, осветленное */
+/* Варианты стекла: прозрачное, затемненное, осветленное - все используют один цвет */
 .glass-card.glass-transparent {
-  background: var(--glass-bg, rgba(255, 255, 255, 0.02));
+  background: var(--glass-bg-flex, rgba(255, 255, 255, 0.02));
 }
 
 .glass-card.glass-darkened {
-  background: var(--glass-bg, rgba(255, 255, 255, 0.02));
+  background: var(--glass-bg-flex, rgba(255, 255, 255, 0.02));
 }
 
 .glass-card.glass-lightened {
-  background: var(--glass-bg, rgba(255, 255, 255, 0.02));
+  background: var(--glass-bg-flex, rgba(255, 255, 255, 0.02));
 }
 
 /* Варианты размытия */
@@ -42,7 +42,7 @@
 
 /* Стекло на фоне стекла - нижнее прозрачное на 97% и затемненное */
 .glass-card.glass-nested {
-  background: rgba(0, 0, 0, 0.03); /* 97% прозрачности */
+  background: var(--glass-bg-flex, rgba(255, 255, 255, 0.02));
   backdrop-filter: blur(var(--glass-blur, 2px));
   -webkit-backdrop-filter: blur(var(--glass-blur, 2px));
 }
@@ -76,7 +76,7 @@
   padding: 10px 18px;
   border-radius: 24px; /* Округлая форма */
   border: 1px solid rgba(255, 255, 255, 0.3);
-  background: var(--glass-bg, rgba(255, 255, 255, 0.12));
+  background: var(--glass-bg-flex, rgba(255, 255, 255, 0.12));
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(var(--glass-blur, 2px)); /* Размытие по умолчанию */
   -webkit-backdrop-filter: blur(var(--glass-blur, 2px));
@@ -91,17 +91,17 @@
     border-color 0.18s ease-out;
 }
 
-/* Варианты стекла для кнопок */
+/* Варианты стекла для кнопок - все используют один цвет */
 .glass-button.glass-transparent {
-  background: var(--glass-bg, rgba(255, 255, 255, 0.02));
+  background: var(--glass-bg-flex, rgba(255, 255, 255, 0.02));
 }
 
 .glass-button.glass-darkened {
-  background: var(--glass-bg, rgba(255, 255, 255, 0.02));
+  background: var(--glass-bg-flex, rgba(255, 255, 255, 0.02));
 }
 
 .glass-button.glass-lightened {
-  background: var(--glass-bg, rgba(255, 255, 255, 0.02));
+  background: var(--glass-bg-flex, rgba(255, 255, 255, 0.02));
 }
 
 .glass-button.glass-no-blur {

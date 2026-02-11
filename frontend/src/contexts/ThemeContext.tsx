@@ -99,22 +99,83 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
 
   const generateRandomGlassTint = (): void => {
     // Рандомный тон стекла в диапазоне от красных до синих оттенков
-    // Берём одинаковую насыщенность/яркость, меняем только hue
+    // Генерируем hex цвет с альфой в формате #rrggbbaa
     const hue = Math.floor(Math.random() * 241) // 0-240 (от красного до синего)
     const saturation = 70
     const lightness = 80
-    const alpha = 0.02 // более прозрачное стекло
-
-    const glassColor = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`
+    
+    // Конвертируем HSL в RGB
+    const h = hue / 360
+    const s = saturation / 100
+    const l = lightness / 100
+    
+    let r: number, g: number, b: number
+    
+    if (s === 0) {
+      r = g = b = l // achromatic
+    } else {
+      const hue2rgb = (p: number, q: number, t: number): number => {
+        if (t < 0) t += 1
+        if (t > 1) t -= 1
+        if (t < 1/6) return p + (q - p) * 6 * t
+        if (t < 1/2) return q
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6
+        return p
+      }
+      
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+      const p = 2 * l - q
+      r = hue2rgb(p, q, h + 1/3)
+      g = hue2rgb(p, q, h)
+      b = hue2rgb(p, q, h - 1/3)
+    }
+    
+    // Конвертируем в hex (0-255)
+    const rHex = Math.round(r * 255).toString(16).padStart(2, '0')
+    const gHex = Math.round(g * 255).toString(16).padStart(2, '0')
+    const bHex = Math.round(b * 255).toString(16).padStart(2, '0')
+    // Альфа в hex: 0x14 = 20 в десятичной = 20/255 ≈ 0.08 прозрачности (формат #rrggbbaa)
+    const alphaHex = '14'
+    
+    // Формат #rrggbbaa
+    const glassColorHex = `#${rHex}${gHex}${bHex}${alphaHex}`
 
     // Инвертированный тон для иконок (противоположный hue)
     const invertedHue = (hue + 180) % 360
     const iconLightness = 30 // иконка темнее, чтобы быть читаемой
-    const iconColor = `hsl(${invertedHue}, ${saturation}%, ${iconLightness}%)`
+    const iconH = invertedHue / 360
+    const iconS = saturation / 100
+    const iconL = iconLightness / 100
+    
+    let iconR: number, iconG: number, iconB: number
+    
+    if (iconS === 0) {
+      iconR = iconG = iconB = iconL
+    } else {
+      const hue2rgb = (p: number, q: number, t: number): number => {
+        if (t < 0) t += 1
+        if (t > 1) t -= 1
+        if (t < 1/6) return p + (q - p) * 6 * t
+        if (t < 1/2) return q
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6
+        return p
+      }
+      
+      const q = iconL < 0.5 ? iconL * (1 + iconS) : iconL + iconS - iconL * iconS
+      const p = 2 * iconL - q
+      iconR = hue2rgb(p, q, iconH + 1/3)
+      iconG = hue2rgb(p, q, iconH)
+      iconB = hue2rgb(p, q, iconH - 1/3)
+    }
+    
+    const iconRHex = Math.round(iconR * 255).toString(16).padStart(2, '0')
+    const iconGHex = Math.round(iconG * 255).toString(16).padStart(2, '0')
+    const iconBHex = Math.round(iconB * 255).toString(16).padStart(2, '0')
+    const iconColorHex = `#${iconRHex}${iconGHex}${iconBHex}`
 
     // Один цвет для всех стекол и иконок до перезагрузки страницы / смены темы
-    document.documentElement.style.setProperty('--glass-bg', glassColor)
-    document.documentElement.style.setProperty('--glass-icon-color', iconColor)
+    document.documentElement.style.setProperty('--glass-bg-flex', glassColorHex)
+    document.documentElement.style.setProperty('--glass-icon-color', iconColorHex)
   }
 
   const toggleTheme = () => {

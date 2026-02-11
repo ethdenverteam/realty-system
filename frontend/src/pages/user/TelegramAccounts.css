@@ -173,7 +173,7 @@
 }
 
 .modal-content {
-  background: var(--glass-bg);
+  background: var(--glass-bg-flex);
   backdrop-filter: blur(10px);
   border-radius: 12px;
   padding: var(--spacing-lg);
