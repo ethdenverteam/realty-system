@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { useEffect, useState } from 'react'
 import Layout from '../../components/Layout'
+import { GlassCard } from '../../components/GlassCard'
 import api from '../../utils/api'
 import type { ApiErrorResponse } from '../../types/models'
 import './Users.css'
@@ -74,7 +75,7 @@ export default function AdminUsers(): JSX.Element {
       <div className="users-page">
         {error && <div className="alert alert-error">{error}</div>}
 
-        <div className="card">
+        <GlassCard>
           <div className="card-header-row">
             <h2 className="card-title">Список пользователей</h2>
             <button onClick={() => void loadUsers()} className="btn btn-sm btn-secondary">
@@ -149,7 +150,7 @@ export default function AdminUsers(): JSX.Element {
           {users.length === 0 && (
             <div className="empty-state">Пользователи не найдены</div>
           )}
-        </div>
+        </GlassCard>
       </div>
     </Layout>
   )

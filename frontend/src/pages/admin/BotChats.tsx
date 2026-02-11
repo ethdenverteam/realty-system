@@ -2,6 +2,7 @@ import axios from 'axios'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
+import { GlassCard } from '../../components/GlassCard'
 import api from '../../utils/api'
 import type {
   BotChatFilters,
@@ -530,7 +531,7 @@ export default function AdminBotChats(): JSX.Element {
           </div>
         )}
 
-        <div className="card">
+        <GlassCard>
           <div className="card-header">
             <h2 className="card-title">Управление районами</h2>
           </div>
@@ -564,9 +565,9 @@ export default function AdminBotChats(): JSX.Element {
               )}
             </div>
           </div>
-        </div>
+        </GlassCard>
 
-        <div className="card">
+        <GlassCard>
           <div className="card-header">
             <h2 className="card-title">Список чатов</h2>
             <div className="card-actions">
@@ -648,7 +649,7 @@ export default function AdminBotChats(): JSX.Element {
               </div>
             )}
           </div>
-        </div>
+        </GlassCard>
       </div>
     </Layout>
   )

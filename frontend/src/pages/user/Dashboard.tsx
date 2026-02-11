@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
+import { GlassCard } from '../../components/GlassCard'
 import { useAuth } from '../../contexts/AuthContext'
 import { useApiData } from '../../hooks/useApiData'
 import type { UserStats } from '../../types/models'
@@ -20,18 +21,24 @@ export default function UserDashboard(): JSX.Element {
       <div className="dashboard-page">
         {error && <div className="alert alert-error">{error}</div>}
 
+        {/* Статистика в стеклянных карточках */}
         <div className="stats-grid">
-          <Link to="/user/dashboard/autopublish" className="stat-card" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <div className="stat-value">{loading ? '-' : (stats?.autopublish_objects_count ?? 0)}</div>
-            <div className="stat-label">Объектов на автопубликации</div>
+          <Link to="/user/dashboard/autopublish" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <GlassCard className="stat-card">
+              <div className="stat-value">{loading ? '-' : (stats?.autopublish_objects_count ?? 0)}</div>
+              <div className="stat-label">Объектов на автопубликации</div>
+            </GlassCard>
           </Link>
-          <Link to="/user/dashboard/objects" className="stat-card" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <div className="stat-value">{loading ? '-' : (stats?.objects_count ?? '-')}</div>
-            <div className="stat-label">Объектов всего</div>
+          <Link to="/user/dashboard/objects" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <GlassCard className="stat-card">
+              <div className="stat-value">{loading ? '-' : (stats?.objects_count ?? '-')}</div>
+              <div className="stat-label">Объектов всего</div>
+            </GlassCard>
           </Link>
         </div>
 
-        <div className="card">
+        {/* Быстрые действия в стеклянной карточке */}
+        <GlassCard>
           <h2 className="card-title">Быстрые действия</h2>
           <div className="actions-grid">
             <Link to="/user/dashboard/objects/create" className="action-card">
@@ -79,10 +86,11 @@ export default function UserDashboard(): JSX.Element {
               <span>Настройки</span>
             </Link>
           </div>
-        </div>
+        </GlassCard>
 
+        {/* Админ функции в стеклянной карточке */}
         {user?.web_role === 'admin' && (
-          <div className="card">
+          <GlassCard>
             <h2 className="card-title">Админ функции</h2>
             <Link to="/admin/dashboard" className="action-card">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -95,7 +103,7 @@ export default function UserDashboard(): JSX.Element {
               </svg>
               <span>Админ панель</span>
             </Link>
-          </div>
+          </GlassCard>
         )}
       </div>
     </Layout>

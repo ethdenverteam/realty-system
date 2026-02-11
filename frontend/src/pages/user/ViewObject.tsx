@@ -2,6 +2,7 @@ import axios from 'axios'
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
+import { GlassCard } from '../../components/GlassCard'
 import api from '../../utils/api'
 import type { RealtyObject, PublishObjectRequest, PublishObjectResponse, ApiErrorResponse } from '../../types/models'
 import './ViewObject.css'
@@ -142,7 +143,7 @@ export default function ViewObject(): JSX.Element {
           </div>
         )}
 
-        <div className="card">
+        <GlassCard>
           <div className="card-header-row">
             <h2 className="card-title">Информация об объекте</h2>
             <span
@@ -300,7 +301,7 @@ export default function ViewObject(): JSX.Element {
                'Опубликовать через бота'}
             </button>
           </div>
-        </div>
+        </GlassCard>
       </div>
 
       {showAccountPublishModal && (

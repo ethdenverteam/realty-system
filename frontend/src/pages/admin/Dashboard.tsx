@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { useEffect, useState } from 'react'
 import Layout from '../../components/Layout'
+import { GlassCard } from '../../components/GlassCard'
 import api from '../../utils/api'
 import type { ActionLogItem, AdminStats, LogsResponse, ApiErrorResponse } from '../../types/models'
 import './Dashboard.css'
@@ -43,25 +44,25 @@ export default function AdminDashboard(): JSX.Element {
         {error && <div className="alert alert-error">{error}</div>}
 
         <div className="stats-grid">
-          <div className="stat-card">
+          <GlassCard className="stat-card">
             <div className="stat-value">{stats?.users_count ?? '-'}</div>
             <div className="stat-label">Пользователей</div>
-          </div>
-          <div className="stat-card">
+          </GlassCard>
+          <GlassCard className="stat-card">
             <div className="stat-value">{stats?.objects_count ?? '-'}</div>
             <div className="stat-label">Объектов</div>
-          </div>
-          <div className="stat-card">
+          </GlassCard>
+          <GlassCard className="stat-card">
             <div className="stat-value">{stats?.publications_today ?? '-'}</div>
             <div className="stat-label">Публикаций сегодня</div>
-          </div>
-          <div className="stat-card">
+          </GlassCard>
+          <GlassCard className="stat-card">
             <div className="stat-value">{stats?.accounts_count ?? '-'}</div>
             <div className="stat-label">Активных аккаунтов</div>
-          </div>
+          </GlassCard>
         </div>
 
-        <div className="card">
+        <GlassCard>
           <h2 className="card-title">Быстрые действия</h2>
           <div className="actions-grid">
             <a href="/admin/dashboard/bot-chats" className="action-card">
@@ -207,9 +208,9 @@ export default function AdminDashboard(): JSX.Element {
               <span>Пользовательский режим</span>
             </a>
           </div>
-        </div>
+        </GlassCard>
 
-        <div className="card">
+        <GlassCard>
           <h2 className="card-title">Последние действия</h2>
           {loading ? (
             <div className="loading">Загрузка...</div>
@@ -239,7 +240,7 @@ export default function AdminDashboard(): JSX.Element {
           ) : (
             <div className="empty-state">Нет действий</div>
           )}
-        </div>
+        </GlassCard>
       </div>
     </Layout>
   )

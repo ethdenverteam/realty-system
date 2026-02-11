@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Layout from '../../components/Layout'
+import { GlassCard } from '../../components/GlassCard'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import Dropdown, { type DropdownOption } from '../../components/Dropdown'
@@ -35,13 +36,6 @@ export default function UserSettings(): JSX.Element {
     default_show_username: false,
     object_card_display_types: [],
     object_list_display_types: [],
-  })
-
-  // Применение загруженных настроек
-  useState(() => {
-    if (settingsData) {
-      setSettings(settingsData)
-    }
   })
 
   // Поля объекта для отображения
@@ -106,7 +100,7 @@ export default function UserSettings(): JSX.Element {
   return (
     <Layout title="Настройки контактов">
       <div className="settings-page">
-        <div className="card">
+        <GlassCard>
           <h2 className="card-title">Настройка контактов</h2>
           <p className="card-description">
             Эти настройки будут использоваться по умолчанию при создании новых объектов
@@ -261,7 +255,7 @@ export default function UserSettings(): JSX.Element {
               Выйти
             </button>
           </div>
-        </div>
+        </GlassCard>
       </div>
     </Layout>
   )
