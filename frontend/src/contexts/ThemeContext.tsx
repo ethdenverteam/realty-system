@@ -32,6 +32,9 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
     if (theme === 'dark-lines') {
       generateRandomGradient()
     }
+
+    // Генерация случайного тоннера стекла для всех тем
+    generateRandomGlassTint()
   }, [theme])
 
   const generateRandomLines = (): void => {
@@ -92,6 +95,20 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
     
     const gradientString = gradients.join(', ') + ', #000000'
     document.documentElement.style.setProperty('--random-gradient-bg', gradientString)
+  }
+
+  const generateRandomGlassTint = (): void => {
+    // Рандомный тон стекла в диапазоне от красных до синих оттенков
+    // Берём одинаковую насыщенность/яркость, меняем только hue
+    const hue = Math.floor(Math.random() * 241) // 0-240 (от красного до синего)
+    const saturation = 70
+    const lightness = 80
+    const alpha = 0.12 // примерно как #96dce31f
+
+    const hslaColor = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`
+
+    // Один цвет для всех стекол до перезагрузки страницы / смены темы
+    document.documentElement.style.setProperty('--glass-bg', hslaColor)
   }
 
   const toggleTheme = () => {

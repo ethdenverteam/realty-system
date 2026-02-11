@@ -62,6 +62,11 @@
   /* Admin colors */
   --color-admin: #dc3545;
   --color-admin-light: #f8d7da;
+
+  /* Glass defaults */
+  --glass-blur: 2px; /* Единый blur для всех стеклянных элементов */
+  /* Базовый цвет стекла (примерно #96dce31f), будет переопределяться рандомно через ThemeContext */
+  --glass-bg: rgba(150, 220, 227, 0.12);
 }
 
 [data-theme="dark"] {
@@ -285,12 +290,12 @@ input, textarea, select {
 
 /* Универсальный стеклянный стиль для всех карточек */
 .card {
-  background: rgba(255, 255, 255, 0.12) !important;
+  background: var(--glass-bg, rgba(255, 255, 255, 0.12)) !important;
   border: 1px solid rgba(255, 255, 255, 0.3) !important;
   border-radius: 24px !important; /* Округлая форма */
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1) !important;
-  backdrop-filter: blur(12px) !important; /* Размытие по умолчанию */
-  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(var(--glass-blur, 2px)) !important; /* Размытие по умолчанию */
+  -webkit-backdrop-filter: blur(var(--glass-blur, 2px)) !important;
 }
 
 /* Utility classes */
