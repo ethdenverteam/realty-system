@@ -1007,6 +1007,12 @@ def user_publish_object_via_bot(current_user):
             'errors': errors if errors else None,
             'message': f'Объект успешно опубликован в {published_count} из {len(target_chats)} чатов'
         }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error publishing object via bot: {e}", exc_info=True)
+        log_error(e, 'web_object_publish_via_bot_failed', current_user.user_id, {'object_id': object_id})
+        return jsonify({'error': str(e)}), 500
 
 
 @user_routes_bp.route('/dashboard/objects/<object_id>/preview', methods=['POST'])
