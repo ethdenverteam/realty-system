@@ -145,6 +145,7 @@ def log_bot_action(action: str, user_id: int = None, telegram_id: str = None,
     """
     logger = logging.getLogger('bot.actions')
     
+    db = None
     try:
         db = get_db()
         
@@ -162,8 +163,9 @@ def log_bot_action(action: str, user_id: int = None, telegram_id: str = None,
             details_json=details or {},
             created_at=datetime.utcnow()
         )
-        db.session.add(log_entry)
-        db.session.commit()
+        # get_db() возвращает SQLAlchemy Session, поэтому используем методы сессии напрямую
+        db.add(log_entry)
+        db.commit()
         
         # Логируем в файл
         user_info = f"UserID: {user_id}" if user_id else f"TelegramID: {telegram_id}"
@@ -175,10 +177,17 @@ def log_bot_action(action: str, user_id: int = None, telegram_id: str = None,
         # Не падаем, если логирование не удалось
         logger.error(f"Failed to log bot action {action}: {e}", exc_info=True)
         try:
-            db = get_db()
-            db.session.rollback()
+            if db is None:
+                db = get_db()
+            db.rollback()
         except Exception:
             pass
+    finally:
+        if db is not None:
+            try:
+                db.close()
+            except Exception:
+                pass
 
 
 def log_bot_error(error: Exception, action: str = None, user_id: int = None, 

@@ -457,25 +457,42 @@ def update_autopublish_config(object_id, current_user):
     if 'accounts_config_json' in data or 'accounts_config' in data:
         accounts_config = data.get('accounts_config_json') or data.get('accounts_config')
         if isinstance(accounts_config, dict):
-            # Проверяем, что есть хотя бы один аккаунт с выбранными чатами
+            # Унифицированная логика с create_or_update_autopublish_config:
+            # разрешаем сохранять формат публикации даже без выбранных чатов
             accounts_list = accounts_config.get('accounts', [])
             has_valid_accounts = False
-            for acc_entry in accounts_list:
-                chat_ids = acc_entry.get('chat_ids', [])
-                if chat_ids and len(chat_ids) > 0:
-                    has_valid_accounts = True
-                    break
-            
-            if has_valid_accounts:
+
+            if accounts_list:
+                for acc_entry in accounts_list:
+                    chat_ids = acc_entry.get('chat_ids', [])
+                    if chat_ids and len(chat_ids) > 0:
+                        has_valid_accounts = True
+                        break
+
+            if has_valid_accounts or accounts_config.get('publication_format'):
+                # Есть валидные аккаунты с чатами ИЛИ хотя бы формат публикации
                 cfg.accounts_config_json = accounts_config
+            elif accounts_list and len(accounts_list) > 0:
+                # Есть аккаунты, но нет выбранных чатов
+                # Очищаем список аккаунтов, но при наличии сохраняем формат
+                if accounts_config.get('publication_format'):
+                    cfg.accounts_config_json = {
+                        'publication_format': accounts_config.get('publication_format'),
+                        'accounts': []
+                    }
+                else:
+                    cfg.accounts_config_json = None
             else:
-                # Если нет выбранных чатов, очищаем конфигурацию аккаунтов
-                cfg.accounts_config_json = None
-                return jsonify({
-                    'error': 'Сначала выберите чаты для аккаунтов',
-                    'details': 'Нельзя включить автопубликацию через аккаунты без выбранных чатов'
-                }), 400
+                # Нет аккаунтов, но можем сохранить только формат публикации
+                if accounts_config.get('publication_format'):
+                    cfg.accounts_config_json = {
+                        'publication_format': accounts_config.get('publication_format'),
+                        'accounts': []
+                    }
+                else:
+                    cfg.accounts_config_json = None
         elif accounts_config is None:
+            # Явное обнуление конфигурации аккаунтов
             cfg.accounts_config_json = None
 
     # Автопубликация всегда включена (бот всегда включен)
