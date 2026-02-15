@@ -1,7 +1,7 @@
 """Add second contact fields to objects
 
 Revision ID: add_second_contact_2024
-Revises: add_chat_filters_json
+Revises: add_residential_complex
 Create Date: 2024-12-19 12:00:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_second_contact_2024'
-down_revision = 'add_chat_filters_json'
+down_revision = ('add_residential_complex', 'add_chat_cached_at')
 branch_labels = None
 depends_on = None
 
