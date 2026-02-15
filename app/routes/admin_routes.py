@@ -587,7 +587,7 @@ def admin_add_bot_chat(current_user):
         title = chat_info.title or (chat_info.first_name or '') + ' ' + (chat_info.last_name or '') or username or f'Chat {telegram_chat_id}'
         chat_type = chat_info.type
         
-        # Check if chat already exists (using raw SQL to avoid filters_json issue)
+        # Check if chat already exists with owner_type='bot' (using raw SQL to avoid filters_json issue)
         from sqlalchemy import text
         try:
             sql = text("""
@@ -595,13 +595,44 @@ def admin_add_bot_chat(current_user):
                        owner_type, owner_account_id, is_active, members_count,
                        added_date, last_publication, total_publications
                 FROM chats
-                WHERE telegram_chat_id = :telegram_chat_id
+                WHERE telegram_chat_id = :telegram_chat_id AND owner_type = 'bot'
                 LIMIT 1
             """)
             result_proxy = db.session.execute(sql, {'telegram_chat_id': telegram_chat_id})
             existing_row = result_proxy.fetchone()
             if existing_row:
-                return jsonify({'error': 'Chat already exists'}), 400
+                # Чат существует, но возможно неактивен - обновим его вместо создания нового
+                logger.info(f"Chat {telegram_chat_id} already exists, updating instead of creating new")
+                # Обновим существующий чат
+                update_sql = text("""
+                    UPDATE chats
+                    SET title = :title, type = :type, filters_json = :filters_json, is_active = true
+                    WHERE telegram_chat_id = :telegram_chat_id AND owner_type = 'bot'
+                """)
+                import json
+                filters_json_str = json.dumps(filters) if filters else '{}'
+                db.session.execute(update_sql, {
+                    'telegram_chat_id': telegram_chat_id,
+                    'title': title,
+                    'type': chat_type,
+                    'filters_json': filters_json_str
+                })
+                db.session.commit()
+                
+                # Получим обновленный чат
+                updated_chat = Chat.query.filter_by(telegram_chat_id=telegram_chat_id, owner_type='bot').first()
+                if updated_chat:
+                    log_action(
+                        action='admin_chat_updated',
+                        user_id=current_user.user_id,
+                        details={
+                            'chat_id': updated_chat.chat_id,
+                            'telegram_chat_id': telegram_chat_id,
+                            'title': title,
+                            'filters': filters
+                        }
+                    )
+                    return jsonify(updated_chat.to_dict()), 200
         except Exception as check_error:
             logger.warning(f"Error checking existing chat: {check_error}")
             # Continue anyway - might be filters_json issue

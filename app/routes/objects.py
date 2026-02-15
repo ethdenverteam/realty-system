@@ -287,7 +287,7 @@ def create_object(current_user):
         db.session.add(obj)
         db.session.commit()
         
-        # Log creation
+        # Log creation with districts
         log_action(
             action='object_created',
             user_id=current_user.user_id,
@@ -295,10 +295,14 @@ def create_object(current_user):
                 'object_id': object_id,
                 'rooms_type': obj.rooms_type,
                 'price': obj.price,
+                'districts_json': obj.districts_json,
                 'status': obj.status,
                 'source': 'web'
             }
         )
+        
+        # Verify districts were saved
+        logger.info(f"Object {object_id} created with districts: {obj.districts_json}")
         
         return jsonify({
             'success': True,
@@ -333,7 +337,9 @@ def update_object(object_id, current_user):
         # Убеждаемся, что это список
         if not isinstance(districts_json, list):
             districts_json = []
+        old_districts = obj.districts_json
         obj.districts_json = districts_json
+        logger.info(f"Object {object_id} districts updated: {old_districts} -> {districts_json}")
     if 'photos_json' in data:
         obj.photos_json = data['photos_json']
     if 'area' in data:
