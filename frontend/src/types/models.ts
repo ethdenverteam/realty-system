@@ -89,6 +89,8 @@ export interface RealtyObject {
   renovation?: string | null;
   contact_name?: string | null;
   phone_number?: string | null;
+  contact_name_2?: string | null;
+  phone_number_2?: string | null;
   show_username?: boolean;
   photos_json?: string[] | null;
   creation_date?: string;
@@ -110,6 +112,8 @@ export interface ObjectFormData {
   renovation: string;
   contact_name: string;
   phone_number: string;
+  contact_name_2: string;
+  phone_number_2: string;
   show_username: boolean;
 }
 
@@ -125,6 +129,8 @@ export interface CreateObjectRequest {
   renovation?: string | null;
   contact_name?: string | null;
   phone_number?: string | null;
+  contact_name_2?: string | null;
+  phone_number_2?: string | null;
   show_username: boolean;
 }
 
@@ -140,6 +146,8 @@ export interface UpdateObjectRequest {
   renovation?: string | null;
   contact_name?: string | null;
   phone_number?: string | null;
+  contact_name_2?: string | null;
+  phone_number_2?: string | null;
   show_username: boolean;
 }
 

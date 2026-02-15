@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import ObjectForm from '../../components/ObjectForm'
@@ -20,6 +20,8 @@ const initialFormData: ObjectFormData = {
   renovation: '',
   contact_name: '',
   phone_number: '',
+  contact_name_2: '',
+  phone_number_2: '',
   show_username: false,
 }
 
@@ -41,15 +43,27 @@ export default function UserCreateObject(): JSX.Element {
     autoLoad: true,
   })
 
-  // Применение настроек к форме
+  // Флаг для отслеживания, были ли применены настройки
+  const settingsApplied = useRef(false)
+  
+  // Применение настроек к форме только один раз при первой загрузке
   useEffect(() => {
-    if (settingsData) {
-      setFormData((prev) => ({
-        ...prev,
-        phone_number: settingsData.phone || '',
-        contact_name: settingsData.contact_name || '',
-        show_username: settingsData.default_show_username || false,
-      }))
+    if (settingsData && !settingsApplied.current) {
+      setFormData((prev) => {
+        // Применяем настройки только если поля пустые (не перезаписываем ввод пользователя)
+        const newData = { ...prev }
+        if (!prev.phone_number && settingsData.phone) {
+          newData.phone_number = settingsData.phone
+        }
+        if (!prev.contact_name && settingsData.contact_name) {
+          newData.contact_name = settingsData.contact_name
+        }
+        if (!prev.show_username && settingsData.default_show_username) {
+          newData.show_username = settingsData.default_show_username
+        }
+        return newData
+      })
+      settingsApplied.current = true
     }
   }, [settingsData])
 
@@ -70,11 +84,17 @@ export default function UserCreateObject(): JSX.Element {
     e.preventDefault()
     clearError()
 
-    // Валидация телефона
+    // Валидация телефонов
     if (formData.phone_number && formData.phone_number.trim()) {
       if (!PHONE_PATTERN.test(formData.phone_number.trim())) {
         clearError()
         // Устанавливаем ошибку через состояние (можно улучшить через setError в хуке)
+        return
+      }
+    }
+    if (formData.phone_number_2 && formData.phone_number_2.trim()) {
+      if (!PHONE_PATTERN.test(formData.phone_number_2.trim())) {
+        clearError()
         return
       }
     }
@@ -99,6 +119,8 @@ export default function UserCreateObject(): JSX.Element {
       renovation: formData.renovation || null,
       contact_name: formData.contact_name || null,
       phone_number: formData.phone_number?.trim() || null,
+      contact_name_2: formData.contact_name_2 || null,
+      phone_number_2: formData.phone_number_2?.trim() || null,
       show_username: formData.show_username,
     }
 
@@ -120,7 +142,10 @@ export default function UserCreateObject(): JSX.Element {
           submitLabel="Создать объект"
           cancelLabel="Отмена"
           onCancel={handleCancel}
-          error={error || (formData.phone_number && formData.phone_number.trim() && !PHONE_PATTERN.test(formData.phone_number.trim()) ? PHONE_ERROR_MESSAGE : '')}
+          error={error || 
+            (formData.phone_number && formData.phone_number.trim() && !PHONE_PATTERN.test(formData.phone_number.trim()) ? PHONE_ERROR_MESSAGE : '') ||
+            (formData.phone_number_2 && formData.phone_number_2.trim() && !PHONE_PATTERN.test(formData.phone_number_2.trim()) ? 'Второй номер телефона должен быть в формате 89693386969' : '')
+          }
         />
       </div>
     </Layout>

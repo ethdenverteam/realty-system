@@ -24,6 +24,8 @@ const initialFormData: ObjectFormData = {
   renovation: '',
   contact_name: '',
   phone_number: '',
+  contact_name_2: '',
+  phone_number_2: '',
   show_username: false,
 }
 
@@ -58,6 +60,8 @@ export default function EditObject(): JSX.Element {
         renovation: obj.renovation || '',
         contact_name: obj.contact_name || '',
         phone_number: obj.phone_number || '',
+        contact_name_2: obj.contact_name_2 || '',
+        phone_number_2: obj.phone_number_2 || '',
         show_username: obj.show_username || false,
       })
     } catch (err: unknown) {
@@ -82,11 +86,18 @@ export default function EditObject(): JSX.Element {
 
     setError('')
     
-    // Validate phone number if provided
+    // Validate phone numbers if provided
     if (formData.phone_number && formData.phone_number.trim()) {
       const phonePattern = /^8\d{10}$/
       if (!phonePattern.test(formData.phone_number.trim())) {
         setError('Номер телефона должен быть в формате 89693386969 (11 цифр, начинается с 8)')
+        return
+      }
+    }
+    if (formData.phone_number_2 && formData.phone_number_2.trim()) {
+      const phonePattern = /^8\d{10}$/
+      if (!phonePattern.test(formData.phone_number_2.trim())) {
+        setError('Второй номер телефона должен быть в формате 89693386969 (11 цифр, начинается с 8)')
         return
       }
     }
@@ -111,6 +122,8 @@ export default function EditObject(): JSX.Element {
         renovation: formData.renovation || null,
         contact_name: formData.contact_name || null,
         phone_number: formData.phone_number?.trim() || null,
+        contact_name_2: formData.contact_name_2 || null,
+        phone_number_2: formData.phone_number_2?.trim() || null,
         show_username: formData.show_username,
       }
 

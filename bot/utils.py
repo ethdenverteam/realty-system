@@ -474,6 +474,8 @@ def _format_publication_text_compact(obj: Object, user: User = None, is_preview:
     contact_parts = []
     phone = obj.phone_number or (user.phone if user else None)
     contact_name = obj.contact_name or ""
+    phone_2 = getattr(obj, 'phone_number_2', None)
+    contact_name_2 = getattr(obj, 'contact_name_2', None) or ""
     show_username = obj.show_username or False
     
     if contact_name:
@@ -481,6 +483,11 @@ def _format_publication_text_compact(obj: Object, user: User = None, is_preview:
         contact_parts.append(contact_name_str)
     if phone:
         contact_parts.append(phone)
+    if contact_name_2:
+        contact_name_2_str = replace_digits_with_special(contact_name_2)
+        contact_parts.append(contact_name_2_str)
+    if phone_2:
+        contact_parts.append(phone_2)
     if show_username and user and user.username:
         username_str = replace_digits_with_special(user.username)
         contact_parts.append(f"@{username_str}")
@@ -617,9 +624,11 @@ def format_publication_text(obj: Object, user: User = None, is_preview: bool = F
     # Контакты
     phone = obj.phone_number or (user.phone if user else None)
     contact_name = obj.contact_name or ""
+    phone_2 = getattr(obj, 'phone_number_2', None)
+    contact_name_2 = getattr(obj, 'contact_name_2', None) or ""
     show_username = obj.show_username or False
     
-    if contact_name or phone or (show_username and user and user.username):
+    if contact_name or phone or contact_name_2 or phone_2 or (show_username and user and user.username):
         if not hashtags:
             lines.append("")
         if contact_name:
@@ -627,6 +636,11 @@ def format_publication_text(obj: Object, user: User = None, is_preview: bool = F
             lines.append(f"🕴🏻¦{contact_name_str}")
         if phone:
             lines.append(f"☎️¦{phone}")
+        if contact_name_2:
+            contact_name_2_str = replace_digits_with_special(contact_name_2)
+            lines.append(f"🕴🏻¦{contact_name_2_str}")
+        if phone_2:
+            lines.append(f"☎️¦{phone_2}")
         if show_username and user and user.username:
             username_str = replace_digits_with_special(user.username)
             lines.append(f"📩¦@{username_str}")

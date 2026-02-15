@@ -230,12 +230,18 @@ export default function ViewObject(): JSX.Element {
               </div>
             )}
 
-            {(object.contact_name || object.phone_number) && (
+            {(object.contact_name || object.phone_number || object.contact_name_2 || object.phone_number_2) && (
               <div className="detail-item detail-item-full">
                 <label>Контакты</label>
                 <div className="detail-value">
                   {object.contact_name && <div>{object.contact_name}</div>}
                   {object.phone_number && <div>{object.phone_number}</div>}
+                  {(object.contact_name_2 || object.phone_number_2) && (
+                    <>
+                      {object.contact_name_2 && <div>{object.contact_name_2}</div>}
+                      {object.phone_number_2 && <div>{object.phone_number_2}</div>}
+                    </>
+                  )}
                   {object.show_username && <div>Показывать username в Telegram</div>}
                 </div>
               </div>

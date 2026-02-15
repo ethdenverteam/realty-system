@@ -28,6 +28,8 @@ class Object(db.Model):
     contact_name = Column(String(100), nullable=True)
     show_username = Column(Boolean, default=False, nullable=False)
     phone_number = Column(String(20), nullable=True)
+    contact_name_2 = Column(String(100), nullable=True)
+    phone_number_2 = Column(String(20), nullable=True)
     status = Column(String(50), default='черновик', nullable=False)  # черновик/опубликовано/запланировано/архив
     source = Column(String(10), default='bot', nullable=False)  # bot/web
     publication_date = Column(DateTime, nullable=True)
@@ -63,6 +65,8 @@ class Object(db.Model):
             'contact_name': self.contact_name,
             'show_username': self.show_username,
             'phone_number': self.phone_number,
+            'contact_name_2': self.contact_name_2,
+            'phone_number_2': self.phone_number_2,
             'status': self.status,
             'source': self.source,
             'publication_date': self.publication_date.isoformat() if self.publication_date else None,

@@ -179,6 +179,8 @@ def create_object(current_user):
         renovation = request.form.get('renovation', '')
         contact_name = request.form.get('contact_name', '')
         phone_number = request.form.get('phone_number', '')
+        contact_name_2 = request.form.get('contact_name_2', '')
+        phone_number_2 = request.form.get('phone_number_2', '')
         show_username = request.form.get('show_username') == 'true'
         
         # Parse districts
@@ -218,6 +220,8 @@ def create_object(current_user):
         renovation = data.get('renovation', '')
         contact_name = data.get('contact_name', '')
         phone_number = data.get('phone_number', '')
+        contact_name_2 = data.get('contact_name_2', '')
+        phone_number_2 = data.get('phone_number_2', '')
         show_username = data.get('show_username', False)
         districts_json = data.get('districts_json', [])
         photos_json = data.get('photos_json', [])
@@ -267,6 +271,8 @@ def create_object(current_user):
         contact_name=contact_name,
         show_username=show_username,
         phone_number=phone_number,
+        contact_name_2=contact_name_2 if contact_name_2 else None,
+        phone_number_2=phone_number_2 if phone_number_2 else None,
         status='черновик',
         source='web'
     )
@@ -337,6 +343,10 @@ def update_object(object_id, current_user):
         obj.show_username = data['show_username']
     if 'phone_number' in data:
         obj.phone_number = data['phone_number']
+    if 'contact_name_2' in data:
+        obj.contact_name_2 = data['contact_name_2']
+    if 'phone_number_2' in data:
+        obj.phone_number_2 = data['phone_number_2']
     if 'status' in data:
         obj.status = data['status']
     
@@ -521,6 +531,8 @@ def publish_object_via_account(current_user):
                     contact_name=obj.contact_name,
                     show_username=obj.show_username,
                     phone_number=obj.phone_number,
+                    contact_name_2=obj.contact_name_2,
+                    phone_number_2=obj.phone_number_2,
                     status=obj.status,
                     source='web'
                 )
@@ -698,6 +710,8 @@ def publish_object_via_bot(current_user):
                     contact_name=obj.contact_name,
                     show_username=obj.show_username,
                     phone_number=obj.phone_number,
+                    contact_name_2=obj.contact_name_2,
+                    phone_number_2=obj.phone_number_2,
                     status=obj.status,
                     source='web'
                 )

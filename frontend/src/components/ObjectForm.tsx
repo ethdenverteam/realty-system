@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useState, useEffect } from 'react'
+import { type ChangeEvent, type FormEvent, useState, useEffect, useRef, useCallback } from 'react'
 import type { ObjectFormData } from '../types/models'
 import api from '../utils/api'
 import { FilterSelect } from './FilterSelect'
@@ -28,29 +28,37 @@ export default function ObjectForm({
 }: ObjectFormProps): JSX.Element {
   const [districts, setDistricts] = useState<string[]>([])
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>([])
+  // Флаг для отслеживания, инициализированы ли districts из formData
+  const isDistrictsInitialized = useRef(false)
+  // Флаг для предотвращения циклических обновлений
+  const isUpdatingDistricts = useRef(false)
 
   useEffect(() => {
     void loadDistricts()
   }, [])
 
+  // Инициализация selectedDistricts из formData только один раз при монтировании
   useEffect(() => {
-    // Parse districts from formData (comma-separated string) when formData changes
-    if (formData.districts) {
+    if (!isDistrictsInitialized.current && formData.districts) {
       const parsed = formData.districts.split(',').map(d => d.trim()).filter(d => d.length > 0)
-      if (JSON.stringify(parsed.sort()) !== JSON.stringify(selectedDistricts.sort())) {
-        setSelectedDistricts(parsed)
-      }
-    } else if (selectedDistricts.length > 0) {
-      setSelectedDistricts([])
+      setSelectedDistricts(parsed)
+      isDistrictsInitialized.current = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.districts])
 
+  // Обновление formData.districts только при изменении selectedDistricts пользователем
   useEffect(() => {
-    // Update formData when selectedDistricts changes
-    const districtsString = selectedDistricts.join(', ')
-    if (districtsString !== formData.districts) {
-      handleChange('districts', districtsString)
+    if (isUpdatingDistricts.current) {
+      isUpdatingDistricts.current = false
+      return
+    }
+    
+    if (isDistrictsInitialized.current) {
+      const districtsString = selectedDistricts.join(', ')
+      if (districtsString !== formData.districts) {
+        isUpdatingDistricts.current = true
+        handleChange('districts', districtsString)
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDistricts])
@@ -64,26 +72,27 @@ export default function ObjectForm({
     }
   }
 
-  const handleChange = (field: keyof ObjectFormData, value: string | boolean): void => {
+  const handleChange = useCallback((field: keyof ObjectFormData, value: string | boolean): void => {
     onChange({
       ...formData,
       [field]: value,
     })
-  }
+  }, [formData, onChange])
 
-  const handleInputChange = (field: keyof ObjectFormData) => (
+  const handleInputChange = useCallback((field: keyof ObjectFormData) => (
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ): void => {
     const value = e.target.type === 'checkbox' 
       ? (e.target as HTMLInputElement).checked 
       : e.target.value
     handleChange(field, value)
-  }
+  }, [handleChange])
 
-  const handleDistrictsChange = (e: ChangeEvent<HTMLSelectElement>): void => {
+  const handleDistrictsChange = useCallback((e: ChangeEvent<HTMLSelectElement>): void => {
     const selected = Array.from(e.target.selectedOptions, option => option.value)
+    isUpdatingDistricts.current = true
     setSelectedDistricts(selected)
-  }
+  }, [])
 
   return (
     <div className="object-form-container">
@@ -114,6 +123,7 @@ export default function ObjectForm({
                 step="0.01"
                 min="0"
                 required
+                autoComplete="off"
               />
             </div>
           </div>
@@ -128,6 +138,7 @@ export default function ObjectForm({
                 step="0.01"
                 min="0"
                 required
+                autoComplete="off"
               />
             </div>
             <div className="form-group">
@@ -138,6 +149,7 @@ export default function ObjectForm({
                 value={formData.floor}
                 onChange={handleInputChange('floor')}
                 placeholder="например: 5/9"
+                autoComplete="off"
               />
             </div>
           </div>
@@ -172,6 +184,7 @@ export default function ObjectForm({
               value={formData.comment}
               onChange={handleInputChange('comment')}
               placeholder="Опишите квартиру и условия покупки"
+              autoComplete="off"
             />
           </div>
           <div className="form-group">
@@ -182,6 +195,7 @@ export default function ObjectForm({
               value={formData.residential_complex}
               onChange={handleInputChange('residential_complex')}
               placeholder="Название жилого комплекса"
+              autoComplete="off"
             />
           </div>
           <div className="form-group">
@@ -192,6 +206,7 @@ export default function ObjectForm({
               value={formData.address}
               onChange={handleInputChange('address')}
               placeholder="Улица и номер дома"
+              autoComplete="off"
             />
           </div>
           <div className="form-group">
@@ -216,6 +231,7 @@ export default function ObjectForm({
                 className="form-input"
                 value={formData.contact_name}
                 onChange={handleInputChange('contact_name')}
+                autoComplete="off"
               />
             </div>
             <div className="form-group">
@@ -228,6 +244,33 @@ export default function ObjectForm({
                 placeholder="89693386969"
                 pattern="^8\d{10}$"
                 title="Номер должен быть в формате 89693386969 (11 цифр, начинается с 8)"
+                autoComplete="off"
+              />
+              <small className="form-hint">Формат: 89693386969 (11 цифр, начинается с 8)</small>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Имя контакта 2</label>
+              <input
+                type="text"
+                className="form-input"
+                value={formData.contact_name_2}
+                onChange={handleInputChange('contact_name_2')}
+                autoComplete="off"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Телефон 2</label>
+              <input
+                type="tel"
+                className="form-input"
+                value={formData.phone_number_2}
+                onChange={handleInputChange('phone_number_2')}
+                placeholder="89693386969"
+                pattern="^8\d{10}$"
+                title="Номер должен быть в формате 89693386969 (11 цифр, начинается с 8)"
+                autoComplete="off"
               />
               <small className="form-hint">Формат: 89693386969 (11 цифр, начинается с 8)</small>
             </div>

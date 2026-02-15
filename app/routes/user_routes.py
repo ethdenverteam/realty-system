@@ -358,6 +358,8 @@ def create_or_update_autopublish_config(current_user):
                         contact_name=obj.contact_name,
                         show_username=obj.show_username,
                         phone_number=obj.phone_number,
+                        contact_name_2=obj.contact_name_2,
+                        phone_number_2=obj.phone_number_2,
                         status=obj.status,
                         source='web'
                     )
@@ -533,6 +535,8 @@ def update_autopublish_config(object_id, current_user):
                         contact_name=obj.contact_name,
                         show_username=obj.show_username,
                         phone_number=obj.phone_number,
+                        contact_name_2=obj.contact_name_2,
+                        phone_number_2=obj.phone_number_2,
                         status=obj.status,
                         source='web'
                     )
@@ -833,6 +837,8 @@ def user_publish_object_via_bot(current_user):
                     contact_name=obj.contact_name,
                     show_username=obj.show_username,
                     phone_number=obj.phone_number,
+                    contact_name_2=obj.contact_name_2,
+                    phone_number_2=obj.phone_number_2,
                     status=obj.status,
                     source='web'
                 )
@@ -1118,6 +1124,8 @@ def user_preview_object_in_bot(object_id, current_user):
                     contact_name=obj.contact_name,
                     show_username=obj.show_username,
                     phone_number=obj.phone_number,
+                    contact_name_2=obj.contact_name_2,
+                    phone_number_2=obj.phone_number_2,
                     status=obj.status,
                     source='web'
                 )
