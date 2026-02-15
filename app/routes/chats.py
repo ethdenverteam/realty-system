@@ -293,10 +293,19 @@ def update_chat(chat_id, current_user):
     
     data = request.get_json() or {}
     
-    if 'category' in data:
-        chat.category = data['category'] if data['category'] else None
-    if 'filters_json' in data:
-        chat.filters_json = data['filters_json'] if data['filters_json'] else None
+    # Обновляем category и filters_json вместе
+    if 'category' in data or 'filters_json' in data:
+        category = data.get('category') if 'category' in data else chat.category
+        filters_json = data.get('filters_json') if 'filters_json' in data else chat.filters_json
+        
+        # Если filters_json пустой или None, очищаем category
+        if not filters_json or filters_json == {}:
+            chat.category = None
+            chat.filters_json = None
+        else:
+            chat.category = category if category else None
+            chat.filters_json = filters_json
+    
     if 'is_active' in data:
         chat.is_active = bool(data['is_active'])
     
@@ -416,10 +425,18 @@ def update_chat_group(group_id, current_user):
         group.name = data['name']
     if 'description' in data:
         group.description = data.get('description', '')
-    if 'category' in data:
-        group.category = data['category'] if data['category'] else None
-    if 'filters_json' in data:
-        group.filters_json = data['filters_json'] if data['filters_json'] else None
+    # Обновляем category и filters_json вместе
+    if 'category' in data or 'filters_json' in data:
+        category = data.get('category') if 'category' in data else group.category
+        filters_json = data.get('filters_json') if 'filters_json' in data else group.filters_json
+        
+        # Если filters_json пустой или None, очищаем category
+        if not filters_json or filters_json == {}:
+            group.category = None
+            group.filters_json = None
+        else:
+            group.category = category if category else None
+            group.filters_json = filters_json
     if 'chat_ids' in data:
         chat_ids = data['chat_ids']
         if not isinstance(chat_ids, list):

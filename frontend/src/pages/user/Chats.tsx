@@ -56,6 +56,7 @@ export default function Chats(): JSX.Element {
   const [showEditGroupModal, setShowEditGroupModal] = useState(false)
   const [editingGroup, setEditingGroup] = useState<ChatGroup | null>(null)
   const [selectedChatsForGroup, setSelectedChatsForGroup] = useState<number[]>([])
+  const [selectedChatsForCreate, setSelectedChatsForCreate] = useState<Set<number>>(new Set())
   const [groupName, setGroupName] = useState('')
   const [groupDescription, setGroupDescription] = useState('')
   const [groupCategory, setGroupCategory] = useState('')
@@ -68,6 +69,11 @@ export default function Chats(): JSX.Element {
   const [showChatCategoryModal, setShowChatCategoryModal] = useState(false)
   const [editingChat, setEditingChat] = useState<CachedChat | null>(null)
   const [chatCategory, setChatCategory] = useState('')
+  const [chatFilterType, setChatFilterType] = useState<'' | 'common' | 'rooms' | 'district' | 'price'>('')
+  const [chatRoomsTypes, setChatRoomsTypes] = useState<string[]>([])
+  const [chatDistricts, setChatDistricts] = useState<string[]>([])
+  const [chatPriceMin, setChatPriceMin] = useState('')
+  const [chatPriceMax, setChatPriceMax] = useState('')
 
   // Загрузка аккаунтов
   const { data: accountsData, loading: loadingAccounts } = useApiData<TelegramAccount[]>({
@@ -152,13 +158,14 @@ export default function Chats(): JSX.Element {
   }
 
   useEffect(() => {
-    if (showCreateGroupModal || showEditGroupModal) {
+    if (showCreateGroupModal || showEditGroupModal || showChatCategoryModal) {
       void loadConfig()
     }
-  }, [showCreateGroupModal, showEditGroupModal])
+  }, [showCreateGroupModal, showEditGroupModal, showChatCategoryModal])
 
   const openCreateGroupModal = (): void => {
-    setSelectedChatsForGroup([])
+    // Используем выбранные чаты из чекбоксов
+    setSelectedChatsForGroup(Array.from(selectedChatsForCreate))
     setGroupName('')
     setGroupDescription('')
     setGroupCategory('')
@@ -232,6 +239,7 @@ export default function Chats(): JSX.Element {
     setGroupDistricts([])
     setGroupPriceMin('')
     setGroupPriceMax('')
+    // Не очищаем selectedChatsForCreate - они остаются для следующего создания группы
   }
 
   // Создание группы чатов
@@ -325,6 +333,45 @@ export default function Chats(): JSX.Element {
   const openChatCategoryModal = (chat: CachedChat): void => {
     setEditingChat(chat)
     setChatCategory(chat.category || '')
+    
+    // Парсим filters_json для редактирования
+    if (chat.filters_json) {
+      if (chat.filters_json.rooms_types) {
+        setChatFilterType('rooms')
+        setChatRoomsTypes(chat.filters_json.rooms_types || [])
+      } else if (chat.filters_json.districts) {
+        setChatFilterType('district')
+        setChatDistricts(chat.filters_json.districts || [])
+      } else if (chat.filters_json.price_min !== undefined || chat.filters_json.price_max !== undefined) {
+        setChatFilterType('price')
+        setChatPriceMin(chat.filters_json.price_min?.toString() || '')
+        setChatPriceMax(chat.filters_json.price_max?.toString() || '')
+      } else if (chat.filters_json.binding_type === 'common') {
+        setChatFilterType('common')
+      } else {
+        setChatFilterType('')
+      }
+    } else if (chat.category) {
+      // Legacy категория
+      if (chat.category.startsWith('rooms_')) {
+        setChatFilterType('rooms')
+        setChatRoomsTypes([chat.category.replace('rooms_', '')])
+      } else if (chat.category.startsWith('district_')) {
+        setChatFilterType('district')
+        setChatDistricts([chat.category.replace('district_', '')])
+      } else if (chat.category.startsWith('price_')) {
+        setChatFilterType('price')
+        const parts = chat.category.replace('price_', '').split('_')
+        if (parts.length === 2) {
+          setChatPriceMin(parts[0])
+          setChatPriceMax(parts[1])
+        }
+      } else {
+        setChatFilterType('')
+      }
+    } else {
+      setChatFilterType('')
+    }
     setShowChatCategoryModal(true)
   }
 
@@ -349,8 +396,39 @@ export default function Chats(): JSX.Element {
 
   const handleSaveChatCategory = (): void => {
     if (!editingChat) return
+    
+    // Формируем filters_json на основе выбранного типа
+    let filtersJson: any = null
+    let category: string | undefined = undefined
+    
+    if (chatFilterType === 'common') {
+      filtersJson = { binding_type: 'common' }
+    } else if (chatFilterType === 'rooms' && chatRoomsTypes.length > 0) {
+      filtersJson = { rooms_types: chatRoomsTypes }
+      // Legacy категория для обратной совместимости
+      if (chatRoomsTypes.length === 1) {
+        category = `rooms_${chatRoomsTypes[0]}`
+      }
+    } else if (chatFilterType === 'district' && chatDistricts.length > 0) {
+      filtersJson = { districts: chatDistricts }
+      // Legacy категория для обратной совместимости
+      if (chatDistricts.length === 1) {
+        category = `district_${chatDistricts[0]}`
+      }
+    } else if (chatFilterType === 'price' && (chatPriceMin || chatPriceMax)) {
+      filtersJson = {
+        price_min: chatPriceMin ? parseFloat(chatPriceMin) : null,
+        price_max: chatPriceMax ? parseFloat(chatPriceMax) : null,
+      }
+      // Legacy категория для обратной совместимости
+      if (chatPriceMin && chatPriceMax) {
+        category = `price_${chatPriceMin}_${chatPriceMax}`
+      }
+    }
+    
     void updateChatCategory({
-      category: chatCategory.trim() || undefined,
+      category: category,
+      filters_json: filtersJson,
     })
   }
 
@@ -469,9 +547,10 @@ export default function Chats(): JSX.Element {
                   <button
                     className="btn btn-primary"
                     onClick={openCreateGroupModal}
-                    disabled={chats.length === 0}
+                    disabled={chats.length === 0 || selectedChatsForCreate.size === 0}
+                    title={selectedChatsForCreate.size === 0 ? 'Выберите хотя бы один чат' : ''}
                   >
-                    Создать группу
+                    Создать группу {selectedChatsForCreate.size > 0 && `(${selectedChatsForCreate.size})`}
                   </button>
                 </div>
                 <div className="chats-control-row chats-control-row-3">
@@ -509,11 +588,29 @@ export default function Chats(): JSX.Element {
             <div className="objects-list chats-list">
               {chats.map(chat => {
                 const chatGroups = chatGroupsMap.get(chat.chat_id) || []
+                const isSelected = selectedChatsForCreate.has(chat.chat_id)
                 return (
-                  <div key={chat.chat_id} className="object-card compact chat-item">
+                  <div key={chat.chat_id} className={`object-card compact chat-item ${isSelected ? 'selected' : ''}`}>
                     <div className="chat-item-content">
                       <div className="chat-item-main">
-                        <h3 className="chat-item-title">{chat.title}</h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              const newSelected = new Set(selectedChatsForCreate)
+                              if (e.target.checked) {
+                                newSelected.add(chat.chat_id)
+                              } else {
+                                newSelected.delete(chat.chat_id)
+                              }
+                              setSelectedChatsForCreate(newSelected)
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          <h3 className="chat-item-title">{chat.title}</h3>
+                        </div>
                         <div className="chat-item-meta">
                           {chatGroups.length > 0 && (
                             <div className="chat-item-groups">
@@ -757,18 +854,100 @@ export default function Chats(): JSX.Element {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Категория связи</label>
-                  <input
-                    type="text"
+                  <label className="form-label">Тип категории связи</label>
+                  <select
                     className="form-control"
-                    value={chatCategory}
-                    onChange={(e) => setChatCategory(e.target.value)}
-                    placeholder="Например: rooms_1k, district_center, price_4000_6000"
-                  />
-                  <small className="form-text text-muted">
-                    Формат: rooms_1k, rooms_2k, district_название, price_мин_макс
-                  </small>
+                    value={chatFilterType}
+                    onChange={(e) => {
+                      const newType = e.target.value as '' | 'common' | 'rooms' | 'district' | 'price'
+                      setChatFilterType(newType)
+                      // Сброс значений при смене типа
+                      setChatRoomsTypes([])
+                      setChatDistricts([])
+                      setChatPriceMin('')
+                      setChatPriceMax('')
+                    }}
+                  >
+                    <option value="">Без привязки</option>
+                    <option value="common">Общий (все посты)</option>
+                    <option value="rooms">По типу комнат</option>
+                    <option value="district">По району</option>
+                    <option value="price">По диапазону цен</option>
+                  </select>
                 </div>
+
+                {chatFilterType === 'rooms' && groupConfig && (
+                  <div className="form-group">
+                    <label className="form-label">Типы комнат</label>
+                    <div className="checkbox-group">
+                      {(groupConfig.rooms_types || []).map((rt) => (
+                        <label key={rt} className="checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={chatRoomsTypes.includes(rt)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setChatRoomsTypes([...chatRoomsTypes, rt])
+                              } else {
+                                setChatRoomsTypes(chatRoomsTypes.filter((x) => x !== rt))
+                              }
+                            }}
+                          />
+                          <span>{rt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {chatFilterType === 'district' && groupConfig && (
+                  <div className="form-group">
+                    <label className="form-label">Районы</label>
+                    <select
+                      className="form-control"
+                      multiple
+                      value={chatDistricts}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                        const selected = Array.from(e.target.selectedOptions).map((opt) => opt.value)
+                        setChatDistricts(selected)
+                      }}
+                    >
+                      {Object.keys(groupConfig.districts || {}).map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="form-text text-muted">Удерживайте Ctrl для выбора нескольких</small>
+                  </div>
+                )}
+
+                {chatFilterType === 'price' && (
+                  <>
+                    <div className="form-group">
+                      <label className="form-label">Минимальная цена (тыс. руб.)</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={chatPriceMin}
+                        onChange={(e) => setChatPriceMin(e.target.value)}
+                        min="0"
+                        step="100"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Максимальная цена (тыс. руб.)</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={chatPriceMax}
+                        onChange={(e) => setChatPriceMax(e.target.value)}
+                        min="0"
+                        step="100"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
               <div className="modal-actions">
                 <button className="btn btn-secondary" onClick={() => {
@@ -778,7 +957,7 @@ export default function Chats(): JSX.Element {
                 }} disabled={updatingChatCategory}>
                   Отмена
                 </button>
-                <button className="btn btn-primary" onClick={handleSaveChatCategory} disabled={updatingChatCategory}>
+                <button className="btn btn-primary" onClick={handleSaveChatCategory} disabled={updatingChatCategory || (chatFilterType && chatFilterType !== 'common' && ((chatFilterType === 'rooms' && chatRoomsTypes.length === 0) || (chatFilterType === 'district' && chatDistricts.length === 0) || (chatFilterType === 'price' && !chatPriceMin && !chatPriceMax)))}>
                   {updatingChatCategory ? 'Сохранение...' : 'Сохранить'}
                 </button>
               </div>

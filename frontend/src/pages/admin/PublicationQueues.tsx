@@ -176,26 +176,45 @@ export default function PublicationQueues(): JSX.Element {
               <table>
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Тип</th>
+                    <th>Запланировано</th>
+                    <th>Создано</th>
+                    <th>Статус</th>
+                    <th>Аккаунт</th>
                     <th>Объект</th>
                     <th>Чат</th>
-                    <th>Аккаунт</th>
-                    <th>Статус</th>
-                    <th>Попытки</th>
-                    <th>Создано</th>
-                    <th>Завершено</th>
                     <th>Ошибка</th>
+                    <th>Попытки</th>
+                    <th>Завершено</th>
+                    <th>ID</th>
+                    <th>Тип</th>
                   </tr>
                 </thead>
                 <tbody>
                   {queues.map((queue) => (
                     <tr key={queue.queue_id}>
-                      <td>{queue.queue_id}</td>
                       <td>
-                        <span className={`badge ${queue.type === 'bot' ? 'badge-primary' : 'badge-secondary'}`}>
-                          {queue.type === 'bot' ? 'Бот' : 'Пользователь'}
+                        {queue.scheduled_time
+                          ? new Date(queue.scheduled_time).toLocaleString('ru-RU')
+                          : '-'}
+                      </td>
+                      <td>
+                        {queue.created_at
+                          ? new Date(queue.created_at).toLocaleString('ru-RU')
+                          : '-'}
+                      </td>
+                      <td>
+                        <span className={`badge ${getStatusBadgeClass(queue.status)}`}>
+                          {getStatusLabel(queue.status)}
                         </span>
+                      </td>
+                      <td>
+                        {queue.account ? (
+                          <div>{queue.account.phone}</div>
+                        ) : queue.type === 'user' ? (
+                          <span className="text-muted">-</span>
+                        ) : (
+                          <span className="text-muted">Бот</span>
+                        )}
                       </td>
                       <td>
                         {queue.object ? (
@@ -219,31 +238,6 @@ export default function PublicationQueues(): JSX.Element {
                         )}
                       </td>
                       <td>
-                        {queue.account ? (
-                          <div>{queue.account.phone}</div>
-                        ) : queue.type === 'user' ? (
-                          <span className="text-muted">-</span>
-                        ) : (
-                          <span className="text-muted">Бот</span>
-                        )}
-                      </td>
-                      <td>
-                        <span className={`badge ${getStatusBadgeClass(queue.status)}`}>
-                          {getStatusLabel(queue.status)}
-                        </span>
-                      </td>
-                      <td>{queue.attempts}</td>
-                      <td>
-                        {queue.created_at
-                          ? new Date(queue.created_at).toLocaleString('ru-RU')
-                          : '-'}
-                      </td>
-                      <td>
-                        {queue.completed_at
-                          ? new Date(queue.completed_at).toLocaleString('ru-RU')
-                          : '-'}
-                      </td>
-                      <td>
                         {queue.error_message ? (
                           <div className="error-message" title={queue.error_message}>
                             {queue.error_message.length > 50
@@ -253,6 +247,18 @@ export default function PublicationQueues(): JSX.Element {
                         ) : (
                           '-'
                         )}
+                      </td>
+                      <td>{queue.attempts}</td>
+                      <td>
+                        {queue.completed_at
+                          ? new Date(queue.completed_at).toLocaleString('ru-RU')
+                          : '-'}
+                      </td>
+                      <td>{queue.queue_id}</td>
+                      <td>
+                        <span className={`badge ${queue.type === 'bot' ? 'badge-primary' : 'badge-secondary'}`}>
+                          {queue.type === 'bot' ? 'Бот' : 'Пользователь'}
+                        </span>
                       </td>
                     </tr>
                   ))}
