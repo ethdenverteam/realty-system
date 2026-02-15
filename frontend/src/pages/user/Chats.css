@@ -13,6 +13,34 @@
   gap: var(--spacing-sm);
 }
 
+.chats-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.chats-control-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.chats-control-row-1 {
+  /* Первая строка - выбор аккаунта */
+}
+
+.chats-control-row-2 {
+  /* Вторая строка - кнопки */
+}
+
+.chats-control-row-3 {
+  /* Третья строка - поиск */
+}
+
+/* Обратная совместимость */
 .chats-actions {
   display: flex;
   flex-direction: column;
@@ -187,10 +215,43 @@
 }
 
 .chats-search-input {
-  max-width: 220px;
+  max-width: 100%;
+  flex: 1;
+}
+
+.chats-selection-list {
+  background: var(--bg-color);
+}
+
+.selected-chats-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.selected-chats-list li {
+  background: var(--bg-hover);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius);
 }
 
 @media (min-width: 768px) {
+  .chats-controls {
+    align-items: flex-start;
+  }
+
+  .chats-control-row {
+    width: 100%;
+  }
+
+  .chats-search-input {
+    max-width: 300px;
+  }
+
+  /* Обратная совместимость */
   .chats-actions {
     align-items: center;
   }

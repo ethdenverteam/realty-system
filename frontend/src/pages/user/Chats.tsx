@@ -150,7 +150,8 @@ export default function Chats(): JSX.Element {
   })
 
   const openCreateGroupModal = (): void => {
-    setSelectedChatsForGroup([])
+    // Если есть выбранные чаты, передаем их в модальное окно
+    // Иначе оставляем пустым для выбора в модальном окне
     setGroupName('')
     setGroupDescription('')
     setShowCreateGroupModal(true)
@@ -215,36 +216,39 @@ export default function Chats(): JSX.Element {
                 <span className="chats-count"> ({chats.length})</span>
               )}
             </h2>
-            <div className="chats-actions">
-              <div className="chats-actions-row">
-                <FilterSelect
-                  value={selectedAccountId?.toString() || ''}
-                  onChange={(value) => setSelectedAccountId(value ? Number(value) : null)}
-                  options={accounts.map(acc => ({ value: acc.account_id.toString(), label: acc.phone }))}
-                  placeholder="Выберите аккаунт"
-                  size="sm"
-                />
-                {selectedAccountId && (
-                  <>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => void refreshChats()}
-                      disabled={refreshing}
-                    >
-                      {refreshing ? 'Обновление...' : 'Обновить чаты'}
-                    </button>
-                    <button
-                      className="btn btn-primary"
-                      onClick={openCreateGroupModal}
-                      disabled={chats.length === 0}
-                    >
-                      Создать группу
-                    </button>
-                  </>
-                )}
-              </div>
-              {selectedAccountId && (
-                <div className="chats-actions-row">
+          </div>
+          <div className="chats-controls">
+            <div className="chats-control-row chats-control-row-1">
+              <FilterSelect
+                value={selectedAccountId?.toString() || ''}
+                onChange={(value) => setSelectedAccountId(value ? Number(value) : null)}
+                options={accounts.map(acc => ({ value: acc.account_id.toString(), label: acc.phone }))}
+                placeholder="Выберите аккаунт"
+                size="sm"
+              />
+            </div>
+            {selectedAccountId && (
+              <>
+                <div className="chats-control-row chats-control-row-2">
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => void refreshChats()}
+                    disabled={refreshing}
+                  >
+                    {refreshing ? 'Обновление...' : 'Обновить чаты'}
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      // Передаем выбранные чаты в модальное окно
+                      openCreateGroupModal()
+                    }}
+                    disabled={chats.length === 0}
+                  >
+                    Создать группу
+                  </button>
+                </div>
+                <div className="chats-control-row chats-control-row-3">
                   <input
                     type="text"
                     className="form-input form-input-sm chats-search-input"
@@ -255,8 +259,8 @@ export default function Chats(): JSX.Element {
                     }}
                   />
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
 
           {loadingAccounts ? (
@@ -397,14 +401,37 @@ export default function Chats(): JSX.Element {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Выбранные чаты: {selectedChatsForGroup.length}</label>
-                  {selectedChatsForGroup.length === 0 ? (
-                    <p className="text-muted">Выберите чаты из списка выше</p>
+                  <label className="form-label">Выберите чаты для группы ({selectedChatsForGroup.length} выбрано)</label>
+                  {chats.length === 0 ? (
+                    <p className="text-muted">Нет доступных чатов</p>
                   ) : (
+                    <div className="chats-selection-list" style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--border-radius)', padding: 'var(--spacing-sm)' }}>
+                      {chats.map(chat => (
+                        <label key={chat.chat_id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-xs)', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedChatsForGroup.includes(chat.chat_id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedChatsForGroup(prev => [...prev, chat.chat_id])
+                              } else {
+                                setSelectedChatsForGroup(prev => prev.filter(id => id !== chat.chat_id))
+                              }
+                            }}
+                          />
+                          <span>{chat.title} ({chat.type})</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {selectedChatsForGroup.length > 0 && (
+                  <div className="form-group">
+                    <label className="form-label">Выбранные чаты:</label>
                     <ul className="selected-chats-list">
                       {chats.filter(c => selectedChatsForGroup.includes(c.chat_id)).map(chat => (
-                        <li key={chat.chat_id}>
-                          {chat.title}
+                        <li key={chat.chat_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--spacing-xs)' }}>
+                          <span>{chat.title}</span>
                           <button
                             type="button"
                             className="btn btn-small btn-link"
@@ -415,11 +442,14 @@ export default function Chats(): JSX.Element {
                         </li>
                       ))}
                     </ul>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
               <div className="modal-actions">
-                <button className="btn btn-secondary" onClick={() => setShowCreateGroupModal(false)} disabled={creatingGroup}>
+                <button className="btn btn-secondary" onClick={() => {
+                  setShowCreateGroupModal(false)
+                  setSelectedChatsForGroup([])
+                }} disabled={creatingGroup}>
                   Отмена
                 </button>
                 <button className="btn btn-primary" onClick={handleCreateGroup} disabled={creatingGroup || !groupName.trim() || selectedChatsForGroup.length === 0}>

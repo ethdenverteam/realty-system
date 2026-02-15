@@ -74,4 +74,32 @@ echo "Check status:"
 echo "  docker ps"
 echo "  docker logs realty_web"
 echo "  docker logs realty_bot"
+echo ""
+
+# Timer function to prevent console from closing
+timer_pid=""
+start_timer() {
+    (
+        sleep 540  # 9 minutes = 540 seconds
+        echo ""
+        echo "⚠️  To prevent console from closing - press any key or 'n' to cancel"
+        while true; do
+            read -t 1 -n 1 input
+            if [ $? -eq 0 ]; then
+                if [ "$input" = "n" ] || [ "$input" = "N" ]; then
+                    echo "Timer cancelled."
+                    return
+                else
+                    echo "Timer restarted for 9 minutes..."
+                    start_timer
+                    return
+                fi
+            fi
+        done
+    ) &
+    timer_pid=$!
+}
+
+# Start the timer in background
+start_timer
 

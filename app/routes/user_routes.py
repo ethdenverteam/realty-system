@@ -60,12 +60,12 @@ def user_stats(current_user):
         is_active=True
     ).count()
     
-    # Objects on autopublication (objects with pending/scheduled autopublish queue items)
-    autopublish_objects = db.session.query(func.count(func.distinct(PublicationQueue.object_id))).filter(
-        PublicationQueue.user_id == current_user.user_id,
-        PublicationQueue.mode == 'autopublish',
-        PublicationQueue.status.in_(['pending', 'scheduled'])
-    ).scalar() or 0
+    # Objects on autopublication (objects with enabled autopublish config)
+    from app.models.autopublish_config import AutopublishConfig
+    autopublish_objects = AutopublishConfig.query.filter_by(
+        user_id=current_user.user_id,
+        enabled=True
+    ).count()
     
     return jsonify({
         'objects_count': objects_count,
