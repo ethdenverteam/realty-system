@@ -4,6 +4,7 @@ import { useRef, useEffect } from 'react'
 import { GlassButton } from './GlassButton'
 import { uiStore } from '../stores/uiStore'
 import { createNavigationOptions } from './BottomNavDropdown'
+import { useAuth } from '../contexts/AuthContext'
 import './GlassMenuButton.css'
 
 /**
@@ -15,7 +16,8 @@ import './GlassMenuButton.css'
  */
 function GlassMenuButton(): JSX.Element {
   const navigate = useNavigate()
-  const navOptions = createNavigationOptions()
+  const { isAdmin } = useAuth()
+  const navOptions = createNavigationOptions(isAdmin)
   const selectRef = useRef<HTMLSelectElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)

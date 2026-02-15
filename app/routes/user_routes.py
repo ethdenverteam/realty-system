@@ -123,6 +123,25 @@ def get_autopublish_config(current_user):
     })
 
 
+@user_routes_bp.route('/dashboard/autopublish/<string:object_id>', methods=['GET'])
+@jwt_required
+def get_autopublish_config_for_object(object_id, current_user):
+    """Get autopublish config for specific object"""
+    cfg = AutopublishConfig.query.filter_by(
+        user_id=current_user.user_id,
+        object_id=object_id
+    ).first()
+    
+    if not cfg:
+        return jsonify({
+            'enabled': False,
+            'bot_enabled': False,
+            'accounts_config_json': {}
+        }), 200
+    
+    return jsonify(cfg.to_dict()), 200
+
+
 @user_routes_bp.route('/dashboard/autopublish/<string:object_id>/chats', methods=['GET'])
 @jwt_required
 def get_autopublish_chats_for_object(object_id, current_user):
@@ -887,6 +906,15 @@ def user_publish_object_via_bot(current_user):
                 matches = False
                 filters = chat.filters_json or {}
                 
+                # Проверка типа привязки "общий" - такой чат получает все посты
+                binding_type = filters.get('binding_type')
+                if binding_type == 'common':
+                    # Map bot chat_id to web chat_id
+                    web_chat = Chat.query.filter_by(telegram_chat_id=chat.telegram_chat_id, owner_type='bot').first()
+                    if web_chat and web_chat.chat_id not in target_chats:
+                        target_chats.append(web_chat.chat_id)
+                    continue  # Пропускаем проверку фильтров для "общего" чата
+                
                 # Check if filters_json is used
                 has_filters_json = bool(filters.get('rooms_types') or filters.get('districts') or 
                                        filters.get('price_min') is not None or filters.get('price_max') is not None)
@@ -950,20 +978,22 @@ def user_publish_object_via_bot(current_user):
             }), 400
         
         # Check if object was published within last 24 hours
-        yesterday = datetime.utcnow() - timedelta(days=1)
-        recent_publications = PublicationHistory.query.filter(
-            PublicationHistory.object_id == object_id,
-            PublicationHistory.chat_id.in_(target_chats),
-            PublicationHistory.published_at >= yesterday,
-            PublicationHistory.deleted == False
-        ).all()
-        
-        if recent_publications:
-            blocked_chats = [p.chat_id for p in recent_publications]
-            return jsonify({
-                'error': 'Object was already published to some chats within 24 hours',
-                'blocked_chat_ids': blocked_chats
-            }), 400
+        # Проверка не применяется для админов (они могут публиковать без ограничений)
+        if current_user.web_role != 'admin':
+            yesterday = datetime.utcnow() - timedelta(days=1)
+            recent_publications = PublicationHistory.query.filter(
+                PublicationHistory.object_id == object_id,
+                PublicationHistory.chat_id.in_(target_chats),
+                PublicationHistory.published_at >= yesterday,
+                PublicationHistory.deleted == False
+            ).all()
+            
+            if recent_publications:
+                blocked_chats = [p.chat_id for p in recent_publications]
+                return jsonify({
+                    'error': 'Object was already published to some chats within 24 hours',
+                    'blocked_chat_ids': blocked_chats
+                }), 400
         
         # Publish to each chat
         published_count = 0
@@ -978,15 +1008,18 @@ def user_publish_object_via_bot(current_user):
                     continue
                 
                 # Check if already published to this chat within 24 hours
-                recent_pub = PublicationHistory.query.filter(
-                    PublicationHistory.object_id == object_id,
-                    PublicationHistory.chat_id == chat_id,
-                    PublicationHistory.published_at >= yesterday,
-                    PublicationHistory.deleted == False
-                ).first()
-                
-                if recent_pub:
-                    continue
+                # Проверка не применяется для админов (они могут публиковать без ограничений)
+                if current_user.web_role != 'admin':
+                    yesterday = datetime.utcnow() - timedelta(days=1)
+                    recent_pub = PublicationHistory.query.filter(
+                        PublicationHistory.object_id == object_id,
+                        PublicationHistory.chat_id == chat_id,
+                        PublicationHistory.published_at >= yesterday,
+                        PublicationHistory.deleted == False
+                    ).first()
+                    
+                    if recent_pub:
+                        continue
                 
                 telegram_chat_id = chat.telegram_chat_id
                 

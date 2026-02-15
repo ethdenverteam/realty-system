@@ -25,6 +25,10 @@ export default function ViewObject(): JSX.Element {
   const [previewing, setPreviewing] = useState(false)
   const [previewError, setPreviewError] = useState('')
   const [previewSuccess, setPreviewSuccess] = useState(false)
+  const [autopublishEnabled, setAutopublishEnabled] = useState(false)
+  const [publicationFormat, setPublicationFormat] = useState<'default' | 'compact'>('default')
+  const [loadingAutopublish, setLoadingAutopublish] = useState(false)
+  const [autopublishError, setAutopublishError] = useState('')
 
   const loadObject = useCallback(async () => {
     if (!objectId) return
@@ -48,6 +52,30 @@ export default function ViewObject(): JSX.Element {
   useEffect(() => {
     void loadObject()
   }, [loadObject])
+
+  // Загрузка настроек автопубликации
+  useEffect(() => {
+    if (!objectId) return
+    void (async () => {
+      try {
+        const res = await api.get<{
+          enabled: boolean
+          bot_enabled: boolean
+          accounts_config_json?: {
+            publication_format?: 'default' | 'compact'
+            accounts?: Array<{ account_id: number; chat_ids: number[] }>
+          }
+        }>(`/user/dashboard/autopublish/${objectId}`)
+        if (res.data) {
+          setAutopublishEnabled(res.data.enabled || false)
+          setPublicationFormat(res.data.accounts_config_json?.publication_format || 'default')
+        }
+      } catch (err) {
+        // Игнорируем ошибку если конфиг не найден - это нормально
+        console.log('Autopublish config not found, using defaults')
+      }
+    })()
+  }, [objectId])
 
   const handlePublish = async (): Promise<void> => {
     if (!objectId) return
@@ -280,6 +308,97 @@ export default function ViewObject(): JSX.Element {
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="autopublish-settings" style={{ marginTop: '20px', padding: '15px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '15px', fontSize: '16px' }}>Настройки автопубликации</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                  type="checkbox"
+                  id="autopublish-enabled"
+                  checked={autopublishEnabled}
+                  onChange={async (e) => {
+                    const enabled = e.target.checked
+                    setLoadingAutopublish(true)
+                    setAutopublishError('')
+                    try {
+                      if (enabled) {
+                        // Включаем автопубликацию
+                        await api.post('/user/dashboard/autopublish', {
+                          object_id: objectId,
+                          bot_enabled: true,
+                          accounts_config_json: {
+                            publication_format: publicationFormat,
+                            accounts: []
+                          }
+                        })
+                      } else {
+                        // Выключаем автопубликацию
+                        await api.delete(`/user/dashboard/autopublish/${objectId}`)
+                      }
+                      setAutopublishEnabled(enabled)
+                    } catch (err: unknown) {
+                      let message = 'Ошибка изменения настроек автопубликации'
+                      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+                        message = err.response?.data?.error || message
+                      }
+                      setAutopublishError(message)
+                    } finally {
+                      setLoadingAutopublish(false)
+                    }
+                  }}
+                  disabled={loadingAutopublish}
+                />
+                <label htmlFor="autopublish-enabled" style={{ cursor: 'pointer' }}>
+                  Включить автопубликацию
+                </label>
+              </div>
+              {autopublishEnabled && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <label htmlFor="publication-format" style={{ minWidth: '150px' }}>
+                    Формат публикации:
+                  </label>
+                  <select
+                    id="publication-format"
+                    value={publicationFormat}
+                    onChange={async (e) => {
+                      const format = e.target.value as 'default' | 'compact'
+                      setLoadingAutopublish(true)
+                      setAutopublishError('')
+                      try {
+                        await api.put(`/user/dashboard/autopublish/${objectId}`, {
+                          bot_enabled: true,
+                          accounts_config_json: {
+                            publication_format: format,
+                            accounts: []
+                          }
+                        })
+                        setPublicationFormat(format)
+                      } catch (err: unknown) {
+                        let message = 'Ошибка изменения формата публикации'
+                        if (axios.isAxiosError<ApiErrorResponse>(err)) {
+                          message = err.response?.data?.error || message
+                        }
+                        setAutopublishError(message)
+                      } finally {
+                        setLoadingAutopublish(false)
+                      }
+                    }}
+                    disabled={loadingAutopublish}
+                    style={{ padding: '8px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', color: 'inherit' }}
+                  >
+                    <option value="default">Стандартный</option>
+                    <option value="compact">Компактный</option>
+                  </select>
+                </div>
+              )}
+              {autopublishError && (
+                <div className="alert alert-error" style={{ marginTop: '10px', fontSize: '14px' }}>
+                  {autopublishError}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="object-actions">

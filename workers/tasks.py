@@ -228,6 +228,12 @@ def _get_matching_bot_chats_for_object(db, obj: Object):
     for chat in chats:
         matches = False
         filters = chat.filters_json or {}
+        
+        # Проверка типа привязки "общий" - такой чат получает все посты
+        binding_type = filters.get('binding_type')
+        if binding_type == 'common':
+            target_chats.append(chat)
+            continue  # Пропускаем проверку фильтров для "общего" чата
 
         has_filters_json = bool(
             filters.get('rooms_types')

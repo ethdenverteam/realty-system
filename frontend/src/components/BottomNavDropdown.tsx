@@ -107,8 +107,8 @@ export default function BottomNavDropdown({
 /**
  * Хелпер для создания опций навигации
  */
-export function createNavigationOptions(): DropdownOption[] {
-  return [
+export function createNavigationOptions(isAdmin: boolean = false): DropdownOption[] {
+  const options: DropdownOption[] = [
     {
       label: 'Главная',
       value: '/user/dashboard',
@@ -213,6 +213,31 @@ export function createNavigationOptions(): DropdownOption[] {
       ),
     },
   ]
+  
+  // Добавляем пункт для админов в самый низ
+  if (isAdmin) {
+    options.push({
+      label: 'Админ панель',
+      value: '/admin/dashboard',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path
+            d="M10 2L2 7L10 12L18 7L10 2Z"
+            fill="currentColor"
+          />
+          <path
+            d="M2 13L10 18L18 13M2 10L10 15L18 10"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    })
+  }
+  
+  return options
 }
 
 /**

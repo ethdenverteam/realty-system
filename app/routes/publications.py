@@ -34,20 +34,22 @@ def create_publication(current_user):
         return jsonify({'error': 'Object not found'}), 404
     
     # Check if object was published to any of the chats within last 24 hours
-    yesterday = datetime.utcnow() - timedelta(days=1)
-    recent_publications = PublicationHistory.query.filter(
-        PublicationHistory.object_id == object_id,
-        PublicationHistory.chat_id.in_(chat_ids),
-        PublicationHistory.published_at >= yesterday,
-        PublicationHistory.deleted == False
-    ).all()
-    
-    if recent_publications:
-        blocked_chats = [p.chat_id for p in recent_publications]
-        return jsonify({
-            'error': 'Object was already published to some chats within 24 hours',
-            'blocked_chat_ids': blocked_chats
-        }), 400
+    # Проверка не применяется для админов (они могут публиковать без ограничений)
+    if current_user.web_role != 'admin':
+        yesterday = datetime.utcnow() - timedelta(days=1)
+        recent_publications = PublicationHistory.query.filter(
+            PublicationHistory.object_id == object_id,
+            PublicationHistory.chat_id.in_(chat_ids),
+            PublicationHistory.published_at >= yesterday,
+            PublicationHistory.deleted == False
+        ).all()
+        
+        if recent_publications:
+            blocked_chats = [p.chat_id for p in recent_publications]
+            return jsonify({
+                'error': 'Object was already published to some chats within 24 hours',
+                'blocked_chat_ids': blocked_chats
+            }), 400
     
     # Create queue entries
     queue_ids = []

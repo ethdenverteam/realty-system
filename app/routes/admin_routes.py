@@ -1604,21 +1604,8 @@ def admin_publish_object_to_chat(chat_id, current_user):
             return jsonify({'error': 'Object not found'}), 404
         
         # Check if object was published to this chat within last 24 hours
-        from app.models.publication_history import PublicationHistory
-        from datetime import timedelta
-        yesterday = datetime.utcnow() - timedelta(days=1)
-        recent_publication = PublicationHistory.query.filter(
-            PublicationHistory.object_id == object_id,
-            PublicationHistory.chat_id == chat_id,
-            PublicationHistory.published_at >= yesterday,
-            PublicationHistory.deleted == False
-        ).first()
-        
-        if recent_publication:
-            return jsonify({
-                'error': 'Object was already published to this chat within 24 hours',
-                'last_publication': recent_publication.published_at.isoformat()
-            }), 400
+        # Проверка не применяется для админов (они могут публиковать без ограничений)
+        # Админы уже проверены через @role_required('admin'), поэтому пропускаем проверку
         
         if not BOT_TOKEN:
             return jsonify({'error': 'BOT_TOKEN is not configured'}), 500

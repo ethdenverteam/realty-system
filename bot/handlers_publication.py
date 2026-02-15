@@ -53,6 +53,13 @@ async def get_target_chats_for_object(obj: Object) -> list:
             matches = False
             filters = chat.filters_json or {}
             
+            # Проверка типа привязки "общий" - такой чат получает все посты
+            binding_type = filters.get('binding_type')
+            if binding_type == 'common':
+                if chat.chat_id not in target_chats:
+                    target_chats.append(chat.chat_id)
+                continue  # Пропускаем проверку фильтров для "общего" чата
+            
             # Check if filters_json is used (has at least one filter)
             has_filters_json = bool(filters.get('rooms_types') or filters.get('districts') or 
                                    filters.get('price_min') is not None or filters.get('price_max') is not None)
@@ -164,41 +171,46 @@ async def publish_immediate_handler(update: Update, context: ContextTypes.DEFAUL
         return OBJECT_PREVIEW_MENU
     
     # Check if object was already published within last 24 hours
-    db = get_db()
-    try:
-        from datetime import timedelta
-        yesterday = datetime.utcnow() - timedelta(days=1)
-        recent_publications = db.query(PublicationHistory).filter(
-            PublicationHistory.object_id == object_id,
-            PublicationHistory.published_at >= yesterday,
-            PublicationHistory.deleted == False
-        ).all()
-        
-        if recent_publications:
-            blocked_chats = []
-            for pub in recent_publications:
-                chat = db.query(Chat).filter_by(chat_id=pub.chat_id).first()
-                if chat:
-                    blocked_chats.append(chat.title or f'Чат {chat.chat_id}')
+    # Проверка не применяется для админов (они могут публиковать без ограничений)
+    user_obj = get_user(str(user.id))
+    is_admin = user_obj and user_obj.web_role == 'admin'
+    
+    if not is_admin:
+        db = get_db()
+        try:
+            from datetime import timedelta
+            yesterday = datetime.utcnow() - timedelta(days=1)
+            recent_publications = db.query(PublicationHistory).filter(
+                PublicationHistory.object_id == object_id,
+                PublicationHistory.published_at >= yesterday,
+                PublicationHistory.deleted == False
+            ).all()
             
-            if blocked_chats:
-                error_text = "⚠️ <b>Ошибка!</b>\n\n"
-                error_text += "Этот объект уже был опубликован в следующие чаты в течение последних 24 часов:\n\n"
-                for i, name in enumerate(blocked_chats, 1):
-                    error_text += f"{i}. {name}\n"
-                error_text += "\nОдин объект не может быть опубликован в один и тот же чат чаще чем раз в сутки."
+            if recent_publications:
+                blocked_chats = []
+                for pub in recent_publications:
+                    chat = db.query(Chat).filter_by(chat_id=pub.chat_id).first()
+                    if chat:
+                        blocked_chats.append(chat.title or f'Чат {chat.chat_id}')
                 
-                keyboard = [[InlineKeyboardButton("⬅️ Назад к редактированию", callback_data="back_to_preview")]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                
-                try:
-                    await query.message.reply_text(error_text, reply_markup=reply_markup, parse_mode='HTML')
-                except:
-                    await query.edit_message_text(error_text, reply_markup=reply_markup, parse_mode='HTML')
-                
-                return OBJECT_PREVIEW_MENU
-    finally:
-        db.close()
+                if blocked_chats:
+                    error_text = "⚠️ <b>Ошибка!</b>\n\n"
+                    error_text += "Этот объект уже был опубликован в следующие чаты в течение последних 24 часов:\n\n"
+                    for i, name in enumerate(blocked_chats, 1):
+                        error_text += f"{i}. {name}\n"
+                    error_text += "\nОдин объект не может быть опубликован в один и тот же чат чаще чем раз в сутки."
+                    
+                    keyboard = [[InlineKeyboardButton("⬅️ Назад к редактированию", callback_data="back_to_preview")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    try:
+                        await query.message.reply_text(error_text, reply_markup=reply_markup, parse_mode='HTML')
+                    except:
+                        await query.edit_message_text(error_text, reply_markup=reply_markup, parse_mode='HTML')
+                    
+                    return OBJECT_PREVIEW_MENU
+        finally:
+            db.close()
     
     # Get target chats
     target_chats = await get_target_chats_for_object(obj)
@@ -307,30 +319,45 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
     
     # Publish to each chat
     for chat_id in target_chats:
-        try:
-            # Check if object was published to this chat within last 24 hours
-            db = get_db()
             try:
-                chat = db.query(Chat).filter_by(chat_id=chat_id).first()
-                if not chat:
-                    continue
+                # Check if object was published to this chat within last 24 hours
+                # Проверка не применяется для админов (они могут публиковать без ограничений)
+                user_obj = get_user(str(user.id))
+                is_admin = user_obj and user_obj.web_role == 'admin'
                 
-                # Check publication history for this object and chat
-                yesterday = datetime.utcnow() - timedelta(days=1)
-                recent_publication = db.query(PublicationHistory).filter(
-                    PublicationHistory.object_id == object_id,
-                    PublicationHistory.chat_id == chat_id,
-                    PublicationHistory.published_at >= yesterday,
-                    PublicationHistory.deleted == False
-                ).first()
-                
-                if recent_publication:
-                    logger.info(f"Object {object_id} was already published to chat {chat_id} within 24 hours, skipping")
-                    continue
-                
-                telegram_chat_id = chat.telegram_chat_id
-            finally:
-                db.close()
+                if not is_admin:
+                    db = get_db()
+                    try:
+                        chat = db.query(Chat).filter_by(chat_id=chat_id).first()
+                        if not chat:
+                            continue
+                        
+                        # Check publication history for this object and chat
+                        yesterday = datetime.utcnow() - timedelta(days=1)
+                        recent_publication = db.query(PublicationHistory).filter(
+                            PublicationHistory.object_id == object_id,
+                            PublicationHistory.chat_id == chat_id,
+                            PublicationHistory.published_at >= yesterday,
+                            PublicationHistory.deleted == False
+                        ).first()
+                        
+                        if recent_publication:
+                            logger.info(f"Object {object_id} was already published to chat {chat_id} within 24 hours, skipping")
+                            continue
+                        
+                        telegram_chat_id = chat.telegram_chat_id
+                    finally:
+                        db.close()
+                else:
+                    # Для админов просто получаем telegram_chat_id без проверки
+                    db = get_db()
+                    try:
+                        chat = db.query(Chat).filter_by(chat_id=chat_id).first()
+                        if not chat:
+                            continue
+                        telegram_chat_id = chat.telegram_chat_id
+                    finally:
+                        db.close()
             
             # Send message
             if photos_json:
