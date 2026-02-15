@@ -107,6 +107,44 @@
   gap: var(--spacing-xs);
 }
 
+/* Отображение чатов и категорий в карточках объектов */
+.object-chats-info {
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  font-size: 0.85rem;
+}
+
+.object-chats-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+
+.object-chats-label {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.object-chats-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+
+.object-chat-tag {
+  padding: 2px var(--spacing-xs);
+  background: var(--bg-hover);
+  border-radius: var(--border-radius);
+  font-size: 0.85rem;
+}
+
 .chats-preview-section strong {
   font-size: var(--font-size-sm);
   color: rgba(255, 255, 255, 0.9);

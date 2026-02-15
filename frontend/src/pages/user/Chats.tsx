@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Layout from '../../components/Layout'
 import { GlassCard } from '../../components/GlassCard'
 import { FilterSelect } from '../../components/FilterSelect'
@@ -6,7 +6,6 @@ import { useApiData } from '../../hooks/useApiData'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { getErrorMessage, logError } from '../../utils/errorHandler'
 import api from '../../utils/api'
-import type { ApiErrorResponse } from '../../types/models'
 import './Chats.css'
 
 interface TelegramAccount {
@@ -25,13 +24,13 @@ interface CachedChat {
   owner_account_id: number
   members_count: number
   cached_at?: string
-}
-
-interface RealtyObject {
-  object_id: string
-  rooms_type?: string
-  price: number
-  status: string
+  category?: string
+  filters_json?: {
+    rooms_types?: string[]
+    districts?: string[]
+    price_min?: number
+    price_max?: number
+  }
 }
 
 interface ChatGroup {
@@ -39,20 +38,30 @@ interface ChatGroup {
   name: string
   description?: string
   chat_ids: number[]
+  category?: string
+  filters_json?: {
+    rooms_types?: string[]
+    districts?: string[]
+    price_min?: number
+    price_max?: number
+  }
 }
 
 export default function Chats(): JSX.Element {
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [testMessageChatId, setTestMessageChatId] = useState<number | null>(null)
-  const [showPublishModal, setShowPublishModal] = useState(false)
-  const [selectedChatId, setSelectedChatId] = useState<number | null>(null)
   const [search, setSearch] = useState('')
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false)
+  const [showEditGroupModal, setShowEditGroupModal] = useState(false)
+  const [editingGroup, setEditingGroup] = useState<ChatGroup | null>(null)
   const [selectedChatsForGroup, setSelectedChatsForGroup] = useState<number[]>([])
   const [groupName, setGroupName] = useState('')
   const [groupDescription, setGroupDescription] = useState('')
+  const [groupCategory, setGroupCategory] = useState('')
+  const [showChatCategoryModal, setShowChatCategoryModal] = useState(false)
+  const [editingChat, setEditingChat] = useState<CachedChat | null>(null)
+  const [chatCategory, setChatCategory] = useState('')
 
   // Загрузка аккаунтов
   const { data: accountsData, loading: loadingAccounts } = useApiData<TelegramAccount[]>({
@@ -69,6 +78,14 @@ export default function Chats(): JSX.Element {
     }
   }, [accounts, selectedAccountId])
 
+  // Загрузка групп чатов
+  const { data: groupsData, loading: loadingGroups, reload: reloadGroups } = useApiData<ChatGroup[]>({
+    url: '/chats/groups',
+    errorContext: 'Loading chat groups',
+    defaultErrorMessage: 'Ошибка загрузки групп чатов',
+  })
+  const groups = groupsData || []
+
   // Загрузка чатов
   const { data: chatsData, loading: loadingChats, reload: reloadChats } = useApiData<CachedChat[]>({
     url: '/chats',
@@ -84,7 +101,19 @@ export default function Chats(): JSX.Element {
   })
   const chats = chatsData || []
 
-  // Обновление чатов (используем прямой вызов API, так как это GET запрос)
+  // Вычисляем группы для каждого чата
+  const chatGroupsMap = useMemo(() => {
+    const map = new Map<number, ChatGroup[]>()
+    chats.forEach(chat => {
+      const chatGroups = groups.filter(g => g.chat_ids.includes(chat.chat_id))
+      if (chatGroups.length > 0) {
+        map.set(chat.chat_id, chatGroups)
+      }
+    })
+    return map
+  }, [chats, groups])
+
+  // Обновление чатов
   const [refreshing, setRefreshing] = useState(false)
   const refreshChats = async (): Promise<void> => {
     if (!selectedAccountId) return
@@ -106,79 +135,68 @@ export default function Chats(): JSX.Element {
     }
   }
 
-  // Отправка тестового сообщения
-  const { mutate: sendTestMessage, loading: sendingTest } = useApiMutation<{ chat_id: string; message: string }, { success: boolean; message_id?: number }>({
-    url: selectedAccountId ? `/accounts/${selectedAccountId}/test-message` : '',
-    method: 'POST',
-    errorContext: 'Sending test message',
-    defaultErrorMessage: 'Ошибка отправки тестового сообщения',
-    onSuccess: () => {
-      setSuccess('Тестовое сообщение отправлено')
-      setTimeout(() => setSuccess(''), 3000)
-      setTestMessageChatId(null)
-    },
-  })
-
-  // Загрузка объектов для публикации
-  const { data: objectsData } = useApiData<{ objects: RealtyObject[] }>({
-    url: '/objects',
-    errorContext: 'Loading objects',
-    defaultErrorMessage: 'Ошибка загрузки объектов',
-    autoLoad: false,
-  })
-  const objects = (objectsData?.objects || []).filter(obj => obj.status !== 'архив')
-
-  const openPublishModal = (chatId: number): void => {
-    setSelectedChatId(chatId)
-    setShowPublishModal(true)
-  }
-
-  // Публикация объекта
-  const { mutate: publishObject, loading: publishing } = useApiMutation<{ object_id: string; account_id: number; chat_id: number }, { success: boolean; message_id?: number }>({
-    url: '/objects/publish-via-account',
-    method: 'POST',
-    errorContext: 'Publishing object',
-    defaultErrorMessage: 'Ошибка публикации объекта',
-    onSuccess: () => {
-      setSuccess('Объект успешно опубликован')
-      setTimeout(() => {
-        setSuccess('')
-        setShowPublishModal(false)
-        setSelectedChatId(null)
-      }, 3000)
-    },
-  })
-
   const openCreateGroupModal = (): void => {
-    // Если есть выбранные чаты, передаем их в модальное окно
-    // Иначе оставляем пустым для выбора в модальном окне
+    setSelectedChatsForGroup([])
     setGroupName('')
     setGroupDescription('')
+    setGroupCategory('')
     setShowCreateGroupModal(true)
   }
 
+  const openEditGroupModal = (group: ChatGroup): void => {
+    setEditingGroup(group)
+    setSelectedChatsForGroup([...group.chat_ids])
+    setGroupName(group.name)
+    setGroupDescription(group.description || '')
+    setGroupCategory(group.category || '')
+    setShowEditGroupModal(true)
+  }
+
+  const closeGroupModal = (): void => {
+    setShowCreateGroupModal(false)
+    setShowEditGroupModal(false)
+    setEditingGroup(null)
+    setSelectedChatsForGroup([])
+    setGroupName('')
+    setGroupDescription('')
+    setGroupCategory('')
+  }
+
   // Создание группы чатов
-  const { mutate: createChatGroup, loading: creatingGroup } = useApiMutation<{ name: string; description?: string; chat_ids: number[] }, { success: boolean; group: ChatGroup }>({
+  const { mutate: createChatGroup, loading: creatingGroup } = useApiMutation<{ name: string; description?: string; chat_ids: number[]; category?: string }, { success: boolean; group: ChatGroup }>({
     url: '/chats/groups',
     method: 'POST',
     errorContext: 'Creating chat group',
     defaultErrorMessage: 'Ошибка создания группы',
     onSuccess: () => {
       setSuccess('Группа чатов создана')
-      setTimeout(() => {
-        setSuccess('')
-        setShowCreateGroupModal(false)
-        setSelectedChatsForGroup([])
-        setGroupName('')
-        setGroupDescription('')
-      }, 3000)
+      setTimeout(() => setSuccess(''), 3000)
+      closeGroupModal()
+      void reloadGroups()
     },
     onError: (errorMsg) => {
       setError(errorMsg)
     },
   })
 
-  const handleCreateGroup = (): void => {
+  // Обновление группы чатов
+  const { mutate: updateChatGroup, loading: updatingGroup } = useApiMutation<{ name: string; description?: string; chat_ids: number[]; category?: string }, { success: boolean; group: ChatGroup }>({
+    url: editingGroup ? `/chats/groups/${editingGroup.group_id}` : '',
+    method: 'PUT',
+    errorContext: 'Updating chat group',
+    defaultErrorMessage: 'Ошибка обновления группы',
+    onSuccess: () => {
+      setSuccess('Группа чатов обновлена')
+      setTimeout(() => setSuccess(''), 3000)
+      closeGroupModal()
+      void reloadGroups()
+    },
+    onError: (errorMsg) => {
+      setError(errorMsg)
+    },
+  })
+
+  const handleSaveGroup = (): void => {
     if (!groupName.trim()) {
       setError('Введите название группы')
       return
@@ -187,11 +205,68 @@ export default function Chats(): JSX.Element {
       setError('Выберите хотя бы один чат')
       return
     }
-    void createChatGroup({
+    const groupData = {
       name: groupName.trim(),
       description: groupDescription.trim() || undefined,
       chat_ids: selectedChatsForGroup,
+      category: groupCategory.trim() || undefined,
+    }
+    if (editingGroup) {
+      void updateChatGroup(groupData)
+    } else {
+      void createChatGroup(groupData)
+    }
+  }
+
+  // Открытие модального окна для установки категории чата
+  const openChatCategoryModal = (chat: CachedChat): void => {
+    setEditingChat(chat)
+    setChatCategory(chat.category || '')
+    setShowChatCategoryModal(true)
+  }
+
+  // Обновление категории чата
+  const { mutate: updateChatCategory, loading: updatingChatCategory } = useApiMutation<{ category?: string }, { success: boolean }>({
+    url: editingChat ? `/chats/${editingChat.chat_id}` : '',
+    method: 'PUT',
+    errorContext: 'Updating chat category',
+    defaultErrorMessage: 'Ошибка обновления категории чата',
+    onSuccess: () => {
+      setSuccess('Категория чата обновлена')
+      setTimeout(() => setSuccess(''), 3000)
+      setShowChatCategoryModal(false)
+      setEditingChat(null)
+      setChatCategory('')
+      void reloadChats()
+    },
+    onError: (errorMsg) => {
+      setError(errorMsg)
+    },
+  })
+
+  const handleSaveChatCategory = (): void => {
+    if (!editingChat) return
+    void updateChatCategory({
+      category: chatCategory.trim() || undefined,
     })
+  }
+
+  // Форматирование категории для отображения
+  const formatCategory = (category?: string): string => {
+    if (!category) return 'Без категории'
+    if (category.startsWith('rooms_')) {
+      return `Комнаты: ${category.replace('rooms_', '')}`
+    }
+    if (category.startsWith('district_')) {
+      return `Район: ${category.replace('district_', '')}`
+    }
+    if (category.startsWith('price_')) {
+      const parts = category.replace('price_', '').split('_')
+      if (parts.length === 2) {
+        return `Цена: ${parts[0]}-${parts[1]} тыс.`
+      }
+    }
+    return category
   }
 
   return (
@@ -206,6 +281,57 @@ export default function Chats(): JSX.Element {
           <div className="alert alert-success" onClick={() => setSuccess('')}>
             {success}
           </div>
+        )}
+
+        {/* Список групп чатов */}
+        {groups.length > 0 && (
+          <GlassCard className="chats-card">
+            <div className="card-header-row">
+              <h2 className="card-title">Группы чатов</h2>
+            </div>
+            <div className="chat-groups-list">
+              {groups.map(group => {
+                const groupChats = chats.filter(c => group.chat_ids.includes(c.chat_id))
+                return (
+                  <div key={group.group_id} className="chat-group-item">
+                    <div className="chat-group-header">
+                      <div className="chat-group-info">
+                        <h3 className="chat-group-name">{group.name}</h3>
+                        {group.description && (
+                          <p className="chat-group-description">{group.description}</p>
+                        )}
+                        <div className="chat-group-details">
+                          <span className="chat-group-chats-count">
+                            Чатов: {groupChats.length}
+                          </span>
+                          {group.category && (
+                            <span className="chat-group-category">
+                              Категория: {formatCategory(group.category)}
+                            </span>
+                          )}
+                        </div>
+                        {groupChats.length > 0 && (
+                          <div className="chat-group-chats">
+                            {groupChats.map(chat => (
+                              <span key={chat.chat_id} className="chat-group-chat-name">
+                                {chat.title}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        className="btn btn-small btn-secondary"
+                        onClick={() => openEditGroupModal(group)}
+                      >
+                        Изменить
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </GlassCard>
         )}
 
         <GlassCard className="chats-card">
@@ -239,10 +365,7 @@ export default function Chats(): JSX.Element {
                   </button>
                   <button
                     className="btn btn-primary"
-                    onClick={() => {
-                      // Передаем выбранные чаты в модальное окно
-                      openCreateGroupModal()
-                    }}
+                    onClick={openCreateGroupModal}
                     disabled={chats.length === 0}
                   >
                     Создать группу
@@ -281,103 +404,55 @@ export default function Chats(): JSX.Element {
             </div>
           ) : (
             <div className="objects-list chats-list">
-              {chats.map(chat => (
-                <div key={chat.chat_id} className="object-card compact chat-item">
-                  <div className="object-details-compact single-line">
-                    <label className="chat-select-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={selectedChatsForGroup.includes(chat.chat_id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedChatsForGroup(prev => [...prev, chat.chat_id])
-                          } else {
-                            setSelectedChatsForGroup(prev => prev.filter(id => id !== chat.chat_id))
-                          }
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </label>
-                    <span className="object-detail-item">
-                      {chat.title}
-                    </span>
+              {chats.map(chat => {
+                const chatGroups = chatGroupsMap.get(chat.chat_id) || []
+                return (
+                  <div key={chat.chat_id} className="object-card compact chat-item">
+                    <div className="chat-item-content">
+                      <div className="chat-item-main">
+                        <h3 className="chat-item-title">{chat.title}</h3>
+                        <div className="chat-item-meta">
+                          {chatGroups.length > 0 && (
+                            <div className="chat-item-groups">
+                              <span className="chat-item-groups-label">Группы:</span>
+                              {chatGroups.map((group, idx) => (
+                                <span key={group.group_id} className="chat-item-group-tag">
+                                  {group.name}
+                                  {group.category && ` (${formatCategory(group.category)})`}
+                                  {idx < chatGroups.length - 1 && ', '}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {chat.category && (
+                            <div className="chat-item-category">
+                              <span className="chat-item-category-label">Категория:</span>
+                              <span className="chat-item-category-value">{formatCategory(chat.category)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-small btn-secondary"
+                        onClick={() => openChatCategoryModal(chat)}
+                      >
+                        Установить категорию
+                      </button>
+                    </div>
                   </div>
-                  <div className="chat-actions">
-                    <button
-                      className="btn btn-small btn-secondary"
-                      onClick={() => {
-                        if (!selectedAccountId) return
-                        setTestMessageChatId(chat.chat_id)
-                        void sendTestMessage({
-                          chat_id: chat.telegram_chat_id.toString(),
-                          message: 'Тестовое сообщение',
-                        })
-                      }}
-                      disabled={(sendingTest && testMessageChatId === chat.chat_id) || !selectedAccountId}
-                    >
-                      {sendingTest && testMessageChatId === chat.chat_id ? 'Отправка...' : 'Отправить тест'}
-                    </button>
-                    <button
-                      className="btn btn-small btn-primary"
-                      onClick={() => void openPublishModal(chat.chat_id)}
-                    >
-                      Опубликовать объект
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </GlassCard>
 
-        {showPublishModal && (
-          <div className="modal-overlay" onClick={() => setShowPublishModal(false)}>
+        {/* Модальное окно создания/редактирования группы */}
+        {(showCreateGroupModal || showEditGroupModal) && (
+          <div className="modal-overlay" onClick={closeGroupModal}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
-                <h3>Выберите объект для публикации</h3>
-                <button className="modal-close" onClick={() => setShowPublishModal(false)}>×</button>
-              </div>
-              <div className="modal-body">
-                {objects.length === 0 ? (
-                  <p>Нет доступных объектов</p>
-                ) : (
-                  <div className="objects-list">
-                    {objects.map(obj => (
-                      <div key={obj.object_id} className="object-item">
-                        <div className="object-info">
-                          <strong>{obj.object_id}</strong>
-                          {obj.rooms_type && <span>{obj.rooms_type}</span>}
-                          {obj.price > 0 && <span>{obj.price} тыс. руб.</span>}
-                        </div>
-                        <button
-                          className="btn btn-small btn-primary"
-                          onClick={() => {
-                            if (!selectedAccountId || !selectedChatId) return
-                            void publishObject({
-                              object_id: obj.object_id,
-                              account_id: selectedAccountId,
-                              chat_id: selectedChatId,
-                            })
-                          }}
-                          disabled={publishing || !selectedAccountId || !selectedChatId}
-                        >
-                          {publishing ? 'Публикация...' : 'Опубликовать'}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showCreateGroupModal && (
-          <div className="modal-overlay" onClick={() => setShowCreateGroupModal(false)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3>Создать группу чатов</h3>
-                <button className="modal-close" onClick={() => setShowCreateGroupModal(false)}>×</button>
+                <h3>{editingGroup ? 'Изменить группу чатов' : 'Создать группу чатов'}</h3>
+                <button className="modal-close" onClick={closeGroupModal}>×</button>
               </div>
               <div className="modal-body">
                 <div className="form-group">
@@ -401,13 +476,26 @@ export default function Chats(): JSX.Element {
                   />
                 </div>
                 <div className="form-group">
+                  <label className="form-label">Категория связи (необязательно)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={groupCategory}
+                    onChange={(e) => setGroupCategory(e.target.value)}
+                    placeholder="Например: rooms_1k, district_center, price_4000_6000"
+                  />
+                  <small className="form-text text-muted">
+                    Формат: rooms_1k, rooms_2k, district_название, price_мин_макс
+                  </small>
+                </div>
+                <div className="form-group">
                   <label className="form-label">Выберите чаты для группы ({selectedChatsForGroup.length} выбрано)</label>
                   {chats.length === 0 ? (
                     <p className="text-muted">Нет доступных чатов</p>
                   ) : (
-                    <div className="chats-selection-list" style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--border-radius)', padding: 'var(--spacing-sm)' }}>
+                    <div className="chats-selection-list">
                       {chats.map(chat => (
-                        <label key={chat.chat_id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-xs)', cursor: 'pointer' }}>
+                        <label key={chat.chat_id} className="chat-selection-item">
                           <input
                             type="checkbox"
                             checked={selectedChatsForGroup.includes(chat.chat_id)}
@@ -430,7 +518,7 @@ export default function Chats(): JSX.Element {
                     <label className="form-label">Выбранные чаты:</label>
                     <ul className="selected-chats-list">
                       {chats.filter(c => selectedChatsForGroup.includes(c.chat_id)).map(chat => (
-                        <li key={chat.chat_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--spacing-xs)' }}>
+                        <li key={chat.chat_id} className="selected-chat-item">
                           <span>{chat.title}</span>
                           <button
                             type="button"
@@ -446,14 +534,67 @@ export default function Chats(): JSX.Element {
                 )}
               </div>
               <div className="modal-actions">
-                <button className="btn btn-secondary" onClick={() => {
-                  setShowCreateGroupModal(false)
-                  setSelectedChatsForGroup([])
-                }} disabled={creatingGroup}>
+                <button className="btn btn-secondary" onClick={closeGroupModal} disabled={creatingGroup || updatingGroup}>
                   Отмена
                 </button>
-                <button className="btn btn-primary" onClick={handleCreateGroup} disabled={creatingGroup || !groupName.trim() || selectedChatsForGroup.length === 0}>
-                  {creatingGroup ? 'Создание...' : 'Создать группу'}
+                <button className="btn btn-primary" onClick={handleSaveGroup} disabled={creatingGroup || updatingGroup || !groupName.trim() || selectedChatsForGroup.length === 0}>
+                  {creatingGroup || updatingGroup ? 'Сохранение...' : (editingGroup ? 'Сохранить' : 'Создать группу')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Модальное окно установки категории чата */}
+        {showChatCategoryModal && editingChat && (
+          <div className="modal-overlay" onClick={() => {
+            setShowChatCategoryModal(false)
+            setEditingChat(null)
+            setChatCategory('')
+          }}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Установить категорию связи для чата</h3>
+                <button className="modal-close" onClick={() => {
+                  setShowChatCategoryModal(false)
+                  setEditingChat(null)
+                  setChatCategory('')
+                }}>×</button>
+              </div>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">Название чата</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={editingChat.title}
+                    disabled
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Категория связи</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={chatCategory}
+                    onChange={(e) => setChatCategory(e.target.value)}
+                    placeholder="Например: rooms_1k, district_center, price_4000_6000"
+                  />
+                  <small className="form-text text-muted">
+                    Формат: rooms_1k, rooms_2k, district_название, price_мин_макс
+                  </small>
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button className="btn btn-secondary" onClick={() => {
+                  setShowChatCategoryModal(false)
+                  setEditingChat(null)
+                  setChatCategory('')
+                }} disabled={updatingChatCategory}>
+                  Отмена
+                </button>
+                <button className="btn btn-primary" onClick={handleSaveChatCategory} disabled={updatingChatCategory}>
+                  {updatingChatCategory ? 'Сохранение...' : 'Сохранить'}
                 </button>
               </div>
             </div>

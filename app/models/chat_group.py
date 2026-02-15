@@ -17,6 +17,9 @@ class ChatGroup(db.Model):
     description = Column(String(500), nullable=True)
     # Массив chat_id из таблицы chats
     chat_ids = Column(JSON, nullable=False)  # [1, 2, 3, ...]
+    # Категория связи (как в админских чатах)
+    category = Column(String(100), nullable=True)  # rooms_1k/rooms_2k/district_center/price_4000_6000 (legacy)
+    filters_json = Column(JSON, nullable=True)  # Extended filters: {rooms_types: [], districts: [], price_min: 0, price_max: 0}
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
@@ -28,7 +31,7 @@ class ChatGroup(db.Model):
     
     def to_dict(self):
         """Convert to dictionary"""
-        return {
+        result = {
             'group_id': self.group_id,
             'user_id': self.user_id,
             'name': self.name,
@@ -37,4 +40,14 @@ class ChatGroup(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
+        # Safely handle category and filters_json - they might not exist in the database
+        try:
+            result['category'] = self.category
+        except AttributeError:
+            result['category'] = None
+        try:
+            result['filters_json'] = self.filters_json or {}
+        except AttributeError:
+            result['filters_json'] = {}
+        return result
 

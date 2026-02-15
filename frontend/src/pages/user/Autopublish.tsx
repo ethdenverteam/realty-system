@@ -31,11 +31,33 @@ interface ObjectChat {
   telegram_chat_id: string
   account_id?: number
   account_phone?: string
+  category?: string
+  filters_json?: {
+    rooms_types?: string[]
+    districts?: string[]
+    price_min?: number
+    price_max?: number
+  }
+}
+
+interface ChatGroupInfo {
+  group_id: number
+  name: string
+  description?: string
+  category?: string
+  filters_json?: {
+    rooms_types?: string[]
+    districts?: string[]
+    price_min?: number
+    price_max?: number
+  }
+  chats: ObjectChat[]
 }
 
 interface ObjectChatsResponse {
   bot_chats: ObjectChat[]
   user_chats: ObjectChat[]
+  chat_groups?: ChatGroupInfo[]
 }
 
 interface ChatGroup {
@@ -258,6 +280,18 @@ export default function Autopublish(): JSX.Element {
       setLoadingChatsForObject(null)
     }
   }
+  
+  // Автоматическая загрузка чатов для всех объектов при загрузке страницы
+  useEffect(() => {
+    if (items.length > 0) {
+      items.forEach((item) => {
+        const objectId = item.object.object_id as string
+        if (!objectChats[objectId]) {
+          void loadChatsForObject(objectId)
+        }
+      })
+    }
+  }, [items.length])
 
   // Удалена функция handleToggleBotEnabled - бот всегда включен
 
@@ -297,6 +331,26 @@ export default function Autopublish(): JSX.Element {
                   accCfg?.accounts?.reduce((sum, a) => sum + (a.chat_ids?.length ?? 0), 0) ?? 0
                 const hasAccounts = totalAccounts > 0 && totalChats > 0
                 const publishMode = hasAccounts ? 'bot+account' : 'bot'
+                const chatsData = objectChats[obj.object_id as string]
+                
+                // Функция форматирования категории
+                const formatCategory = (category?: string): string => {
+                  if (!category) return 'Без категории'
+                  if (category.startsWith('rooms_')) {
+                    return `Комнаты: ${category.replace('rooms_', '')}`
+                  }
+                  if (category.startsWith('district_')) {
+                    return `Район: ${category.replace('district_', '')}`
+                  }
+                  if (category.startsWith('price_')) {
+                    const parts = category.replace('price_', '').split('_')
+                    if (parts.length === 2) {
+                      return `Цена: ${parts[0]}-${parts[1]} тыс.`
+                    }
+                  }
+                  return category
+                }
+                
                 return (
                   <div key={obj.object_id} className="object-card compact autopublish-item">
                     <div className="object-details-compact single-line">
@@ -309,6 +363,53 @@ export default function Autopublish(): JSX.Element {
                         </span>
                       )}
                     </div>
+                    {/* Отображение чатов и категорий */}
+                    {chatsData && (
+                      <div className="object-chats-info">
+                        {chatsData.bot_chats.length > 0 && (
+                          <div className="object-chats-section">
+                            <span className="object-chats-label">Бот чаты:</span>
+                            <div className="object-chats-list">
+                              {chatsData.bot_chats.map((chat, idx) => (
+                                <span key={chat.chat_id} className="object-chat-tag">
+                                  {chat.title}
+                                  {chat.category && ` (${formatCategory(chat.category)})`}
+                                  {idx < chatsData.bot_chats.length - 1 && ', '}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {chatsData.user_chats.length > 0 && (
+                          <div className="object-chats-section">
+                            <span className="object-chats-label">Аккаунт чаты:</span>
+                            <div className="object-chats-list">
+                              {chatsData.user_chats.map((chat, idx) => (
+                                <span key={chat.chat_id} className="object-chat-tag">
+                                  {chat.title}
+                                  {chat.category && ` (${formatCategory(chat.category)})`}
+                                  {idx < chatsData.user_chats.length - 1 && ', '}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {chatsData.chat_groups && chatsData.chat_groups.length > 0 && (
+                          <div className="object-chats-section">
+                            <span className="object-chats-label">Группы чатов:</span>
+                            <div className="object-chats-list">
+                              {chatsData.chat_groups.map((group, idx) => (
+                                <span key={group.group_id} className="object-chat-tag">
+                                  {group.name}
+                                  {group.category && ` (${formatCategory(group.category)})`}
+                                  {idx < chatsData.chat_groups!.length - 1 && ', '}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div className="autopublish-controls">
                       <div className="autopublish-toggle-row">
                         <label className="toggle-label">
@@ -403,12 +504,13 @@ export default function Autopublish(): JSX.Element {
                           onClick={() => {
                             if (!objectChats[obj.object_id as string]) {
                               void loadChatsForObject(obj.object_id as string)
+                            } else {
+                              setShowChatsModal(obj.object_id as string)
                             }
-                            setShowChatsModal(obj.object_id as string)
                           }}
                           disabled={loadingChatsForObject === obj.object_id}
                         >
-                          Список чатов
+                          {loadingChatsForObject === obj.object_id ? 'Загрузка...' : 'Список чатов'}
                         </button>
                         <button
                           className="btn btn-small btn-primary"

@@ -291,10 +291,12 @@ def update_chat(chat_id, current_user):
         if account and account.owner_id != current_user.user_id:
             return jsonify({'error': 'You can only modify your own chats'}), 403
     
-    data = request.get_json()
+    data = request.get_json() or {}
     
     if 'category' in data:
-        chat.category = data['category']
+        chat.category = data['category'] if data['category'] else None
+    if 'filters_json' in data:
+        chat.filters_json = data['filters_json'] if data['filters_json'] else None
     if 'is_active' in data:
         chat.is_active = bool(data['is_active'])
     
@@ -353,6 +355,8 @@ def create_chat_group(current_user):
     name = data.get('name')
     description = data.get('description', '')
     chat_ids = data.get('chat_ids', [])
+    category = data.get('category', '')
+    filters_json = data.get('filters_json', {})
     
     if not name:
         return jsonify({'error': 'name is required'}), 400
@@ -377,7 +381,9 @@ def create_chat_group(current_user):
             user_id=current_user.user_id,
             name=name,
             description=description,
-            chat_ids=chat_ids
+            chat_ids=chat_ids,
+            category=category if category else None,
+            filters_json=filters_json if filters_json else None
         )
         db.session.add(group)
         db.session.commit()
@@ -385,7 +391,7 @@ def create_chat_group(current_user):
         log_action(
             action='chat_group_created',
             user_id=current_user.user_id,
-            details={'group_id': group.group_id, 'name': name, 'chat_count': len(chat_ids)}
+            details={'group_id': group.group_id, 'name': name, 'chat_count': len(chat_ids), 'category': category}
         )
         
         return jsonify({'success': True, 'group': group.to_dict()}), 201
@@ -410,6 +416,10 @@ def update_chat_group(group_id, current_user):
         group.name = data['name']
     if 'description' in data:
         group.description = data.get('description', '')
+    if 'category' in data:
+        group.category = data['category'] if data['category'] else None
+    if 'filters_json' in data:
+        group.filters_json = data['filters_json'] if data['filters_json'] else None
     if 'chat_ids' in data:
         chat_ids = data['chat_ids']
         if not isinstance(chat_ids, list):

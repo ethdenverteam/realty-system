@@ -270,8 +270,26 @@ def get_autopublish_chats_for_object(object_id, current_user):
                                 'telegram_chat_id': chat.telegram_chat_id,
                                 'type': 'user',
                                 'account_id': account_id,
-                                'account_phone': account.phone
+                                'account_phone': account.phone,
+                                'category': chat.category,
+                                'filters_json': chat.filters_json
                             })
+    
+    # Добавляем информацию о группах чатов
+    from app.models.chat_group import ChatGroup
+    user_groups = ChatGroup.query.filter_by(user_id=current_user.user_id).all()
+    result['chat_groups'] = []
+    for group in user_groups:
+        group_chats = [c for c in result['user_chats'] if c['chat_id'] in group.chat_ids]
+        if group_chats:
+            result['chat_groups'].append({
+                'group_id': group.group_id,
+                'name': group.name,
+                'description': group.description,
+                'category': group.category,
+                'filters_json': group.filters_json,
+                'chats': group_chats
+            })
     
     return jsonify(result)
 
