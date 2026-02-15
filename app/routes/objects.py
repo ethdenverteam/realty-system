@@ -328,6 +328,9 @@ def update_object(object_id, current_user):
     
     data = request.get_json()
     
+    # Логируем входящие данные для отладки
+    logger.info(f"Object {object_id} update request: districts_json={data.get('districts_json')}, type={type(data.get('districts_json'))}")
+    
     # Update fields
     if 'rooms_type' in data:
         obj.rooms_type = data['rooms_type']
@@ -338,6 +341,7 @@ def update_object(object_id, current_user):
         districts_json = data['districts_json']
         # Убеждаемся, что это список
         if not isinstance(districts_json, list):
+            logger.warning(f"Object {object_id} districts_json is not a list, got {type(districts_json)}: {districts_json}")
             districts_json = []
         old_districts = obj.districts_json
         obj.districts_json = districts_json

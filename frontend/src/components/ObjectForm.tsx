@@ -28,40 +28,32 @@ export default function ObjectForm({
 }: ObjectFormProps): JSX.Element {
   const [districts, setDistricts] = useState<string[]>([])
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>([])
-  // Флаг для отслеживания, инициализированы ли districts из formData
-  const isDistrictsInitialized = useRef(false)
-  // Флаг для предотвращения циклических обновлений
-  const isUpdatingDistricts = useRef(false)
+  // Флаг для предотвращения циклических обновлений при синхронизации formData -> selectedDistricts
+  const isSyncingFromFormData = useRef(false)
 
   useEffect(() => {
     void loadDistricts()
   }, [])
 
-  // Инициализация selectedDistricts из formData только один раз при монтировании
+  // Синхронизация selectedDistricts с formData.districts (когда formData меняется извне, например при загрузке объекта)
   useEffect(() => {
-    if (!isDistrictsInitialized.current && formData.districts) {
-      const parsed = formData.districts.split(',').map(d => d.trim()).filter(d => d.length > 0)
-      setSelectedDistricts(parsed)
-      isDistrictsInitialized.current = true
-    }
-  }, [formData.districts])
-
-  // Обновление formData.districts только при изменении selectedDistricts пользователем
-  useEffect(() => {
-    if (isUpdatingDistricts.current) {
-      isUpdatingDistricts.current = false
+    if (isSyncingFromFormData.current) {
+      isSyncingFromFormData.current = false
       return
     }
     
-    if (isDistrictsInitialized.current) {
-      const districtsString = selectedDistricts.join(', ')
-      if (districtsString !== formData.districts) {
-        isUpdatingDistricts.current = true
-        handleChange('districts', districtsString)
-      }
+    const parsed = formData.districts 
+      ? formData.districts.split(',').map(d => d.trim()).filter(d => d.length > 0)
+      : []
+    
+    // Обновляем selectedDistricts только если он отличается от текущего
+    const currentString = selectedDistricts.join(', ')
+    const newString = parsed.join(', ')
+    if (currentString !== newString) {
+      setSelectedDistricts(parsed)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDistricts])
+  }, [formData.districts])
 
   const loadDistricts = async (): Promise<void> => {
     try {
@@ -90,9 +82,14 @@ export default function ObjectForm({
 
   const handleDistrictsChange = useCallback((e: ChangeEvent<HTMLSelectElement>): void => {
     const selected = Array.from(e.target.selectedOptions, option => option.value)
-    isUpdatingDistricts.current = true
     setSelectedDistricts(selected)
-  }, [])
+    // Сразу обновляем formData.districts для немедленной синхронизации
+    const districtsString = selected.join(', ')
+    // Устанавливаем флаг, чтобы избежать обратной синхронизации в useEffect
+    isSyncingFromFormData.current = true
+    handleChange('districts', districtsString)
+    console.log('ObjectForm - districts changed:', selected, '-> districtsString:', districtsString)
+  }, [handleChange])
 
   return (
     <div className="object-form-container">

@@ -105,10 +105,15 @@ export default function EditObject(): JSX.Element {
     setSaving(true)
 
     try {
+      // Логируем для отладки
+      console.log('EditObject submit - formData.districts:', formData.districts)
+      
       const districts = formData.districts
         .split(',')
         .map((d) => d.trim())
         .filter((d) => d.length > 0)
+
+      console.log('EditObject submit - parsed districts:', districts)
 
       const requestData: UpdateObjectRequest = {
         rooms_type: formData.rooms_type || null,

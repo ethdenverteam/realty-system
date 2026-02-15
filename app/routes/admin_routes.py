@@ -129,8 +129,8 @@ def admin_database_schema_examples(current_user):
         result_proxy = db.session.execute(sql)
         rows = result_proxy.fetchall()
         
-        # Get column names
-        columns = [desc[0] for desc in result_proxy.description]
+        # Get column names - в SQLAlchemy 2.0+ используем keys() вместо description
+        columns = list(result_proxy.keys())
         
         # Convert rows to dictionaries
         examples = []
