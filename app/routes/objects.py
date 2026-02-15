@@ -229,7 +229,9 @@ def create_object(current_user):
         districts_json = data.get('districts_json', [])
         # Убеждаемся, что districts_json это список
         if not isinstance(districts_json, list):
+            logger.warning(f"districts_json is not a list, got {type(districts_json)}: {districts_json}")
             districts_json = []
+        logger.info(f"Creating object with districts_json: {districts_json} (type: {type(districts_json)})")
         photos_json = data.get('photos_json', [])
     
     # Generate object_id (proper logic from bot)

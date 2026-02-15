@@ -109,6 +109,61 @@ def admin_database_schema_data(current_user):
         }), 500
 
 
+@admin_routes_bp.route('/dashboard/database-schema/examples', methods=['GET'])
+@jwt_required
+@role_required('admin')
+def admin_database_schema_examples(current_user):
+    """Get 2 random example rows from selected table"""
+    table_name = request.args.get('table')
+    if not table_name:
+        return jsonify({'error': 'table parameter is required'}), 400
+    
+    try:
+        from sqlalchemy import text
+        # Get 2 random rows from the table
+        sql = text(f"""
+            SELECT * FROM {table_name}
+            ORDER BY RANDOM()
+            LIMIT 2
+        """)
+        result_proxy = db.session.execute(sql)
+        rows = result_proxy.fetchall()
+        
+        # Get column names
+        columns = [desc[0] for desc in result_proxy.description]
+        
+        # Convert rows to dictionaries
+        examples = []
+        for row in rows:
+            row_dict = {}
+            for i, col_name in enumerate(columns):
+                value = row[i]
+                # Convert special types to JSON-serializable format
+                if hasattr(value, 'isoformat'):  # datetime
+                    value = value.isoformat()
+                elif isinstance(value, (dict, list)):  # JSON fields
+                    value = value
+                elif value is None:
+                    value = None
+                else:
+                    value = str(value)
+                row_dict[col_name] = value
+            examples.append(row_dict)
+        
+        return jsonify({
+            'success': True,
+            'table': table_name,
+            'columns': columns,
+            'examples': examples
+        })
+    except Exception as e:
+        logger.error(f"Error getting examples from table {table_name}: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @admin_routes_bp.route('/dashboard/stats', methods=['GET'])
 @jwt_required
 @role_required('admin')

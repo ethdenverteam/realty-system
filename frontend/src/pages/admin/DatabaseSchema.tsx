@@ -39,11 +39,25 @@ interface SchemaResponse {
   error?: string
 }
 
+interface ExampleRow {
+  [key: string]: string | number | boolean | null | unknown
+}
+
+interface ExamplesResponse {
+  success: boolean
+  table?: string
+  columns?: string[]
+  examples?: ExampleRow[]
+  error?: string
+}
+
 export default function AdminDatabaseSchema(): JSX.Element {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
   const [schema, setSchema] = useState<Record<string, TableInfo>>({})
   const [selectedTable, setSelectedTable] = useState<string | null>(null)
+  const [loadingExamples, setLoadingExamples] = useState(false)
+  const [examples, setExamples] = useState<ExamplesResponse | null>(null)
 
   useEffect(() => {
     void loadSchema()
@@ -73,6 +87,28 @@ export default function AdminDatabaseSchema(): JSX.Element {
     }
   }
 
+  const loadExamples = async (): Promise<void> => {
+    if (!selectedTable) return
+    try {
+      setLoadingExamples(true)
+      setError('')
+      const res = await api.get<ExamplesResponse>(`/admin/dashboard/database-schema/examples?table=${encodeURIComponent(selectedTable)}`)
+      if (res.data.success) {
+        setExamples(res.data)
+      } else {
+        setError(res.data.error || 'Ошибка загрузки примеров')
+      }
+    } catch (err: unknown) {
+      let message = 'Ошибка загрузки примеров'
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+        message = err.response?.data?.error || err.message || message
+      }
+      setError(message)
+    } finally {
+      setLoadingExamples(false)
+    }
+  }
+
   const table = selectedTable ? schema[selectedTable] : null
 
   return (
@@ -90,7 +126,10 @@ export default function AdminDatabaseSchema(): JSX.Element {
                 {Object.keys(schema).map((tableName) => (
                   <div
                     key={tableName}
-                    onClick={() => setSelectedTable(tableName)}
+                    onClick={() => {
+                      setSelectedTable(tableName)
+                      setExamples(null)
+                    }}
                     style={{
                       padding: '10px',
                       cursor: 'pointer',
@@ -112,7 +151,17 @@ export default function AdminDatabaseSchema(): JSX.Element {
             <div className="table-details" style={{ flex: 1 }}>
               {table ? (
                 <>
-                  <h2>{table.name}</h2>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h2>{table.name}</h2>
+                    <button
+                      onClick={() => void loadExamples()}
+                      disabled={loadingExamples}
+                      className="btn btn-primary"
+                      style={{ marginLeft: '20px' }}
+                    >
+                      {loadingExamples ? 'Загрузка...' : 'Получить пример'}
+                    </button>
+                  </div>
 
                   <div className="card" style={{ marginBottom: '20px' }}>
                     <h3>Колонки ({table.columns.length})</h3>
@@ -190,6 +239,43 @@ export default function AdminDatabaseSchema(): JSX.Element {
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                  )}
+
+                  {examples && examples.examples && examples.examples.length > 0 && (
+                    <div className="card" style={{ marginTop: '20px' }}>
+                      <h3>Примеры данных (2 случайных записи)</h3>
+                      {examples.examples.map((example, idx) => (
+                        <div key={idx} style={{ marginBottom: '30px', border: '1px solid #ddd', padding: '15px', borderRadius: '8px' }}>
+                          <h4 style={{ marginTop: 0, marginBottom: '15px' }}>Запись #{idx + 1}</h4>
+                          <table className="table" style={{ width: '100%' }}>
+                            <thead>
+                              <tr>
+                                <th>Параметр</th>
+                                <th>Значение</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {examples.columns?.map((colName) => (
+                                <tr key={colName}>
+                                  <td><strong>{colName}</strong></td>
+                                  <td>
+                                    {example[colName] === null || example[colName] === undefined ? (
+                                      <span style={{ color: '#999', fontStyle: 'italic' }}>NULL</span>
+                                    ) : typeof example[colName] === 'object' ? (
+                                      <pre style={{ margin: 0, fontSize: '12px', maxWidth: '500px', overflow: 'auto' }}>
+                                        {JSON.stringify(example[colName], null, 2)}
+                                      </pre>
+                                    ) : (
+                                      String(example[colName])
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </>

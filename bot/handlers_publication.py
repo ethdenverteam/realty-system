@@ -319,45 +319,45 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
     
     # Publish to each chat
     for chat_id in target_chats:
-            try:
-                # Check if object was published to this chat within last 24 hours
-                # Проверка не применяется для админов (они могут публиковать без ограничений)
-                user_obj = get_user(str(user.id))
-                is_admin = user_obj and user_obj.web_role == 'admin'
-                
-                if not is_admin:
-                    db = get_db()
-                    try:
-                        chat = db.query(Chat).filter_by(chat_id=chat_id).first()
-                        if not chat:
-                            continue
-                        
-                        # Check publication history for this object and chat
-                        yesterday = datetime.utcnow() - timedelta(days=1)
-                        recent_publication = db.query(PublicationHistory).filter(
-                            PublicationHistory.object_id == object_id,
-                            PublicationHistory.chat_id == chat_id,
-                            PublicationHistory.published_at >= yesterday,
-                            PublicationHistory.deleted == False
-                        ).first()
-                        
-                        if recent_publication:
-                            logger.info(f"Object {object_id} was already published to chat {chat_id} within 24 hours, skipping")
-                            continue
-                        
-                        telegram_chat_id = chat.telegram_chat_id
-                    finally:
-                        db.close()
-                else:
-                    # Для админов просто получаем telegram_chat_id без проверки
-                    db = get_db()
-                    try:
-                        chat = db.query(Chat).filter_by(chat_id=chat_id).first()
-                        if not chat:
-                            continue
-                        telegram_chat_id = chat.telegram_chat_id
-                    finally:
-                        db.close()
+        try:
+            # Check if object was published to this chat within last 24 hours
+            # Проверка не применяется для админов (они могут публиковать без ограничений)
+            user_obj = get_user(str(user.id))
+            is_admin = user_obj and user_obj.web_role == 'admin'
+            
+            if not is_admin:
+                db = get_db()
+                try:
+                    chat = db.query(Chat).filter_by(chat_id=chat_id).first()
+                    if not chat:
+                        continue
+                    
+                    # Check publication history for this object and chat
+                    yesterday = datetime.utcnow() - timedelta(days=1)
+                    recent_publication = db.query(PublicationHistory).filter(
+                        PublicationHistory.object_id == object_id,
+                        PublicationHistory.chat_id == chat_id,
+                        PublicationHistory.published_at >= yesterday,
+                        PublicationHistory.deleted == False
+                    ).first()
+                    
+                    if recent_publication:
+                        logger.info(f"Object {object_id} was already published to chat {chat_id} within 24 hours, skipping")
+                        continue
+                    
+                    telegram_chat_id = chat.telegram_chat_id
+                finally:
+                    db.close()
+            else:
+                # Для админов просто получаем telegram_chat_id без проверки
+                db = get_db()
+                try:
+                    chat = db.query(Chat).filter_by(chat_id=chat_id).first()
+                    if not chat:
+                        continue
+                    telegram_chat_id = chat.telegram_chat_id
+                finally:
+                    db.close()
             
             # Send message
             if photos_json:
