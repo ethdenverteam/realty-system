@@ -259,6 +259,12 @@ export default function AdminBotChats(): JSX.Element {
 
   const getFiltersText = (chat: BotChatListItem) => {
     const filters = chat.filters_json || {}
+    
+    // Проверка типа привязки "общий" - такой чат получает все посты
+    if (filters.binding_type === 'common') {
+      return 'Общий (все посты)'
+    }
+    
     const parts: string[] = []
 
     if (filters.rooms_types?.length) {

@@ -187,6 +187,9 @@ def create_object(current_user):
         districts_json_str = request.form.get('districts_json', '[]')
         try:
             districts_json = json.loads(districts_json_str) if districts_json_str else []
+            # Убеждаемся, что districts_json это список
+            if not isinstance(districts_json, list):
+                districts_json = []
         except:
             districts_json = []
         
@@ -224,6 +227,9 @@ def create_object(current_user):
         phone_number_2 = data.get('phone_number_2', '')
         show_username = data.get('show_username', False)
         districts_json = data.get('districts_json', [])
+        # Убеждаемся, что districts_json это список
+        if not isinstance(districts_json, list):
+            districts_json = []
         photos_json = data.get('photos_json', [])
     
     # Generate object_id (proper logic from bot)
@@ -322,7 +328,12 @@ def update_object(object_id, current_user):
     if 'price' in data:
         obj.price = float(data['price'])
     if 'districts_json' in data:
-        obj.districts_json = data['districts_json']
+        # Всегда обновляем районы, даже если это пустой список
+        districts_json = data['districts_json']
+        # Убеждаемся, что это список
+        if not isinstance(districts_json, list):
+            districts_json = []
+        obj.districts_json = districts_json
     if 'photos_json' in data:
         obj.photos_json = data['photos_json']
     if 'area' in data:

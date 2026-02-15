@@ -485,6 +485,7 @@ def _format_publication_text_compact(obj: Object, user: User = None, is_preview:
     # 7 строка: контакт2
     phone_2 = getattr(obj, 'phone_number_2', None)
     contact_name_2 = getattr(obj, 'contact_name_2', None) or ""
+    show_username = getattr(obj, 'show_username', False)
     contact2_parts = []
     if contact_name_2:
         contact2_parts.append(contact_name_2)  # Обычные символы
