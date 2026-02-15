@@ -366,20 +366,6 @@ export default function Autopublish(): JSX.Element {
                     {/* Отображение чатов и категорий */}
                     {chatsData && (
                       <div className="object-chats-info">
-                        {chatsData.bot_chats.length > 0 && (
-                          <div className="object-chats-section">
-                            <span className="object-chats-label">Бот чаты:</span>
-                            <div className="object-chats-list">
-                              {chatsData.bot_chats.map((chat, idx) => (
-                                <span key={chat.chat_id} className="object-chat-tag">
-                                  {chat.title}
-                                  {chat.category && ` (${formatCategory(chat.category)})`}
-                                  {idx < chatsData.bot_chats.length - 1 && ', '}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                         {chatsData.user_chats.length > 0 && (
                           <div className="object-chats-section">
                             <span className="object-chats-label">Аккаунт чаты:</span>

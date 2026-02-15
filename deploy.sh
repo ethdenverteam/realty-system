@@ -80,9 +80,9 @@ echo ""
 timer_pid=""
 start_timer() {
     (
-        sleep 540  # 9 minutes = 540 seconds
+        sleep 240  # 4 minutes = 240 seconds
         echo ""
-        echo "⚠️  To prevent console from closing - press any key or 'n' to cancel"
+        echo "To prevent console from closing - press any key or 'n' to cancel"
         while true; do
             read -t 1 -n 1 input
             if [ $? -eq 0 ]; then
@@ -90,7 +90,7 @@ start_timer() {
                     echo "Timer cancelled."
                     return
                 else
-                    echo "Timer restarted for 9 minutes..."
+                    echo "Timer restarted for 4 minutes..."
                     start_timer
                     return
                 fi

@@ -320,7 +320,7 @@
 
 .chat-item-title {
   margin: 0 0 var(--spacing-xs) 0;
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   font-weight: 600;
 }
 

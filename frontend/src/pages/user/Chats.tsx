@@ -59,6 +59,12 @@ export default function Chats(): JSX.Element {
   const [groupName, setGroupName] = useState('')
   const [groupDescription, setGroupDescription] = useState('')
   const [groupCategory, setGroupCategory] = useState('')
+  const [groupFilterType, setGroupFilterType] = useState<'' | 'common' | 'rooms' | 'district' | 'price'>('')
+  const [groupRoomsTypes, setGroupRoomsTypes] = useState<string[]>([])
+  const [groupDistricts, setGroupDistricts] = useState<string[]>([])
+  const [groupPriceMin, setGroupPriceMin] = useState('')
+  const [groupPriceMax, setGroupPriceMax] = useState('')
+  const [groupConfig, setGroupConfig] = useState<{ districts?: Record<string, unknown>; rooms_types?: string[]; price_ranges?: Array<{ min: number; max: number; label: string }> } | null>(null)
   const [showChatCategoryModal, setShowChatCategoryModal] = useState(false)
   const [editingChat, setEditingChat] = useState<CachedChat | null>(null)
   const [chatCategory, setChatCategory] = useState('')
@@ -135,11 +141,32 @@ export default function Chats(): JSX.Element {
     }
   }
 
+  // Загрузка конфигурации для категорий связи
+  const loadConfig = async (): Promise<void> => {
+    try {
+      const res = await api.get<{ districts?: Record<string, unknown>; rooms_types?: string[]; price_ranges?: Array<{ min: number; max: number; label: string }> }>('/admin/dashboard/bot-chats/config')
+      setGroupConfig(res.data)
+    } catch (err) {
+      console.error('Error loading config:', err)
+    }
+  }
+
+  useEffect(() => {
+    if (showCreateGroupModal || showEditGroupModal) {
+      void loadConfig()
+    }
+  }, [showCreateGroupModal, showEditGroupModal])
+
   const openCreateGroupModal = (): void => {
     setSelectedChatsForGroup([])
     setGroupName('')
     setGroupDescription('')
     setGroupCategory('')
+    setGroupFilterType('')
+    setGroupRoomsTypes([])
+    setGroupDistricts([])
+    setGroupPriceMin('')
+    setGroupPriceMax('')
     setShowCreateGroupModal(true)
   }
 
@@ -149,6 +176,46 @@ export default function Chats(): JSX.Element {
     setGroupName(group.name)
     setGroupDescription(group.description || '')
     setGroupCategory(group.category || '')
+    
+    // Парсим filters_json для редактирования
+    if (group.filters_json) {
+      if (group.filters_json.rooms_types) {
+        setGroupFilterType('rooms')
+        setGroupRoomsTypes(group.filters_json.rooms_types || [])
+      } else if (group.filters_json.districts) {
+        setGroupFilterType('district')
+        setGroupDistricts(group.filters_json.districts || [])
+      } else if (group.filters_json.price_min !== undefined || group.filters_json.price_max !== undefined) {
+        setGroupFilterType('price')
+        setGroupPriceMin(group.filters_json.price_min?.toString() || '')
+        setGroupPriceMax(group.filters_json.price_max?.toString() || '')
+      } else if (group.filters_json.binding_type === 'common') {
+        setGroupFilterType('common')
+      } else {
+        setGroupFilterType('')
+      }
+    } else if (group.category) {
+      // Legacy категория
+      if (group.category.startsWith('rooms_')) {
+        setGroupFilterType('rooms')
+        setGroupRoomsTypes([group.category.replace('rooms_', '')])
+      } else if (group.category.startsWith('district_')) {
+        setGroupFilterType('district')
+        setGroupDistricts([group.category.replace('district_', '')])
+      } else if (group.category.startsWith('price_')) {
+        setGroupFilterType('price')
+        const parts = group.category.replace('price_', '').split('_')
+        if (parts.length === 2) {
+          setGroupPriceMin(parts[0])
+          setGroupPriceMax(parts[1])
+        }
+      } else {
+        setGroupFilterType('')
+      }
+    } else {
+      setGroupFilterType('')
+    }
+    
     setShowEditGroupModal(true)
   }
 
@@ -160,10 +227,15 @@ export default function Chats(): JSX.Element {
     setGroupName('')
     setGroupDescription('')
     setGroupCategory('')
+    setGroupFilterType('')
+    setGroupRoomsTypes([])
+    setGroupDistricts([])
+    setGroupPriceMin('')
+    setGroupPriceMax('')
   }
 
   // Создание группы чатов
-  const { mutate: createChatGroup, loading: creatingGroup } = useApiMutation<{ name: string; description?: string; chat_ids: number[]; category?: string }, { success: boolean; group: ChatGroup }>({
+  const { mutate: createChatGroup, loading: creatingGroup } = useApiMutation<{ name: string; description?: string; chat_ids: number[]; category?: string; filters_json?: any }, { success: boolean; group: ChatGroup }>({
     url: '/chats/groups',
     method: 'POST',
     errorContext: 'Creating chat group',
@@ -180,7 +252,7 @@ export default function Chats(): JSX.Element {
   })
 
   // Обновление группы чатов
-  const { mutate: updateChatGroup, loading: updatingGroup } = useApiMutation<{ name: string; description?: string; chat_ids: number[]; category?: string }, { success: boolean; group: ChatGroup }>({
+  const { mutate: updateChatGroup, loading: updatingGroup } = useApiMutation<{ name: string; description?: string; chat_ids: number[]; category?: string; filters_json?: any }, { success: boolean; group: ChatGroup }>({
     url: editingGroup ? `/chats/groups/${editingGroup.group_id}` : '',
     method: 'PUT',
     errorContext: 'Updating chat group',
@@ -205,11 +277,42 @@ export default function Chats(): JSX.Element {
       setError('Выберите хотя бы один чат')
       return
     }
+    
+    // Формируем filters_json на основе выбранного типа
+    let filtersJson: any = null
+    let category: string | undefined = undefined
+    
+    if (groupFilterType === 'common') {
+      filtersJson = { binding_type: 'common' }
+    } else if (groupFilterType === 'rooms' && groupRoomsTypes.length > 0) {
+      filtersJson = { rooms_types: groupRoomsTypes }
+      // Legacy категория для обратной совместимости
+      if (groupRoomsTypes.length === 1) {
+        category = `rooms_${groupRoomsTypes[0]}`
+      }
+    } else if (groupFilterType === 'district' && groupDistricts.length > 0) {
+      filtersJson = { districts: groupDistricts }
+      // Legacy категория для обратной совместимости
+      if (groupDistricts.length === 1) {
+        category = `district_${groupDistricts[0]}`
+      }
+    } else if (groupFilterType === 'price' && (groupPriceMin || groupPriceMax)) {
+      filtersJson = {
+        price_min: groupPriceMin ? parseFloat(groupPriceMin) : null,
+        price_max: groupPriceMax ? parseFloat(groupPriceMax) : null,
+      }
+      // Legacy категория для обратной совместимости
+      if (groupPriceMin && groupPriceMax) {
+        category = `price_${groupPriceMin}_${groupPriceMax}`
+      }
+    }
+    
     const groupData = {
       name: groupName.trim(),
       description: groupDescription.trim() || undefined,
       chat_ids: selectedChatsForGroup,
-      category: groupCategory.trim() || undefined,
+      category: category,
+      filters_json: filtersJson,
     }
     if (editingGroup) {
       void updateChatGroup(groupData)
@@ -476,18 +579,100 @@ export default function Chats(): JSX.Element {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Категория связи (необязательно)</label>
-                  <input
-                    type="text"
+                  <label className="form-label">Тип категории связи</label>
+                  <select
                     className="form-control"
-                    value={groupCategory}
-                    onChange={(e) => setGroupCategory(e.target.value)}
-                    placeholder="Например: rooms_1k, district_center, price_4000_6000"
-                  />
-                  <small className="form-text text-muted">
-                    Формат: rooms_1k, rooms_2k, district_название, price_мин_макс
-                  </small>
+                    value={groupFilterType}
+                    onChange={(e) => {
+                      const newType = e.target.value as '' | 'common' | 'rooms' | 'district' | 'price'
+                      setGroupFilterType(newType)
+                      // Сброс значений при смене типа
+                      setGroupRoomsTypes([])
+                      setGroupDistricts([])
+                      setGroupPriceMin('')
+                      setGroupPriceMax('')
+                    }}
+                  >
+                    <option value="">Без привязки</option>
+                    <option value="common">Общий (все посты)</option>
+                    <option value="rooms">По типу комнат</option>
+                    <option value="district">По району</option>
+                    <option value="price">По диапазону цен</option>
+                  </select>
                 </div>
+
+                {groupFilterType === 'rooms' && groupConfig && (
+                  <div className="form-group">
+                    <label className="form-label">Типы комнат</label>
+                    <div className="checkbox-group">
+                      {(groupConfig.rooms_types || []).map((rt) => (
+                        <label key={rt} className="checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={groupRoomsTypes.includes(rt)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setGroupRoomsTypes([...groupRoomsTypes, rt])
+                              } else {
+                                setGroupRoomsTypes(groupRoomsTypes.filter((x) => x !== rt))
+                              }
+                            }}
+                          />
+                          <span>{rt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {groupFilterType === 'district' && groupConfig && (
+                  <div className="form-group">
+                    <label className="form-label">Районы</label>
+                    <select
+                      className="form-control"
+                      multiple
+                      value={groupDistricts}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                        const selected = Array.from(e.target.selectedOptions).map((opt) => opt.value)
+                        setGroupDistricts(selected)
+                      }}
+                    >
+                      {Object.keys(groupConfig.districts || {}).map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="form-text text-muted">Удерживайте Ctrl для выбора нескольких</small>
+                  </div>
+                )}
+
+                {groupFilterType === 'price' && (
+                  <>
+                    <div className="form-group">
+                      <label className="form-label">Минимальная цена (тыс. руб.)</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={groupPriceMin}
+                        onChange={(e) => setGroupPriceMin(e.target.value)}
+                        min="0"
+                        step="100"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Максимальная цена (тыс. руб.)</label>
+                      <input
+                        type="number"
+                        className="form-control"
+                        value={groupPriceMax}
+                        onChange={(e) => setGroupPriceMax(e.target.value)}
+                        min="0"
+                        step="100"
+                      />
+                    </div>
+                  </>
+                )}
                 <div className="form-group">
                   <label className="form-label">Выберите чаты для группы ({selectedChatsForGroup.length} выбрано)</label>
                   {chats.length === 0 ? (
@@ -537,7 +722,7 @@ export default function Chats(): JSX.Element {
                 <button className="btn btn-secondary" onClick={closeGroupModal} disabled={creatingGroup || updatingGroup}>
                   Отмена
                 </button>
-                <button className="btn btn-primary" onClick={handleSaveGroup} disabled={creatingGroup || updatingGroup || !groupName.trim() || selectedChatsForGroup.length === 0}>
+                <button className="btn btn-primary" onClick={handleSaveGroup} disabled={creatingGroup || updatingGroup || !groupName.trim() || selectedChatsForGroup.length === 0 || (groupFilterType && groupFilterType !== 'common' && ((groupFilterType === 'rooms' && groupRoomsTypes.length === 0) || (groupFilterType === 'district' && groupDistricts.length === 0) || (groupFilterType === 'price' && !groupPriceMin && !groupPriceMax)))}>
                   {creatingGroup || updatingGroup ? 'Сохранение...' : (editingGroup ? 'Сохранить' : 'Создать группу')}
                 </button>
               </div>

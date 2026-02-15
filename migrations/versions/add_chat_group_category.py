@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'add_chat_group_category'
-down_revision = 'add_chat_filters_json'
+down_revision = 'add_second_contact_2024'
 branch_labels = None
 depends_on = None
 
