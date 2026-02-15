@@ -212,6 +212,9 @@ export default function AdminDashboard(): JSX.Element {
 
         <GlassCard>
           <h2 className="card-title">Страницы админ-панели</h2>
+          <p style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', marginBottom: '15px' }}>
+            Список всех доступных страниц админ-панели. Для добавления новой страницы добавьте её в массив ниже.
+          </p>
           <div className="admin-pages-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px', marginTop: '15px' }}>
             {[
               { path: '/admin/dashboard', label: 'Главная', icon: '🏠' },
@@ -226,6 +229,7 @@ export default function AdminDashboard(): JSX.Element {
               { path: '/admin/dashboard/test/dropdown-test', label: 'Тест Dropdown (детально)', icon: '🧪' },
               { path: '/admin/dashboard/typescript-types', label: 'TypeScript типы', icon: '📝' },
               { path: '/admin/dashboard/mobx-store', label: 'MobX Store', icon: '📦' },
+              // Добавьте новую страницу здесь, и она автоматически появится в списке
             ].map((page) => (
               <a
                 key={page.path}

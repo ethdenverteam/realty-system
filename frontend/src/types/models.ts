@@ -41,6 +41,7 @@ export interface RealtyObjectListItem {
 }
 
 export interface BotChatFilters {
+  binding_type?: 'common';
   rooms_types?: string[];
   districts?: string[];
   price_min?: number | null;

@@ -409,7 +409,8 @@ def _format_publication_text_compact(obj: Object, user: User = None, is_preview:
     3 строка: ремонт
     4 строка: комментарий + перенос
     5 строка: ЦЕНА + перенос
-    6 строка: контакты
+    6 строка: контакт1
+    7 строка: контакт2
     """
     lines = []
     
@@ -444,7 +445,7 @@ def _format_publication_text_compact(obj: Object, user: User = None, is_preview:
     if obj.floor:
         second_line_parts.append(f"этаж {obj.floor}")
     if obj.area:
-        area_str = replace_digits_with_special(str(obj.area))
+        area_str = str(obj.area)  # Обычные символы, не заменяем
         second_line_parts.append(f"{area_str} м²")
     
     if second_line_parts:
@@ -470,30 +471,29 @@ def _format_publication_text_compact(obj: Object, user: User = None, is_preview:
         lines.append(f"{price_str}тр")
     lines.append("")  # Перенос
     
-    # 6 строка: контакты
-    contact_parts = []
+    # 6 строка: контакт1
     phone = obj.phone_number or (user.phone if user else None)
     contact_name = obj.contact_name or ""
+    contact1_parts = []
+    if contact_name:
+        contact1_parts.append(contact_name)  # Обычные символы
+    if phone:
+        contact1_parts.append(phone)
+    if contact1_parts:
+        lines.append(" ".join(contact1_parts))
+    
+    # 7 строка: контакт2
     phone_2 = getattr(obj, 'phone_number_2', None)
     contact_name_2 = getattr(obj, 'contact_name_2', None) or ""
-    show_username = obj.show_username or False
-    
-    if contact_name:
-        contact_name_str = replace_digits_with_special(contact_name)
-        contact_parts.append(contact_name_str)
-    if phone:
-        contact_parts.append(phone)
+    contact2_parts = []
     if contact_name_2:
-        contact_name_2_str = replace_digits_with_special(contact_name_2)
-        contact_parts.append(contact_name_2_str)
+        contact2_parts.append(contact_name_2)  # Обычные символы
     if phone_2:
-        contact_parts.append(phone_2)
+        contact2_parts.append(phone_2)
     if show_username and user and user.username:
-        username_str = replace_digits_with_special(user.username)
-        contact_parts.append(f"@{username_str}")
-    
-    if contact_parts:
-        lines.append(" ".join(contact_parts))
+        contact2_parts.append(f"@{user.username}")  # Обычные символы
+    if contact2_parts:
+        lines.append(" ".join(contact2_parts))
     
     return "\n".join(lines)
 
@@ -553,17 +553,22 @@ def format_publication_text(obj: Object, user: User = None, is_preview: bool = F
     
     # Площадь
     if obj.area:
-        area_str = replace_digits_with_special(str(obj.area))
+        area_str = str(obj.area)  # Обычные символы, не заменяем
         lines.append(f"𝙈 ²¦{area_str}")
     
     # Этаж
     if obj.floor:
-        floor_str = replace_digits_with_special(str(obj.floor))
+        floor_str = str(obj.floor)  # Обычные символы, не заменяем
         lines.append(f"📐¦{floor_str}")
     
     # Ремонт
     if obj.renovation:
         lines.append(f"🛋¦{obj.renovation}")
+    
+    # ЖК из базы данных
+    residential_complex = getattr(obj, 'residential_complex', None) or ""
+    if residential_complex:
+        lines.append(f"🏘¦{residential_complex}")
     
     # Адрес
     if obj.address:
@@ -632,18 +637,15 @@ def format_publication_text(obj: Object, user: User = None, is_preview: bool = F
         if not hashtags:
             lines.append("")
         if contact_name:
-            contact_name_str = replace_digits_with_special(contact_name)
-            lines.append(f"🕴🏻¦{contact_name_str}")
+            lines.append(f"🕴🏻¦{contact_name}")  # Обычные символы, не заменяем
         if phone:
             lines.append(f"☎️¦{phone}")
         if contact_name_2:
-            contact_name_2_str = replace_digits_with_special(contact_name_2)
-            lines.append(f"🕴🏻¦{contact_name_2_str}")
+            lines.append(f"🕴🏻¦{contact_name_2}")  # Обычные символы, не заменяем
         if phone_2:
             lines.append(f"☎️¦{phone_2}")
         if show_username and user and user.username:
-            username_str = replace_digits_with_special(user.username)
-            lines.append(f"📩¦@{username_str}")
+            lines.append(f"📩¦@{user.username}")  # Обычные символы, не заменяем
     
     # Показываем родительские районы в конце
     if parent_districts:

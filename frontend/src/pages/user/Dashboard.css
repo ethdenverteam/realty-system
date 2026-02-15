@@ -1,32 +1,16 @@
 /* Reuse admin dashboard styles */
 @import '../admin/Dashboard.css';
 
-/* Prevent scrolling on dashboard */
+/* Dashboard page - разрешаем прокрутку */
 .dashboard-page {
-  overflow: hidden;
   height: 100%;
-  max-height: 100vh;
 }
 
 @media (max-width: 767px) {
   .dashboard-page {
-    overflow: hidden;
-    height: calc(100vh - 140px);
-    max-height: calc(100vh - 140px);
     display: flex;
     flex-direction: column;
     justify-content: center;
   }
-}
-
-/* Prevent scrolling on dashboard */
-.dashboard-page {
-  overflow: hidden;
-  height: 100vh;
-  max-height: 100vh;
-}
-
-.dashboard-page * {
-  overflow: hidden;
 }
 

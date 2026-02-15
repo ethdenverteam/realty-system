@@ -20,7 +20,7 @@ interface DistrictsResponse {
 interface BotChatsFormData {
   chat_id: string
   chat_title: string
-  filter_type: '' | 'rooms' | 'district' | 'price'
+  filter_type: '' | 'common' | 'rooms' | 'district' | 'price'
   rooms_types: string[]
   districts: string[]
   price_min: string
@@ -140,7 +140,9 @@ export default function AdminBotChats(): JSX.Element {
     setSuccess('')
 
     const filters: BotChatFilters = {}
-    if (formData.filter_type === 'rooms') {
+    if (formData.filter_type === 'common') {
+      filters.binding_type = 'common'
+    } else if (formData.filter_type === 'rooms') {
       filters.rooms_types = formData.rooms_types
     } else if (formData.filter_type === 'district') {
       filters.districts = formData.districts
@@ -433,6 +435,7 @@ export default function AdminBotChats(): JSX.Element {
                     required
                   >
                     <option value="">Выберите тип</option>
+                    <option value="common">Общий (все посты)</option>
                     <option value="rooms">По типу комнат</option>
                     <option value="district">По району</option>
                     <option value="price">По диапазону цен</option>

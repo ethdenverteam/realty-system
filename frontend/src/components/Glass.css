@@ -10,7 +10,7 @@
   padding: var(--spacing-lg);
   color: var(--color-text);
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden; /* Скрываем горизонтальную прокрутку */
   /* Центрирование карточки по горизонтали на всех страницах */
   margin-left: auto;
   margin-right: auto;

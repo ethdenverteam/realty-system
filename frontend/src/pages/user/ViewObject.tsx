@@ -354,19 +354,19 @@ export default function ViewObject(): JSX.Element {
                   Включить автопубликацию
                 </label>
               </div>
-              {autopublishEnabled && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <label htmlFor="publication-format" style={{ minWidth: '150px' }}>
-                    Формат публикации:
-                  </label>
-                  <select
-                    id="publication-format"
-                    value={publicationFormat}
-                    onChange={async (e) => {
-                      const format = e.target.value as 'default' | 'compact'
-                      setLoadingAutopublish(true)
-                      setAutopublishError('')
-                      try {
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <label htmlFor="publication-format" style={{ minWidth: '150px', flexShrink: 0 }}>
+                  Формат публикации:
+                </label>
+                <select
+                  id="publication-format"
+                  value={publicationFormat}
+                  onChange={async (e) => {
+                    const format = e.target.value as 'default' | 'compact'
+                    setLoadingAutopublish(true)
+                    setAutopublishError('')
+                    try {
+                      if (autopublishEnabled) {
                         await api.put(`/user/dashboard/autopublish/${objectId}`, {
                           bot_enabled: true,
                           accounts_config_json: {
@@ -374,25 +374,44 @@ export default function ViewObject(): JSX.Element {
                             accounts: []
                           }
                         })
-                        setPublicationFormat(format)
-                      } catch (err: unknown) {
-                        let message = 'Ошибка изменения формата публикации'
-                        if (axios.isAxiosError<ApiErrorResponse>(err)) {
-                          message = err.response?.data?.error || message
-                        }
-                        setAutopublishError(message)
-                      } finally {
-                        setLoadingAutopublish(false)
+                      } else {
+                        // Если автопубликация выключена, просто сохраняем формат для будущего использования
+                        await api.post('/user/dashboard/autopublish', {
+                          object_id: objectId,
+                          bot_enabled: false,
+                          accounts_config_json: {
+                            publication_format: format,
+                            accounts: []
+                          }
+                        })
                       }
-                    }}
-                    disabled={loadingAutopublish}
-                    style={{ padding: '8px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', color: 'inherit' }}
-                  >
-                    <option value="default">Стандартный</option>
-                    <option value="compact">Компактный</option>
-                  </select>
-                </div>
-              )}
+                      setPublicationFormat(format)
+                    } catch (err: unknown) {
+                      let message = 'Ошибка изменения формата публикации'
+                      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+                        message = err.response?.data?.error || message
+                      }
+                      setAutopublishError(message)
+                    } finally {
+                      setLoadingAutopublish(false)
+                    }
+                  }}
+                  disabled={loadingAutopublish}
+                  style={{ 
+                    padding: '8px', 
+                    borderRadius: '4px', 
+                    border: '1px solid rgba(255,255,255,0.2)', 
+                    background: 'rgba(255,255,255,0.05)', 
+                    color: 'inherit',
+                    minWidth: '150px',
+                    maxWidth: '100%',
+                    flex: '1 1 auto'
+                  }}
+                >
+                  <option value="default">Стандартный</option>
+                  <option value="compact">Компактный</option>
+                </select>
+              </div>
               {autopublishError && (
                 <div className="alert alert-error" style={{ marginTop: '10px', fontSize: '14px' }}>
                   {autopublishError}

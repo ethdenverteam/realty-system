@@ -715,22 +715,29 @@ def user_objects_list(current_user):
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     
     # Add can_publish info for each object
-    from datetime import timedelta
-    yesterday = datetime.utcnow() - timedelta(days=1)
+    # Проверка не применяется для админов (они могут публиковать без ограничений)
     objects_list = []
     for obj in pagination.items:
         obj_dict = obj.to_dict()
-        # Check if can publish (not published within last 24 hours)
-        recent_publications = PublicationHistory.query.filter(
-            PublicationHistory.object_id == obj.object_id,
-            PublicationHistory.published_at >= yesterday,
-            PublicationHistory.deleted == False
-        ).all()
         
-        obj_dict['can_publish'] = len(recent_publications) == 0
-        if recent_publications:
-            last_pub = max(recent_publications, key=lambda p: p.published_at)
-            obj_dict['last_publication'] = last_pub.published_at.isoformat()
+        if current_user.web_role != 'admin':
+            # Check if can publish (not published within last 24 hours)
+            from datetime import timedelta
+            yesterday = datetime.utcnow() - timedelta(days=1)
+            recent_publications = PublicationHistory.query.filter(
+                PublicationHistory.object_id == obj.object_id,
+                PublicationHistory.published_at >= yesterday,
+                PublicationHistory.deleted == False
+            ).all()
+            
+            obj_dict['can_publish'] = len(recent_publications) == 0
+            if recent_publications:
+                last_pub = max(recent_publications, key=lambda p: p.published_at)
+                obj_dict['last_publication'] = last_pub.published_at.isoformat()
+        else:
+            # Админы всегда могут публиковать
+            obj_dict['can_publish'] = True
+        
         objects_list.append(obj_dict)
     
     return jsonify({
@@ -759,19 +766,23 @@ def user_get_object(object_id, current_user):
         return jsonify({'error': 'Object not found'}), 404
     
     # Check if can publish (not published within last 24 hours)
-    from datetime import timedelta
-    yesterday = datetime.utcnow() - timedelta(days=1)
-    recent_publications = PublicationHistory.query.filter(
-        PublicationHistory.object_id == object_id,
-        PublicationHistory.published_at >= yesterday,
-        PublicationHistory.deleted == False
-    ).all()
-    
-    can_publish = len(recent_publications) == 0
+    # Проверка не применяется для админов (они могут публиковать без ограничений)
+    can_publish = True
     last_publication = None
-    if recent_publications:
-        last_pub = max(recent_publications, key=lambda p: p.published_at)
-        last_publication = last_pub.published_at.isoformat()
+    
+    if current_user.web_role != 'admin':
+        from datetime import timedelta
+        yesterday = datetime.utcnow() - timedelta(days=1)
+        recent_publications = PublicationHistory.query.filter(
+            PublicationHistory.object_id == object_id,
+            PublicationHistory.published_at >= yesterday,
+            PublicationHistory.deleted == False
+        ).all()
+        
+        can_publish = len(recent_publications) == 0
+        if recent_publications:
+            last_pub = max(recent_publications, key=lambda p: p.published_at)
+            last_publication = last_pub.published_at.isoformat()
     
     obj_dict = obj.to_dict()
     obj_dict['can_publish'] = can_publish
