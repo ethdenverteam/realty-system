@@ -101,11 +101,37 @@ def get_autopublish_config(current_user):
         if not obj:
             continue
 
+        # Определяем ближайшее время публикации для бота (общая очередь бота)
+        next_bot_queue = PublicationQueue.query.filter(
+            PublicationQueue.user_id == current_user.user_id,
+            PublicationQueue.object_id == cfg.object_id,
+            PublicationQueue.type == 'bot',
+            PublicationQueue.mode == 'autopublish',
+            PublicationQueue.status == 'pending'
+        ).order_by(
+            PublicationQueue.scheduled_time.asc().nullslast(),
+            PublicationQueue.created_at.asc()
+        ).first()
+
+        # Определяем ближайшее время публикации через аккаунты пользователя
+        next_user_queue = PublicationQueue.query.filter(
+            PublicationQueue.user_id == current_user.user_id,
+            PublicationQueue.object_id == cfg.object_id,
+            PublicationQueue.type == 'user',
+            PublicationQueue.mode == 'autopublish',
+            PublicationQueue.status == 'pending'
+        ).order_by(
+            PublicationQueue.scheduled_time.asc().nullslast(),
+            PublicationQueue.created_at.asc()
+        ).first()
+
         item = {
             'object': obj.to_dict(),
             'config': cfg.to_dict(),
             # Для бота чаты подбираются автоматически по фильтрам,
             # поэтому явно не сохраняем их список в конфиге.
+            'next_bot_publication_time': next_bot_queue.scheduled_time.isoformat() if next_bot_queue and next_bot_queue.scheduled_time else None,
+            'next_user_publication_time': next_user_queue.scheduled_time.isoformat() if next_user_queue and next_user_queue.scheduled_time else None,
         }
         autopublish_items.append(item)
 

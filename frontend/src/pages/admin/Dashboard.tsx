@@ -63,7 +63,6 @@ export default function AdminDashboard(): JSX.Element {
         </div>
 
         <GlassCard>
-          <h2 className="card-title">Быстрые действия</h2>
           <div className="actions-grid">
             <a href="/admin/dashboard/bot-chats" className="action-card">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">

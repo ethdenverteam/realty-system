@@ -37,6 +37,11 @@ interface PublicationQueue {
     account_id: number
     phone: string
   }
+  user?: {
+    user_id: number
+    username?: string | null
+    phone?: string | null
+  }
 }
 
 interface QueuesResponse {
@@ -54,6 +59,16 @@ export default function PublicationQueues(): JSX.Element {
   const [queueType, setQueueType] = useState<'all' | 'bot' | 'user'>('all')
   const [status, setStatus] = useState<'all' | 'pending' | 'processing' | 'completed' | 'failed'>('all')
   const [total, setTotal] = useState(0)
+
+  const formatMoscowTime = (iso?: string): string => {
+    if (!iso) return '-'
+    const date = new Date(iso)
+    try {
+      return date.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })
+    } catch {
+      return date.toLocaleString('ru-RU')
+    }
+  }
 
   useEffect(() => {
     void loadQueues()
@@ -180,6 +195,7 @@ export default function PublicationQueues(): JSX.Element {
                     <th>Создано</th>
                     <th>Статус</th>
                     <th>Аккаунт</th>
+                    <th>Пользователь</th>
                     <th>Объект</th>
                     <th>Чат</th>
                     <th>Ошибка</th>
@@ -194,12 +210,12 @@ export default function PublicationQueues(): JSX.Element {
                     <tr key={queue.queue_id}>
                       <td>
                         {queue.scheduled_time
-                          ? new Date(queue.scheduled_time).toLocaleString('ru-RU')
+                          ? formatMoscowTime(queue.scheduled_time)
                           : '-'}
                       </td>
                       <td>
                         {queue.created_at
-                          ? new Date(queue.created_at).toLocaleString('ru-RU')
+                          ? formatMoscowTime(queue.created_at)
                           : '-'}
                       </td>
                       <td>
@@ -214,6 +230,18 @@ export default function PublicationQueues(): JSX.Element {
                           <span className="text-muted">-</span>
                         ) : (
                           <span className="text-muted">Бот</span>
+                        )}
+                      </td>
+                      <td>
+                        {queue.user ? (
+                          <div>
+                            <div>{queue.user.username || '(без username)'}</div>
+                            <div className="text-muted" style={{ fontSize: '11px' }}>
+                              ID: {queue.user.user_id}
+                            </div>
+                          </div>
+                        ) : (
+                          '-'
                         )}
                       </td>
                       <td>
@@ -251,7 +279,7 @@ export default function PublicationQueues(): JSX.Element {
                       <td>{queue.attempts}</td>
                       <td>
                         {queue.completed_at
-                          ? new Date(queue.completed_at).toLocaleString('ru-RU')
+                          ? formatMoscowTime(queue.completed_at)
                           : '-'}
                       </td>
                       <td>{queue.queue_id}</td>

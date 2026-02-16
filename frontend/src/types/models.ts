@@ -87,6 +87,7 @@ export interface RealtyObject {
   districts_json?: string[] | null;
   comment?: string | null;
   address?: string | null;
+  residential_complex?: string | null;
   renovation?: string | null;
   contact_name?: string | null;
   phone_number?: string | null;
@@ -199,6 +200,8 @@ export interface AutopublishConfigDto {
 export interface AutopublishItem {
   object: RealtyObjectListItem | RealtyObject;
   config: AutopublishConfigDto;
+  next_bot_publication_time?: string | null;
+  next_user_publication_time?: string | null;
 }
 
 export interface AutopublishListResponse {

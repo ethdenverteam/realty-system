@@ -107,6 +107,18 @@ export default function Autopublish(): JSX.Element {
 
   const [accountChats, setAccountChats] = useState<Record<number, BotChatListItem[]>>({})
 
+  // Хелпер форматирования времени в часовом поясе Москвы
+  const formatMoscowTime = (iso?: string | null): string => {
+    if (!iso) return '-'
+    const date = new Date(iso)
+    try {
+      return date.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })
+    } catch {
+      // Fallback, если нет поддержки timeZone
+      return date.toLocaleString('ru-RU')
+    }
+  }
+
   // Загрузка чатов для аккаунта
   const loadChatsForAccount = async (accountId: number): Promise<void> => {
     try {
@@ -363,6 +375,17 @@ export default function Autopublish(): JSX.Element {
                           {(obj.districts_json || []).join(',')}
                         </span>
                       )}
+                    </div>
+                    {/* Небольшой блок с расчетным временем ближайшей автопубликации */}
+                    <div style={{ marginTop: '4px', fontSize: '11px', opacity: 0.8 }}>
+                      <div>
+                        <span style={{ fontWeight: 500 }}>Бот:</span>{' '}
+                        {formatMoscowTime(item.next_bot_publication_time)}
+                      </div>
+                      <div>
+                        <span style={{ fontWeight: 500 }}>TG-аккаунты:</span>{' '}
+                        {hasAccounts ? formatMoscowTime(item.next_user_publication_time) : '-'}
+                      </div>
                     </div>
                     {/* Отображение привязанных чатов с кнопкой развернуть */}
                     {chatsData && (chatsData.user_chats.length > 0 || (chatsData.chat_groups && chatsData.chat_groups.length > 0)) && (

@@ -254,6 +254,13 @@ export default function ViewObject(): JSX.Element {
               </div>
             )}
 
+            {object.residential_complex && (
+              <div className="detail-item detail-item-full">
+                <label>ЖК</label>
+                <div className="detail-value">{object.residential_complex}</div>
+              </div>
+            )}
+
             {object.renovation && (
               <div className="detail-item">
                 <label>Ремонт</label>
@@ -506,64 +513,92 @@ export default function ViewObject(): JSX.Element {
             </button>
           </div>
 
-          {/* Отображение чатов и групп */}
-          {objectChats && (objectChats.user_chats && objectChats.user_chats.length > 0 || objectChats.chat_groups && objectChats.chat_groups.length > 0) && (
-            <div style={{ marginTop: '20px', padding: '15px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}>
-              <h3 style={{ marginTop: 0, marginBottom: '15px', fontSize: '16px' }}>Привязанные чаты и группы</h3>
-              
-              {objectChats.user_chats && objectChats.user_chats.length > 0 && (
-                <div style={{ marginBottom: '15px' }}>
-                  <strong style={{ fontSize: '14px', display: 'block', marginBottom: '8px' }}>Аккаунт-чаты:</strong>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {objectChats.user_chats.map((chat) => (
-                      <span
-                        key={chat.chat_id}
-                        style={{
-                          padding: '4px 8px',
-                          background: 'rgba(255, 255, 255, 0.1)',
-                          borderRadius: '4px',
-                          fontSize: '13px',
-                        }}
-                      >
-                        {chat.title}
-                        {chat.category && ` (${chat.category})`}
-                      </span>
-                    ))}
-                  </div>
+          {/* Отображение чатов и групп (блок всегда виден, даже если чатов нет) */}
+          <div
+            style={{
+              marginTop: '20px',
+              padding: '15px',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '8px',
+            }}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: '10px', fontSize: '16px' }}>Привязанные чаты и группы</h3>
+
+            {loadingObjectChats && (
+              <div className="loading" style={{ fontSize: '13px' }}>
+                Загрузка списка чатов...
+              </div>
+            )}
+
+            {!loadingObjectChats &&
+              (!objectChats ||
+                (((objectChats.user_chats?.length || 0) === 0) &&
+                  ((objectChats.chat_groups?.length || 0) === 0))) && (
+                <div style={{ fontSize: '13px', opacity: 0.7 }}>
+                  Для этого объекта пока не настроены чаты и группы автопубликации.
                 </div>
               )}
 
-              {objectChats.chat_groups && objectChats.chat_groups.length > 0 && (
-                <div>
-                  <strong style={{ fontSize: '14px', display: 'block', marginBottom: '8px' }}>Группы чатов:</strong>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {objectChats.chat_groups.map((group) => (
-                      <div
-                        key={group.group_id}
-                        style={{
-                          padding: '8px',
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          borderRadius: '4px',
-                        }}
-                      >
-                        <div style={{ fontWeight: 500, marginBottom: '4px' }}>
-                          {group.name}
-                          {group.category && ` (${group.category})`}
-                        </div>
-                        {group.chats && group.chats.length > 0 && (
-                          <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                            {group.chats.map((chat) => (
-                              <span key={chat.chat_id}>{chat.title}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+            {objectChats && (objectChats.user_chats?.length || 0) > 0 && (
+              <div style={{ marginTop: '10px', marginBottom: '10px' }}>
+                <strong style={{ fontSize: '14px', display: 'block', marginBottom: '8px' }}>Аккаунт-чаты:</strong>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {objectChats.user_chats!.map((chat) => (
+                    <span
+                      key={chat.chat_id}
+                      style={{
+                        padding: '4px 8px',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        borderRadius: '4px',
+                        fontSize: '13px',
+                      }}
+                    >
+                      {chat.title}
+                      {chat.category && ` (${chat.category})`}
+                    </span>
+                  ))}
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+
+            {objectChats && (objectChats.chat_groups?.length || 0) > 0 && (
+              <div style={{ marginTop: (objectChats.user_chats?.length || 0) > 0 ? '5px' : '10px' }}>
+                <strong style={{ fontSize: '14px', display: 'block', marginBottom: '8px' }}>Группы чатов:</strong>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {objectChats.chat_groups!.map((group) => (
+                    <div
+                      key={group.group_id}
+                      style={{
+                        padding: '8px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        borderRadius: '4px',
+                      }}
+                    >
+                      <div style={{ fontWeight: 500, marginBottom: '4px' }}>
+                        {group.name}
+                        {group.category && ` (${group.category})`}
+                      </div>
+                      {group.chats && group.chats.length > 0 && (
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            color: 'rgba(255, 255, 255, 0.7)',
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: '4px',
+                          }}
+                        >
+                          {group.chats.map((chat) => (
+                            <span key={chat.chat_id}>{chat.title}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </GlassCard>
       </div>
 

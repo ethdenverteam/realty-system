@@ -1856,6 +1856,15 @@ def admin_publication_queues_data(current_user):
                 'account_id': account.account_id if account else None,
                 'phone': account.phone if account else None,
             } if account else None
+
+            # Добавляем информацию о пользователе (для отображения в админке)
+            if queue.user:
+                user = queue.user
+                queue_dict['user'] = {
+                    'user_id': user.user_id,
+                    'username': user.username,
+                    'phone': user.phone,
+                }
             
             queue_data.append(queue_dict)
         
