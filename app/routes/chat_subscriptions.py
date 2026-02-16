@@ -58,11 +58,13 @@ def create_chat_group(current_user):
             if link.startswith('https://t.me/+') or link.startswith('http://t.me/+'):
                 # Invite ссылка - используем hash как временный идентификатор
                 hash_part = link.split('+')[-1]
-                temp_chat_id = f"invite_{hash_part}"
+                # Добавляем user_id для уникальности (чтобы разные пользователи могли создавать группы с одинаковыми ссылками)
+                temp_chat_id = f"invite_{current_user.user_id}_{hash_part}"
             else:
                 # Публичный чат
                 username = link.split('/')[-1].replace('@', '')
-                temp_chat_id = f"public_{username}"
+                # Добавляем user_id для уникальности
+                temp_chat_id = f"public_{current_user.user_id}_{username}"
             
             # Ищем или создаем чат
             # Используем telegram_chat_id для хранения временного идентификатора до подписки
@@ -78,8 +80,16 @@ def create_chat_group(current_user):
                     owner_account_id=None,  # Будет заполнено после подписки
                     is_active=False,  # Не активен до подписки
                 )
-                db.session.add(chat)
-                db.session.flush()  # Получаем chat_id
+                try:
+                    db.session.add(chat)
+                    db.session.flush()  # Получаем chat_id
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"Error creating chat for link {link}: {e}", exc_info=True)
+                    # Если ошибка уникальности - пробуем найти существующий
+                    chat = Chat.query.filter_by(telegram_chat_id=temp_chat_id).first()
+                    if not chat:
+                        raise
             
             chat_ids.append(chat.chat_id)
         

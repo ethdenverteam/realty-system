@@ -53,23 +53,23 @@ export default function ChatSubscriptions(): JSX.Element {
 
   // Загрузка данных
   const { data: accounts, loading: accountsLoading } = useApiData<TelegramAccount[]>({
-    url: '/system/accounts',
+    url: '/accounts',
     errorContext: 'Loading accounts',
   })
 
   const { data: groups, loading: groupsLoading, reload: reloadGroups } = useApiData<ChatGroup[]>({
-    url: '/system/chat-subscriptions/groups',
+    url: '/chat-subscriptions/groups',
     errorContext: 'Loading groups',
   })
 
   const { data: tasks, loading: tasksLoading, reload: reloadTasks } = useApiData<SubscriptionTask[]>({
-    url: '/system/chat-subscriptions/tasks',
+    url: '/chat-subscriptions/tasks',
     errorContext: 'Loading tasks',
   })
 
   // Мутации
   const createGroupMutation = useApiMutation<ChatGroup>({
-    url: '/system/chat-subscriptions/groups',
+    url: '/chat-subscriptions/groups',
     method: 'POST',
     onSuccess: () => {
       setGroupName('')
@@ -79,7 +79,7 @@ export default function ChatSubscriptions(): JSX.Element {
   })
 
   const startSubscriptionMutation = useApiMutation<SubscriptionTask>({
-    url: '/system/chat-subscriptions/tasks',
+    url: '/chat-subscriptions/tasks',
     method: 'POST',
     onSuccess: (data) => {
       setSelectedTaskId(data.task_id)
@@ -88,7 +88,7 @@ export default function ChatSubscriptions(): JSX.Element {
   })
 
   const continueSubscriptionMutation = useApiMutation<SubscriptionTask>({
-    url: `/system/chat-subscriptions/tasks/${selectedTaskId}/continue`,
+    url: `/chat-subscriptions/tasks/${selectedTaskId}/continue`,
     method: 'POST',
     onSuccess: () => {
       reloadTasks()
@@ -96,7 +96,7 @@ export default function ChatSubscriptions(): JSX.Element {
   })
 
   const deleteGroupMutation = useApiMutation({
-    url: `/system/chat-subscriptions/groups/${selectedGroupId}`,
+    url: `/chat-subscriptions/groups/${selectedGroupId}`,
     method: 'DELETE',
     onSuccess: () => {
       reloadGroups()
