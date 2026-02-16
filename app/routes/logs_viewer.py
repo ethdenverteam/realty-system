@@ -201,7 +201,8 @@ def download_log_file(log_type):
         return jsonify({'error': 'Unauthorized'}), 401
     
     # Try LOGS_DOWNLOAD_TOKEN first (for scripts)
-    if token == Config.LOGS_DOWNLOAD_TOKEN and Config.LOGS_DOWNLOAD_TOKEN:
+    # Проверяем, что токен не пустой и совпадает с LOGS_DOWNLOAD_TOKEN
+    if Config.LOGS_DOWNLOAD_TOKEN and token == Config.LOGS_DOWNLOAD_TOKEN:
         # Authenticated with download token
         pass
     else:
@@ -212,7 +213,8 @@ def download_log_file(log_type):
             user = User.query.get(payload.get('user_id'))
             if not user or user.web_role != 'admin':
                 return jsonify({'error': 'Forbidden'}), 403
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error verifying token: {e}", exc_info=True)
             return jsonify({'error': 'Invalid token'}), 401
     
     # Test logs (for AI analysis - short, fresh logs)

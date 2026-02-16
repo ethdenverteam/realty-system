@@ -43,3 +43,6 @@ class Config:
     
     # Admin ID для автоматического назначения роли админа
     ADMIN_ID = int(os.environ.get('ADMIN_ID', '0'))
+    
+    # Token для скачивания логов (используется скриптами, не JWT)
+    LOGS_DOWNLOAD_TOKEN = os.environ.get('LOGS_DOWNLOAD_TOKEN', '')

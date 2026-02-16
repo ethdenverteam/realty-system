@@ -1008,17 +1008,14 @@ async def subscribe_to_chat(phone: str, chat_link: str) -> Tuple[bool, Optional[
                 entity = await client.get_entity(username)
                 
                 # Try to join if it's a channel or group
+                from telethon.tl.functions.channels import JoinChannelRequest
                 if isinstance(entity, Channel):
-                    from telethon.tl.functions.channels import JoinChannelRequest
                     await client(JoinChannelRequest(entity))
                 else:
-                    # For groups/supergroups, use join_chat method
-                    from telethon.tl.functions.messages import ImportChatInviteRequest
                     # Для публичных групп просто получаем entity, подписка происходит автоматически при get_entity
                     # Но если нужно явно подписаться, используем JoinChannelRequest для supergroup
                     if hasattr(entity, 'access_hash'):
                         # Это supergroup, используем JoinChannelRequest
-                        from telethon.tl.functions.channels import JoinChannelRequest
                         await client(JoinChannelRequest(entity))
                 
                 # Get chat info

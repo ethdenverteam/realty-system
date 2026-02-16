@@ -347,9 +347,12 @@ def delete_chat(chat_id, current_user):
 @chats_bp.route('/groups', methods=['GET'])
 @jwt_required
 def list_chat_groups(current_user):
-    """Get list of chat groups for current user"""
+    """Get list of chat groups for autopublish (только purpose='autopublish')"""
     try:
-        groups = ChatGroup.query.filter_by(user_id=current_user.user_id).all()
+        groups = ChatGroup.query.filter_by(
+            user_id=current_user.user_id,
+            purpose='autopublish'
+        ).all()
         return jsonify([group.to_dict() for group in groups])
     except Exception as e:
         logger.error(f"Error listing chat groups: {e}", exc_info=True)
@@ -391,6 +394,7 @@ def create_chat_group(current_user):
             name=name,
             description=description,
             chat_ids=chat_ids,
+            purpose='autopublish',  # Группа для автопубликации
             category=category if category else None,
             filters_json=filters_json if filters_json else None
         )

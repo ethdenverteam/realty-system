@@ -301,9 +301,12 @@ def get_autopublish_chats_for_object(object_id, current_user):
                                 'filters_json': chat.filters_json
                             })
     
-    # Добавляем информацию о группах чатов
+    # Добавляем информацию о группах чатов (только для автопубликации)
     from app.models.chat_group import ChatGroup
-    user_groups = ChatGroup.query.filter_by(user_id=current_user.user_id).all()
+    user_groups = ChatGroup.query.filter_by(
+        user_id=current_user.user_id,
+        purpose='autopublish'
+    ).all()
     result['chat_groups'] = []
     for group in user_groups:
         group_chats = [c for c in result['user_chats'] if c['chat_id'] in group.chat_ids]

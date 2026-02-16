@@ -93,31 +93,37 @@ def create_chat_group(current_user):
             
             chat_ids.append(chat.chat_id)
         
-        # Создаем или обновляем ChatGroup
-        # Проверяем, есть ли уже группа с таким названием у пользователя
-        existing_group = ChatGroup.query.filter_by(user_id=current_user.user_id, name=name).first()
+        # Создаем или обновляем ChatGroup для подписки (purpose='subscription')
+        # Проверяем, есть ли уже группа с таким названием у пользователя для подписки
+        existing_group = ChatGroup.query.filter_by(
+            user_id=current_user.user_id, 
+            name=name,
+            purpose='subscription'
+        ).first()
         
         if existing_group:
             # Обновляем существующую группу
             existing_group.chat_ids = chat_ids
             existing_group.chat_links = links  # Сохраняем исходные ссылки
+            existing_group.purpose = 'subscription'  # Убеждаемся, что purpose правильный
             existing_group.updated_at = datetime.utcnow()
             db.session.commit()
             
             log_action(
                 user_id=current_user.user_id,
                 action='update_chat_group',
-                details={'group_id': existing_group.group_id, 'name': name, 'chats_count': len(chat_ids)}
+                details={'group_id': existing_group.group_id, 'name': name, 'chats_count': len(chat_ids), 'purpose': 'subscription'}
             )
             
             return jsonify(existing_group.to_dict()), 200
         else:
-            # Создаем новую группу
+            # Создаем новую группу для подписки
             group = ChatGroup(
                 user_id=current_user.user_id,
                 name=name,
                 chat_ids=chat_ids,
                 chat_links=links,  # Сохраняем исходные ссылки
+                purpose='subscription',  # Группа для подписки на чаты
             )
             db.session.add(group)
             db.session.commit()
@@ -144,9 +150,12 @@ def create_chat_group(current_user):
 @chat_subscriptions_bp.route('/groups', methods=['GET'])
 @jwt_required
 def list_chat_groups(current_user):
-    """Получить список групп чатов пользователя"""
+    """Получить список групп чатов пользователя для подписки (только purpose='subscription')"""
     try:
-        groups = ChatGroup.query.filter_by(user_id=current_user.user_id).all()
+        groups = ChatGroup.query.filter_by(
+            user_id=current_user.user_id,
+            purpose='subscription'
+        ).all()
         return jsonify([group.to_dict() for group in groups]), 200
     except Exception as e:
         logger.error(f"Error listing chat groups: {e}", exc_info=True)
@@ -198,10 +207,14 @@ def start_subscription(current_user):
         if not account:
             return jsonify({'error': 'Аккаунт не найден'}), 404
         
-        # Проверяем, что группа принадлежит пользователю
-        group = ChatGroup.query.filter_by(group_id=group_id, user_id=current_user.user_id).first()
+        # Проверяем, что группа принадлежит пользователю и предназначена для подписки
+        group = ChatGroup.query.filter_by(
+            group_id=group_id, 
+            user_id=current_user.user_id,
+            purpose='subscription'
+        ).first()
         if not group:
-            return jsonify({'error': 'Группа не найдена'}), 404
+            return jsonify({'error': 'Группа не найдена или не предназначена для подписки'}), 404
         
         # Проверяем, нет ли уже активной задачи подписки для этого аккаунта
         active_task = ChatSubscriptionTask.query.filter_by(
