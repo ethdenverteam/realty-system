@@ -95,6 +95,15 @@ export default function ChatSubscriptions(): JSX.Element {
     },
   })
 
+  const cancelSubscriptionMutation = useApiMutation<SubscriptionTask>({
+    url: `/chat-subscriptions/tasks/${selectedTaskId}/cancel`,
+    method: 'POST',
+    onSuccess: () => {
+      setSelectedTaskId(null)
+      reloadTasks()
+    },
+  })
+
   const deleteGroupMutation = useApiMutation({
     url: `/chat-subscriptions/groups/${selectedGroupId}`,
     method: 'DELETE',
@@ -170,6 +179,19 @@ export default function ChatSubscriptions(): JSX.Element {
     } catch (error) {
       logError(error, 'Continuing subscription')
       alert(getErrorMessage(error, 'Ошибка продолжения подписки'))
+    }
+  }
+
+  const handleCancelSubscription = async (taskId: number) => {
+    if (!confirm('Отменить эту задачу подписки? Прогресс будет потерян.')) {
+      return
+    }
+    setSelectedTaskId(taskId)
+    try {
+      await cancelSubscriptionMutation.mutate({})
+    } catch (error) {
+      logError(error, 'Canceling subscription')
+      alert(getErrorMessage(error, 'Ошибка отмены задачи'))
     }
   }
 
@@ -344,13 +366,25 @@ export default function ChatSubscriptions(): JSX.Element {
                 <span className="status-badge" style={{ backgroundColor: getStatusColor(currentTask.status) }}>
                   {getStatusText(currentTask)}
                 </span>
-                <GlassButton
-                  onClick={() => reloadTasks()}
-                  disabled={tasksLoading}
-                  small
-                >
-                  Обновить статус
-                </GlassButton>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  {(currentTask.status === 'processing' || currentTask.status === 'pending' || currentTask.status === 'flood_wait') && (
+                    <GlassButton
+                      onClick={() => handleCancelSubscription(currentTask.task_id)}
+                      disabled={cancelSubscriptionMutation.isLoading}
+                      small
+                      style={{ backgroundColor: '#dc3545' }}
+                    >
+                      {cancelSubscriptionMutation.isLoading ? 'Отмена...' : 'Отменить'}
+                    </GlassButton>
+                  )}
+                  <GlassButton
+                    onClick={() => reloadTasks()}
+                    disabled={tasksLoading}
+                    small
+                  >
+                    Обновить статус
+                  </GlassButton>
+                </div>
               </div>
               <div className="progress-info">
                 <div className="progress-bar">

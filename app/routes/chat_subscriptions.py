@@ -217,9 +217,10 @@ def start_subscription(current_user):
             return jsonify({'error': 'Группа не найдена или не предназначена для подписки'}), 404
         
         # Проверяем, нет ли уже активной задачи подписки для этого аккаунта
-        active_task = ChatSubscriptionTask.query.filter_by(
-            account_id=account_id,
-            status='processing'
+        # Активные статусы: pending, processing, flood_wait
+        active_task = ChatSubscriptionTask.query.filter(
+            ChatSubscriptionTask.account_id == account_id,
+            ChatSubscriptionTask.status.in_(['pending', 'processing', 'flood_wait'])
         ).first()
         
         if active_task:
@@ -346,5 +347,44 @@ def continue_subscription(current_user, task_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error continuing subscription: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@chat_subscriptions_bp.route('/tasks/<int:task_id>/cancel', methods=['POST'])
+@jwt_required
+def cancel_subscription(current_user, task_id):
+    """Отменить задачу подписки"""
+    try:
+        task = ChatSubscriptionTask.query.filter_by(task_id=task_id, user_id=current_user.user_id).first()
+        if not task:
+            return jsonify({'error': 'Задача не найдена'}), 404
+        
+        # Можно отменять только активные задачи
+        previous_status = task.status
+        if task.status not in ['pending', 'processing', 'flood_wait']:
+            return jsonify({'error': f'Нельзя отменить задачу в статусе {task.status}'}), 400
+        
+        # Отменяем задачу
+        task.status = 'failed'
+        task.error_message = 'Отменено пользователем'
+        task.completed_at = datetime.utcnow()
+        db.session.commit()
+        
+        log_action(
+            user_id=current_user.user_id,
+            action='cancel_chat_subscription',
+            details={'task_id': task_id, 'previous_status': previous_status}
+        )
+        
+        return jsonify(task.to_dict()), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error canceling subscription: {e}", exc_info=True)
+        log_error(
+            error=e,
+            action='cancel_chat_subscription',
+            user_id=current_user.user_id if current_user else None,
+        )
         return jsonify({'error': str(e)}), 500
 
