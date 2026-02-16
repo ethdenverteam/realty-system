@@ -1,7 +1,7 @@
 """
 Add ChatSubscriptionTask table and chat_links to ChatGroup
 
-Revision ID: add_chat_subscription_and_chat_links
+Revision ID: add_subscription_chat_links
 Revises: add_chat_subscription_task
 Create Date: 2024-12-19 00:00:00.000000
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'add_chat_subscription_and_chat_links'
+revision = 'add_subscription_chat_links'
 down_revision = 'add_chat_subscription_task'  # Эта миграция идет после add_chat_subscription_task
 branch_labels = None
 depends_on = None
