@@ -3,6 +3,7 @@ import axios from 'axios'
 import Layout from '../../components/Layout'
 import { GlassCard } from '../../components/GlassCard'
 import api from '../../utils/api'
+import { formatSystemTime } from '../../utils/timezone'
 import type { ApiErrorResponse } from '../../types/models'
 import './PublicationQueues.css'
 
@@ -60,15 +61,6 @@ export default function PublicationQueues(): JSX.Element {
   const [status, setStatus] = useState<'all' | 'pending' | 'processing' | 'completed' | 'failed'>('all')
   const [total, setTotal] = useState(0)
 
-  const formatMoscowTime = (iso?: string): string => {
-    if (!iso) return '-'
-    const date = new Date(iso)
-    try {
-      return date.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })
-    } catch {
-      return date.toLocaleString('ru-RU')
-    }
-  }
 
   useEffect(() => {
     void loadQueues()
@@ -209,14 +201,10 @@ export default function PublicationQueues(): JSX.Element {
                   {queues.map((queue) => (
                     <tr key={queue.queue_id}>
                       <td>
-                        {queue.scheduled_time
-                          ? formatMoscowTime(queue.scheduled_time)
-                          : '-'}
+                        {formatSystemTime(queue.scheduled_time)}
                       </td>
                       <td>
-                        {queue.created_at
-                          ? formatMoscowTime(queue.created_at)
-                          : '-'}
+                        {formatSystemTime(queue.created_at)}
                       </td>
                       <td>
                         <span className={`badge ${getStatusBadgeClass(queue.status)}`}>
@@ -278,9 +266,7 @@ export default function PublicationQueues(): JSX.Element {
                       </td>
                       <td>{queue.attempts}</td>
                       <td>
-                        {queue.completed_at
-                          ? formatMoscowTime(queue.completed_at)
-                          : '-'}
+                        {formatSystemTime(queue.completed_at)}
                       </td>
                       <td>{queue.queue_id}</td>
                       <td>

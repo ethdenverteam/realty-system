@@ -14,15 +14,29 @@ logger = logging.getLogger(__name__)
 
 
 def get_moscow_time() -> datetime:
-    """Получить текущее время в московском часовом поясе"""
+    """
+    Получить текущее время в системном часовом поясе (МСК)
+    Использует глобальную переменную SYSTEM_TIMEZONE из app.config
+    """
     try:
+        from app.config import SYSTEM_TIMEZONE
         from zoneinfo import ZoneInfo
-        MOSCOW_TZ = ZoneInfo('Europe/Moscow')
+        SYSTEM_TZ = ZoneInfo(SYSTEM_TIMEZONE)
     except ImportError:
-        import pytz
-        MOSCOW_TZ = pytz.timezone('Europe/Moscow')
+        try:
+            from app.config import SYSTEM_TIMEZONE
+            import pytz
+            SYSTEM_TZ = pytz.timezone(SYSTEM_TIMEZONE)
+        except ImportError:
+            # Fallback если config не доступен
+            try:
+                from zoneinfo import ZoneInfo
+                SYSTEM_TZ = ZoneInfo('Europe/Moscow')
+            except ImportError:
+                import pytz
+                SYSTEM_TZ = pytz.timezone('Europe/Moscow')
     
-    return datetime.now(MOSCOW_TZ)
+    return datetime.now(SYSTEM_TZ)
 
 
 def format_moscow_datetime(dt: datetime = None, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:

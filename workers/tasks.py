@@ -11,44 +11,14 @@ from sqlalchemy import or_
 import logging
 
 from bot.utils import get_districts_config, get_moscow_time
+from app.utils.time_utils import (
+    get_next_allowed_time_msk,
+    get_next_scheduled_time_for_publication,
+    is_within_publish_hours,
+    msk_to_utc
+)
 
 logger = logging.getLogger(__name__)
-
-
-def get_next_allowed_time_msk(now_msk: datetime = None) -> datetime:
-    """
-    Получить ближайшее разрешенное время для публикации (8:00-21:00 МСК)
-    Если сейчас вне разрешенного времени - возвращает ближайшее разрешенное время
-    Если сейчас в разрешенном времени - возвращает текущее время
-    """
-    if now_msk is None:
-        now_msk = get_moscow_time()
-    
-    # Если сейчас до 8:00 - ставим на 8:00 сегодня
-    if now_msk.hour < 8:
-        return now_msk.replace(hour=8, minute=0, second=0, microsecond=0)
-    
-    # Если сейчас после 21:00 - ставим на 8:00 следующего дня
-    if now_msk.hour >= 21:
-        tomorrow = now_msk + timedelta(days=1)
-        return tomorrow.replace(hour=8, minute=0, second=0, microsecond=0)
-    
-    # Если сейчас в разрешенном времени (8:00-21:00) - возвращаем текущее время
-    return now_msk
-
-
-def get_next_scheduled_time_for_publication(now_msk: datetime = None) -> datetime:
-    """
-    Получить время для публикации при попытке публикации
-    Если сейчас в разрешенном времени - ставим на следующее свободное время начиная с 8 утра следующего дня
-    Если сейчас вне разрешенного времени - ставим на ближайшее разрешенное время
-    """
-    if now_msk is None:
-        now_msk = get_moscow_time()
-    
-    # Всегда ставим на следующий день, ближайшее свободное время начиная с 8 утра
-    tomorrow = now_msk + timedelta(days=1)
-    return tomorrow.replace(hour=8, minute=0, second=0, microsecond=0)
 
 
 @celery_app.task(name='workers.tasks.publish_to_telegram')
@@ -79,6 +49,19 @@ def publish_to_telegram(queue_id: int):
             queue.error_message = 'Object or chat not found'
             db.commit()
             return False
+        
+        # Проверка времени для автопубликации: публикация разрешена только с 8:00 до 22:00 МСК
+        if queue.mode == 'autopublish':
+            now_msk = get_moscow_time()
+            if not is_within_publish_hours(now_msk):
+                logger.info(f"Outside publish hours (8:00-22:00 МСК), rescheduling queue {queue_id}")
+                # Переносим на ближайшее разрешенное время
+                next_time_msk = get_next_allowed_time_msk(now_msk)
+                next_time_utc = msk_to_utc(next_time_msk)
+                queue.scheduled_time = next_time_utc
+                queue.status = 'pending'
+                db.commit()
+                return False
         
         # Check if object was published to this chat within last 24 hours
         # Ограничение 24 часа применяется только для ручной публикации (mode != 'autopublish')
@@ -393,26 +376,12 @@ def schedule_daily_autopublish():
             # Через бота: чаты подбираются автоматически
             if cfg.bot_enabled:
                 chats = _get_matching_bot_chats_for_object(db, obj)
-                # Получаем время для публикации (8:00-21:00 МСК)
+                # Получаем время для публикации (8:00-22:00 МСК)
                 now_msk = get_moscow_time()
                 scheduled_time_msk = get_next_allowed_time_msk(now_msk)
                 
                 # Конвертируем МСК время в UTC
-                try:
-                    from app.utils.time_utils import msk_to_utc
-                    scheduled_time_utc = msk_to_utc(scheduled_time_msk)
-                except ImportError:
-                    # Fallback если импорт не удался
-                    try:
-                        from zoneinfo import ZoneInfo
-                        MOSCOW_TZ = ZoneInfo('Europe/Moscow')
-                        UTC_TZ = ZoneInfo('UTC')
-                    except ImportError:
-                        import pytz
-                        MOSCOW_TZ = pytz.timezone('Europe/Moscow')
-                        UTC_TZ = pytz.timezone('UTC')
-                    
-                    scheduled_time_utc = scheduled_time_msk.replace(tzinfo=MOSCOW_TZ).astimezone(UTC_TZ).replace(tzinfo=None)
+                scheduled_time_utc = msk_to_utc(scheduled_time_msk)
                 
                 for chat in chats:
                     queue = PublicationQueue(

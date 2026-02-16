@@ -446,7 +446,7 @@ def create_or_update_autopublish_config(current_user):
                             status='pending'
                         ).first()
                         if not existing:
-                            # Получаем время для публикации (8:00-21:00 МСК)
+                            # Получаем время для публикации (8:00-22:00 МСК)
                             from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc
                             from bot.utils import get_moscow_time
                             now_msk = get_moscow_time()
@@ -490,7 +490,7 @@ def create_or_update_autopublish_config(current_user):
                                         status='pending'
                                     ).first()
                                     if not existing:
-                                        # Получаем время для публикации (8:00-21:00 МСК)
+                                        # Получаем время для публикации (8:00-22:00 МСК)
                                         from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc
                                         from bot.utils import get_moscow_time
                                         now_msk = get_moscow_time()
@@ -639,7 +639,7 @@ def update_autopublish_config(object_id, current_user):
                             status='pending'
                         ).first()
                         if not existing:
-                            # Получаем время для публикации (8:00-21:00 МСК)
+                            # Получаем время для публикации (8:00-22:00 МСК)
                             from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc
                             from bot.utils import get_moscow_time
                             now_msk = get_moscow_time()
@@ -683,7 +683,7 @@ def update_autopublish_config(object_id, current_user):
                                         status='pending'
                                     ).first()
                                     if not existing:
-                                        # Получаем время для публикации (8:00-21:00 МСК)
+                                        # Получаем время для публикации (8:00-22:00 МСК)
                                         from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc
                                         from bot.utils import get_moscow_time
                                         now_msk = get_moscow_time()

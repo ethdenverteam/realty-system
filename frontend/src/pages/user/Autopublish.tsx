@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import Layout from '../../components/Layout'
 import { GlassCard } from '../../components/GlassCard'
 import { GlassButton } from '../../components/GlassButton'
@@ -65,6 +65,41 @@ interface ChatGroup {
   name: string
   description?: string
   chat_ids: number[]
+}
+
+// Компонент для группы чатов с checkbox (исправляет проблему useRef в map)
+function ChatGroupCheckbox({
+  group,
+  groupChats,
+  allSelected,
+  someSelected,
+  onToggle,
+}: {
+  group: ChatGroup
+  groupChats: BotChatListItem[]
+  allSelected: boolean
+  someSelected: boolean
+  onToggle: () => void
+}): JSX.Element {
+  const checkboxRef = useRef<HTMLInputElement>(null)
+  
+  useEffect(() => {
+    if (checkboxRef.current) {
+      checkboxRef.current.indeterminate = someSelected && !allSelected
+    }
+  }, [someSelected, allSelected])
+  
+  return (
+    <label className="chat-group-item">
+      <input
+        ref={checkboxRef}
+        type="checkbox"
+        checked={allSelected}
+        onChange={onToggle}
+      />
+      <span>{group.name} ({groupChats.length} чатов)</span>
+    </label>
+  )
 }
 
 export default function Autopublish(): JSX.Element {
@@ -669,36 +704,29 @@ export default function Autopublish(): JSX.Element {
                                           const someSelected = groupChats.some(c => 
                                             selectedAccountCfg?.chat_ids.map(String).includes(String(c.chat_id))
                                           )
-                                          const checkboxRef = useRef<HTMLInputElement>(null)
-                                          useEffect(() => {
-                                            if (checkboxRef.current) {
-                                              checkboxRef.current.indeterminate = someSelected && !allSelected
-                                            }
-                                          }, [someSelected, allSelected])
                                           return (
-                                            <label key={group.group_id} className="chat-group-item">
-                                              <input
-                                                ref={checkboxRef}
-                                                type="checkbox"
-                                                checked={allSelected}
-                                                onChange={() => {
-                                                  if (allSelected) {
-                                                    // Убираем все чаты группы
-                                                    groupChats.forEach(c => {
+                                            <ChatGroupCheckbox
+                                              key={group.group_id}
+                                              group={group}
+                                              groupChats={groupChats}
+                                              allSelected={allSelected}
+                                              someSelected={someSelected}
+                                              onToggle={() => {
+                                                if (allSelected) {
+                                                  // Убираем все чаты группы
+                                                  groupChats.forEach(c => {
+                                                    toggleChatForEditing(acc.account_id, c.chat_id)
+                                                  })
+                                                } else {
+                                                  // Добавляем все чаты группы
+                                                  groupChats.forEach(c => {
+                                                    if (!selectedAccountCfg?.chat_ids.map(String).includes(String(c.chat_id))) {
                                                       toggleChatForEditing(acc.account_id, c.chat_id)
-                                                    })
-                                                  } else {
-                                                    // Добавляем все чаты группы
-                                                    groupChats.forEach(c => {
-                                                      if (!selectedAccountCfg?.chat_ids.map(String).includes(String(c.chat_id))) {
-                                                        toggleChatForEditing(acc.account_id, c.chat_id)
-                                                      }
-                                                    })
-                                                  }
-                                                }}
-                                              />
-                                              <span>{group.name} ({groupChats.length} чатов)</span>
-                                            </label>
+                                                    }
+                                                  })
+                                                }
+                                              }}
+                                            />
                                           )
                                         })}
                                       </div>
@@ -853,29 +881,22 @@ export default function Autopublish(): JSX.Element {
                                         editingChats.map(String).includes(String(c.chat_id))
                                       )
                                       const someSelected = groupChats.some(c => editingChats.map(String).includes(String(c.chat_id)))
-                                      const checkboxRef = useRef<HTMLInputElement>(null)
-                                      useEffect(() => {
-                                        if (checkboxRef.current) {
-                                          checkboxRef.current.indeterminate = someSelected && !allSelected
-                                        }
-                                      }, [someSelected, allSelected])
                                       return (
-                                        <label key={group.group_id} className="chat-group-item">
-                                          <input
-                                            ref={checkboxRef}
-                                            type="checkbox"
-                                            checked={allSelected}
-                                            onChange={() => {
-                                              if (allSelected) {
-                                                setEditingChats(prev => prev.filter(id => !groupChats.some(c => String(c.chat_id) === String(id))))
-                                              } else {
-                                                const newIds = groupChats.map(c => c.chat_id).filter(id => !editingChats.map(String).includes(String(id)))
-                                                setEditingChats(prev => [...prev, ...newIds])
-                                              }
-                                            }}
-                                          />
-                                          <span>{group.name} ({groupChats.length} чатов)</span>
-                                        </label>
+                                        <ChatGroupCheckbox
+                                          key={group.group_id}
+                                          group={group}
+                                          groupChats={groupChats}
+                                          allSelected={allSelected}
+                                          someSelected={someSelected}
+                                          onToggle={() => {
+                                            if (allSelected) {
+                                              setEditingChats(prev => prev.filter(id => !groupChats.some(c => String(c.chat_id) === String(id))))
+                                            } else {
+                                              const newIds = groupChats.map(c => c.chat_id).filter(id => !editingChats.map(String).includes(String(id)))
+                                              setEditingChats(prev => [...prev, ...newIds])
+                                            }
+                                          }}
+                                        />
                                       )
                                     })}
                                   </div>

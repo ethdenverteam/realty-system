@@ -33,11 +33,9 @@ logger = logging.getLogger(__name__)
 @accounts_bp.route('/', methods=['GET'])
 @jwt_required
 def list_accounts(current_user):
-    """Get list of user's Telegram accounts"""
-    if current_user.web_role == 'admin':
-        accounts = TelegramAccount.query.all()
-    else:
-        accounts = TelegramAccount.query.filter_by(owner_id=current_user.user_id).all()
+    """Get list of user's Telegram accounts - только свои аккаунты, админ не видит чужие"""
+    # Каждый пользователь видит только свои аккаунты (конфиденциальная информация)
+    accounts = TelegramAccount.query.filter_by(owner_id=current_user.user_id).all()
     
     return jsonify([acc.to_dict() for acc in accounts])
 
