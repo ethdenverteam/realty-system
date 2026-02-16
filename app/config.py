@@ -15,7 +15,18 @@ AUTOPUBLISH_END_HOUR = 22   # Конец работы: 22:00 МСК
 class Config:
     """Application configuration"""
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'postgresql://user:password@localhost/realty_db'
+    
+    # Build DATABASE_URL from environment variables if not provided
+    _db_url = os.environ.get('DATABASE_URL')
+    if not _db_url or _db_url.strip() == '':
+        # Construct from individual environment variables
+        _db_user = os.environ.get('POSTGRES_USER', 'realty_user')
+        _db_password = os.environ.get('POSTGRES_PASSWORD', 'realty_password')
+        _db_host = os.environ.get('POSTGRES_HOST', 'postgres')
+        _db_port = os.environ.get('POSTGRES_PORT', '5432')
+        _db_name = os.environ.get('POSTGRES_DB', 'realty_db')
+        _db_url = f'postgresql://{_db_user}:{_db_password}@{_db_host}:{_db_port}/{_db_name}'
+    SQLALCHEMY_DATABASE_URI = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'jwt-secret-key-change-in-production'
     JWT_ALGORITHM = 'HS256'
