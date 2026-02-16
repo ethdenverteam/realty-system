@@ -4,7 +4,21 @@
 """
 from datetime import datetime, timedelta
 from app.config import SYSTEM_TIMEZONE, AUTOPUBLISH_START_HOUR, AUTOPUBLISH_END_HOUR
-from bot.utils import get_moscow_time
+
+
+def get_moscow_time() -> datetime:
+    """
+    Получить текущее время в системном часовом поясе (МСК)
+    Использует глобальную переменную SYSTEM_TIMEZONE из app.config
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        SYSTEM_TZ = ZoneInfo(SYSTEM_TIMEZONE)
+    except ImportError:
+        import pytz
+        SYSTEM_TZ = pytz.timezone(SYSTEM_TIMEZONE)
+    
+    return datetime.now(SYSTEM_TZ)
 
 
 def get_next_allowed_time_msk(now_msk: datetime = None) -> datetime:

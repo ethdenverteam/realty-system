@@ -10,8 +10,9 @@ from datetime import datetime, timedelta
 from sqlalchemy import or_
 import logging
 
-from bot.utils import get_districts_config, get_moscow_time
+from bot.utils import get_districts_config
 from app.utils.time_utils import (
+    get_moscow_time,
     get_next_allowed_time_msk,
     get_next_scheduled_time_for_publication,
     is_within_publish_hours,
