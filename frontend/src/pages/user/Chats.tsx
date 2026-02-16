@@ -164,7 +164,7 @@ export default function Chats(): JSX.Element {
   }, [showCreateGroupModal, showEditGroupModal, showChatCategoryModal])
 
   const openCreateGroupModal = (): void => {
-    // Используем выбранные чаты из чекбоксов
+    // Используем выбранные чаты из кликов на карточки
     setSelectedChatsForGroup(Array.from(selectedChatsForCreate))
     setGroupName('')
     setGroupDescription('')
@@ -275,6 +275,28 @@ export default function Chats(): JSX.Element {
       setError(errorMsg)
     },
   })
+
+  // Удаление группы чатов
+  const { mutate: deleteChatGroup, loading: deletingGroup } = useApiMutation<{}, { success: boolean }>({
+    url: editingGroup ? `/chats/groups/${editingGroup.group_id}` : '',
+    method: 'DELETE',
+    errorContext: 'Deleting chat group',
+    defaultErrorMessage: 'Ошибка удаления группы',
+    onSuccess: () => {
+      setSuccess('Группа чатов удалена')
+      setTimeout(() => setSuccess(''), 3000)
+      closeGroupModal()
+      void reloadGroups()
+    },
+    onError: (errorMsg) => {
+      setError(errorMsg)
+    },
+  })
+
+  const handleDeleteGroup = (): void => {
+    if (!editingGroup) return
+    void deleteChatGroup({})
+  }
 
   const handleSaveGroup = (): void => {
     if (!groupName.trim()) {
@@ -547,8 +569,6 @@ export default function Chats(): JSX.Element {
                   <button
                     className="btn btn-primary"
                     onClick={openCreateGroupModal}
-                    disabled={chats.length === 0 || selectedChatsForCreate.size === 0}
-                    title={selectedChatsForCreate.size === 0 ? 'Выберите хотя бы один чат' : ''}
                   >
                     Создать группу {selectedChatsForCreate.size > 0 && `(${selectedChatsForCreate.size})`}
                   </button>
@@ -590,28 +610,24 @@ export default function Chats(): JSX.Element {
                 const chatGroups = chatGroupsMap.get(chat.chat_id) || []
                 const isSelected = selectedChatsForCreate.has(chat.chat_id)
                 return (
-                  <div key={chat.chat_id} className={`object-card compact chat-item ${isSelected ? 'selected' : ''}`}>
+                  <div 
+                    key={chat.chat_id} 
+                    className={`object-card compact chat-item ${isSelected ? 'selected' : ''}`}
+                    onClick={() => {
+                      const newSelected = new Set(selectedChatsForCreate)
+                      if (isSelected) {
+                        newSelected.delete(chat.chat_id)
+                      } else {
+                        newSelected.add(chat.chat_id)
+                      }
+                      setSelectedChatsForCreate(newSelected)
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <div className="chat-item-content">
-                      <div className="chat-item-main">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              const newSelected = new Set(selectedChatsForCreate)
-                              if (e.target.checked) {
-                                newSelected.add(chat.chat_id)
-                              } else {
-                                newSelected.delete(chat.chat_id)
-                              }
-                              setSelectedChatsForCreate(newSelected)
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            style={{ cursor: 'pointer' }}
-                          />
-                          <h3 className="chat-item-title">{chat.title}</h3>
-                        </div>
-                        <div className="chat-item-meta">
+                      <div className="chat-item-main" style={{ flex: 1 }}>
+                        <h3 className="chat-item-title">{chat.title}</h3>
+                        <div className="chat-item-meta" style={{ wordBreak: 'break-word' }}>
                           {chatGroups.length > 0 && (
                             <div className="chat-item-groups">
                               <span className="chat-item-groups-label">Группы:</span>
@@ -631,13 +647,16 @@ export default function Chats(): JSX.Element {
                             </div>
                           )}
                         </div>
+                        <button
+                          className="btn btn-small btn-secondary"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openChatCategoryModal(chat)
+                          }}
+                        >
+                          Установить категорию
+                        </button>
                       </div>
-                      <button
-                        className="btn btn-small btn-secondary"
-                        onClick={() => openChatCategoryModal(chat)}
-                      >
-                        Установить категорию
-                      </button>
                     </div>
                   </div>
                 )
@@ -816,10 +835,15 @@ export default function Chats(): JSX.Element {
                 )}
               </div>
               <div className="modal-actions">
-                <button className="btn btn-secondary" onClick={closeGroupModal} disabled={creatingGroup || updatingGroup}>
+                {editingGroup && (
+                  <button className="btn btn-danger" onClick={handleDeleteGroup} disabled={deletingGroup || creatingGroup || updatingGroup}>
+                    {deletingGroup ? 'Удаление...' : 'Удалить'}
+                  </button>
+                )}
+                <button className="btn btn-secondary" onClick={closeGroupModal} disabled={creatingGroup || updatingGroup || deletingGroup}>
                   Отмена
                 </button>
-                <button className="btn btn-primary" onClick={handleSaveGroup} disabled={creatingGroup || updatingGroup || !groupName.trim() || selectedChatsForGroup.length === 0 || (groupFilterType && groupFilterType !== 'common' && ((groupFilterType === 'rooms' && groupRoomsTypes.length === 0) || (groupFilterType === 'district' && groupDistricts.length === 0) || (groupFilterType === 'price' && !groupPriceMin && !groupPriceMax)))}>
+                <button className="btn btn-primary" onClick={handleSaveGroup} disabled={creatingGroup || updatingGroup || deletingGroup || !groupName.trim() || selectedChatsForGroup.length === 0 || (groupFilterType && groupFilterType !== 'common' && ((groupFilterType === 'rooms' && groupRoomsTypes.length === 0) || (groupFilterType === 'district' && groupDistricts.length === 0) || (groupFilterType === 'price' && !groupPriceMin && !groupPriceMax)))}>
                   {creatingGroup || updatingGroup ? 'Сохранение...' : (editingGroup ? 'Сохранить' : 'Создать группу')}
                 </button>
               </div>

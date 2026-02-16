@@ -10,9 +10,45 @@ from datetime import datetime, timedelta
 from sqlalchemy import or_
 import logging
 
-from bot.utils import get_districts_config
+from bot.utils import get_districts_config, get_moscow_time
 
 logger = logging.getLogger(__name__)
+
+
+def get_next_allowed_time_msk(now_msk: datetime = None) -> datetime:
+    """
+    Получить ближайшее разрешенное время для публикации (8:00-21:00 МСК)
+    Если сейчас вне разрешенного времени - возвращает ближайшее разрешенное время
+    Если сейчас в разрешенном времени - возвращает текущее время
+    """
+    if now_msk is None:
+        now_msk = get_moscow_time()
+    
+    # Если сейчас до 8:00 - ставим на 8:00 сегодня
+    if now_msk.hour < 8:
+        return now_msk.replace(hour=8, minute=0, second=0, microsecond=0)
+    
+    # Если сейчас после 21:00 - ставим на 8:00 следующего дня
+    if now_msk.hour >= 21:
+        tomorrow = now_msk + timedelta(days=1)
+        return tomorrow.replace(hour=8, minute=0, second=0, microsecond=0)
+    
+    # Если сейчас в разрешенном времени (8:00-21:00) - возвращаем текущее время
+    return now_msk
+
+
+def get_next_scheduled_time_for_publication(now_msk: datetime = None) -> datetime:
+    """
+    Получить время для публикации при попытке публикации
+    Если сейчас в разрешенном времени - ставим на следующее свободное время начиная с 8 утра следующего дня
+    Если сейчас вне разрешенного времени - ставим на ближайшее разрешенное время
+    """
+    if now_msk is None:
+        now_msk = get_moscow_time()
+    
+    # Всегда ставим на следующий день, ближайшее свободное время начиная с 8 утра
+    tomorrow = now_msk + timedelta(days=1)
+    return tomorrow.replace(hour=8, minute=0, second=0, microsecond=0)
 
 
 @celery_app.task(name='workers.tasks.publish_to_telegram')
@@ -45,20 +81,23 @@ def publish_to_telegram(queue_id: int):
             return False
         
         # Check if object was published to this chat within last 24 hours
-        yesterday = datetime.utcnow() - timedelta(days=1)
-        recent_publication = db.query(PublicationHistory).filter(
-            PublicationHistory.object_id == queue.object_id,
-            PublicationHistory.chat_id == queue.chat_id,
-            PublicationHistory.published_at >= yesterday,
-            PublicationHistory.deleted == False
-        ).first()
-        
-        if recent_publication:
-            logger.info(f"Object {queue.object_id} was already published to chat {queue.chat_id} within 24 hours, skipping")
-            queue.status = 'failed'
-            queue.error_message = 'Object was already published to this chat within 24 hours'
-            db.commit()
-            return False
+        # Ограничение 24 часа применяется только для ручной публикации (mode != 'autopublish')
+        # Для автопубликации ограничение не применяется
+        if queue.mode != 'autopublish':
+            yesterday = datetime.utcnow() - timedelta(days=1)
+            recent_publication = db.query(PublicationHistory).filter(
+                PublicationHistory.object_id == queue.object_id,
+                PublicationHistory.chat_id == queue.chat_id,
+                PublicationHistory.published_at >= yesterday,
+                PublicationHistory.deleted == False
+            ).first()
+            
+            if recent_publication:
+                logger.info(f"Object {queue.object_id} was already published to chat {queue.chat_id} within 24 hours, skipping")
+                queue.status = 'failed'
+                queue.error_message = 'Object was already published to this chat within 24 hours'
+                db.commit()
+                return False
         
         # Реализация публикации через Telegram API
         import requests
@@ -145,7 +184,27 @@ def publish_to_telegram(queue_id: int):
             
             # Создаем задачу на следующий день для автопубликации
             if queue.mode == 'autopublish':
-                tomorrow = datetime.utcnow() + timedelta(days=1)
+                # Получаем время для следующей публикации (следующий день, начиная с 8:00 МСК)
+                now_msk = get_moscow_time()
+                next_time_msk = get_next_scheduled_time_for_publication(now_msk)
+                # Конвертируем МСК время в UTC для сохранения в БД
+                try:
+                    from app.utils.time_utils import msk_to_utc
+                    next_time_utc = msk_to_utc(next_time_msk)
+                except ImportError:
+                    # Fallback если импорт не удался
+                    try:
+                        from zoneinfo import ZoneInfo
+                        MOSCOW_TZ = ZoneInfo('Europe/Moscow')
+                        UTC_TZ = ZoneInfo('UTC')
+                    except ImportError:
+                        import pytz
+                        MOSCOW_TZ = pytz.timezone('Europe/Moscow')
+                        UTC_TZ = pytz.timezone('UTC')
+                    
+                    next_time_with_tz = next_time_msk.replace(tzinfo=MOSCOW_TZ)
+                    next_time_utc = next_time_with_tz.astimezone(UTC_TZ).replace(tzinfo=None)
+                
                 # Создаем новую задачу на следующий день
                 next_queue = PublicationQueue(
                     object_id=obj.object_id,
@@ -155,12 +214,12 @@ def publish_to_telegram(queue_id: int):
                     type=queue.type,
                     mode='autopublish',
                     status='pending',
-                    scheduled_time=tomorrow,
+                    scheduled_time=next_time_utc,
                     created_at=datetime.utcnow(),
                 )
                 db.add(next_queue)
                 db.commit()
-                logger.info(f"Created next day autopublish task for object {obj.object_id} to chat {chat.chat_id}")
+                logger.info(f"Created next day autopublish task for object {obj.object_id} to chat {chat.chat_id} at {next_time_msk}")
             
             logger.info(f"Successfully published object {obj.object_id} to chat {chat.telegram_chat_id}")
             return True
@@ -334,6 +393,27 @@ def schedule_daily_autopublish():
             # Через бота: чаты подбираются автоматически
             if cfg.bot_enabled:
                 chats = _get_matching_bot_chats_for_object(db, obj)
+                # Получаем время для публикации (8:00-21:00 МСК)
+                now_msk = get_moscow_time()
+                scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                
+                # Конвертируем МСК время в UTC
+                try:
+                    from app.utils.time_utils import msk_to_utc
+                    scheduled_time_utc = msk_to_utc(scheduled_time_msk)
+                except ImportError:
+                    # Fallback если импорт не удался
+                    try:
+                        from zoneinfo import ZoneInfo
+                        MOSCOW_TZ = ZoneInfo('Europe/Moscow')
+                        UTC_TZ = ZoneInfo('UTC')
+                    except ImportError:
+                        import pytz
+                        MOSCOW_TZ = pytz.timezone('Europe/Moscow')
+                        UTC_TZ = pytz.timezone('UTC')
+                    
+                    scheduled_time_utc = scheduled_time_msk.replace(tzinfo=MOSCOW_TZ).astimezone(UTC_TZ).replace(tzinfo=None)
+                
                 for chat in chats:
                     queue = PublicationQueue(
                         object_id=obj.object_id,
@@ -343,6 +423,7 @@ def schedule_daily_autopublish():
                         type='bot',
                         mode='autopublish',
                         status='pending',
+                        scheduled_time=scheduled_time_utc,
                         created_at=datetime.utcnow(),
                     )
                     db.add(queue)

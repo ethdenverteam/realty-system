@@ -78,6 +78,7 @@ export default function Autopublish(): JSX.Element {
   const [showChatsModal, setShowChatsModal] = useState<string | null>(null)
   const [showEditChatsModal, setShowEditChatsModal] = useState<string | null>(null)
   const [editingChats, setEditingChats] = useState<(number | string)[]>([])
+  const [expandedChats, setExpandedChats] = useState<Set<string>>(new Set())
 
   // Загрузка данных автопубликации
   const { data: autopublishData, loading, reload: reloadAutopublish } = useApiData<AutopublishListResponse>({
@@ -363,35 +364,71 @@ export default function Autopublish(): JSX.Element {
                         </span>
                       )}
                     </div>
-                    {/* Отображение чатов и категорий */}
-                    {chatsData && (
-                      <div className="object-chats-info">
-                        {chatsData.user_chats.length > 0 && (
-                          <div className="object-chats-section">
-                            <span className="object-chats-label">Аккаунт чаты:</span>
-                            <div className="object-chats-list">
-                              {chatsData.user_chats.map((chat, idx) => (
-                                <span key={chat.chat_id} className="object-chat-tag">
-                                  {chat.title}
-                                  {chat.category && ` (${formatCategory(chat.category)})`}
-                                  {idx < chatsData.user_chats.length - 1 && ', '}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {chatsData.chat_groups && chatsData.chat_groups.length > 0 && (
-                          <div className="object-chats-section">
-                            <span className="object-chats-label">Группы чатов:</span>
-                            <div className="object-chats-list">
-                              {chatsData.chat_groups.map((group, idx) => (
-                                <span key={group.group_id} className="object-chat-tag">
-                                  {group.name}
-                                  {group.category && ` (${formatCategory(group.category)})`}
-                                  {idx < chatsData.chat_groups!.length - 1 && ', '}
-                                </span>
-                              ))}
-                            </div>
+                    {/* Отображение привязанных чатов с кнопкой развернуть */}
+                    {chatsData && (chatsData.user_chats.length > 0 || (chatsData.chat_groups && chatsData.chat_groups.length > 0)) && (
+                      <div style={{ marginTop: '10px' }}>
+                        <button
+                          className="btn btn-small btn-secondary"
+                          type="button"
+                          onClick={() => {
+                            const objId = obj.object_id as string
+                            if (expandedChats.has(objId)) {
+                              setExpandedChats(prev => {
+                                const next = new Set(prev)
+                                next.delete(objId)
+                                return next
+                              })
+                            } else {
+                              setExpandedChats(prev => new Set(prev).add(objId))
+                            }
+                          }}
+                        >
+                          {expandedChats.has(obj.object_id as string) ? 'Свернуть чаты' : 'Развернуть чаты'}
+                        </button>
+                        {expandedChats.has(obj.object_id as string) && (
+                          <div style={{ marginTop: '10px', padding: '10px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px' }}>
+                            {chatsData.user_chats.length > 0 && (
+                              <div style={{ marginBottom: '10px' }}>
+                                <strong style={{ fontSize: '14px', display: 'block', marginBottom: '5px' }}>Аккаунт чаты:</strong>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                                  {chatsData.user_chats.map((chat) => (
+                                    <span
+                                      key={chat.chat_id}
+                                      style={{
+                                        padding: '4px 8px',
+                                        background: 'rgba(255, 255, 255, 0.1)',
+                                        borderRadius: '4px',
+                                        fontSize: '13px',
+                                      }}
+                                    >
+                                      {chat.title}
+                                      {chat.category && ` (${formatCategory(chat.category)})`}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {chatsData.chat_groups && chatsData.chat_groups.length > 0 && (
+                              <div>
+                                <strong style={{ fontSize: '14px', display: 'block', marginBottom: '5px' }}>Группы чатов:</strong>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                                  {chatsData.chat_groups.map((group) => (
+                                    <span
+                                      key={group.group_id}
+                                      style={{
+                                        padding: '4px 8px',
+                                        background: 'rgba(255, 255, 255, 0.1)',
+                                        borderRadius: '4px',
+                                        fontSize: '13px',
+                                      }}
+                                    >
+                                      {group.name}
+                                      {group.category && ` (${formatCategory(group.category)})`}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

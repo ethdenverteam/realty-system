@@ -420,6 +420,13 @@ def create_or_update_autopublish_config(current_user):
                             status='pending'
                         ).first()
                         if not existing:
+                            # Получаем время для публикации (8:00-21:00 МСК)
+                            from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc
+                            from bot.utils import get_moscow_time
+                            now_msk = get_moscow_time()
+                            scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                            scheduled_time_utc = msk_to_utc(scheduled_time_msk)
+                            
                             queue = PublicationQueue(
                                 object_id=object_id,
                                 chat_id=web_chat.chat_id,
@@ -428,6 +435,7 @@ def create_or_update_autopublish_config(current_user):
                                 type='bot',
                                 mode='autopublish',
                                 status='pending',
+                                scheduled_time=scheduled_time_utc,
                                 created_at=datetime.utcnow(),
                             )
                             db.session.add(queue)
@@ -456,6 +464,13 @@ def create_or_update_autopublish_config(current_user):
                                         status='pending'
                                     ).first()
                                     if not existing:
+                                        # Получаем время для публикации (8:00-21:00 МСК)
+                                        from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc
+                                        from bot.utils import get_moscow_time
+                                        now_msk = get_moscow_time()
+                                        scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                                        scheduled_time_utc = msk_to_utc(scheduled_time_msk)
+                                        
                                         queue = PublicationQueue(
                                             object_id=object_id,
                                             chat_id=chat_id,
@@ -464,6 +479,7 @@ def create_or_update_autopublish_config(current_user):
                                             type='user',
                                             mode='autopublish',
                                             status='pending',
+                                            scheduled_time=scheduled_time_utc,
                                             created_at=datetime.utcnow(),
                                         )
                                         db.session.add(queue)
@@ -597,6 +613,13 @@ def update_autopublish_config(object_id, current_user):
                             status='pending'
                         ).first()
                         if not existing:
+                            # Получаем время для публикации (8:00-21:00 МСК)
+                            from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc
+                            from bot.utils import get_moscow_time
+                            now_msk = get_moscow_time()
+                            scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                            scheduled_time_utc = msk_to_utc(scheduled_time_msk)
+                            
                             queue = PublicationQueue(
                                 object_id=object_id,
                                 chat_id=web_chat.chat_id,
@@ -605,6 +628,7 @@ def update_autopublish_config(object_id, current_user):
                                 type='bot',
                                 mode='autopublish',
                                 status='pending',
+                                scheduled_time=scheduled_time_utc,
                                 created_at=datetime.utcnow(),
                             )
                             db.session.add(queue)
@@ -633,6 +657,13 @@ def update_autopublish_config(object_id, current_user):
                                         status='pending'
                                     ).first()
                                     if not existing:
+                                        # Получаем время для публикации (8:00-21:00 МСК)
+                                        from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc
+                                        from bot.utils import get_moscow_time
+                                        now_msk = get_moscow_time()
+                                        scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                                        scheduled_time_utc = msk_to_utc(scheduled_time_msk)
+                                        
                                         queue = PublicationQueue(
                                             object_id=object_id,
                                             chat_id=chat_id,
@@ -641,6 +672,7 @@ def update_autopublish_config(object_id, current_user):
                                             type='user',
                                             mode='autopublish',
                                             status='pending',
+                                            scheduled_time=scheduled_time_utc,
                                             created_at=datetime.utcnow(),
                                         )
                                         db.session.add(queue)
