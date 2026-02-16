@@ -13,6 +13,8 @@ from app.models.bot_web_code import BotWebCode
 from app.models.system_setting import SystemSetting
 from app.models.quick_access import QuickAccess
 from app.models.autopublish_config import AutopublishConfig
+from app.models.chat_group import ChatGroup
+from app.models.chat_subscription_task import ChatSubscriptionTask
 
 __all__ = [
     'User',
@@ -27,5 +29,7 @@ __all__ = [
     'SystemSetting',
     'QuickAccess',
     'AutopublishConfig',
+    'ChatGroup',
+    'ChatSubscriptionTask',
 ]
 

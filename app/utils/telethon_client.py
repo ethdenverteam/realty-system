@@ -8,7 +8,18 @@ import time
 import threading
 from typing import Optional, Dict, List, Tuple
 from telethon import TelegramClient
-from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, PhoneNumberInvalidError
+from telethon.errors import (
+    SessionPasswordNeededError, 
+    PhoneCodeInvalidError, 
+    PhoneNumberInvalidError,
+    FloodWaitError,
+    InviteHashExpiredError,
+    UserAlreadyParticipantError,
+    ChatAdminRequiredError,
+    ChannelPrivateError,
+    UsernameNotOccupiedError,
+)
+from telethon.tl.functions.messages import ImportChatInviteRequest
 from telethon.tl.types import Channel, Chat, User
 from app.config import Config
 
@@ -821,6 +832,268 @@ def cleanup_connection(phone: str):
         except:
             pass
         del _active_connections[phone]
+
+
+async def subscribe_to_chat(phone: str, chat_link: str) -> Tuple[bool, Optional[str], Optional[Dict]]:
+    """
+    Подписаться на чат/канал по ссылке
+    Returns: (success, error_message, chat_info)
+    chat_info содержит: telegram_chat_id, title, type
+    """
+    session_lock = get_session_lock(phone)
+    max_retries = 3
+    retry_delay = 1.0
+    client = None
+    
+    for attempt in range(max_retries):
+        try:
+            if session_lock.acquire(timeout=10):
+                try:
+                    client = await create_client(phone)
+                    await client.connect()
+                    break
+                except Exception as lock_error:
+                    if "database is locked" in str(lock_error).lower() or "locked" in str(lock_error).lower():
+                        if attempt < max_retries - 1:
+                            logger.warning(f"Session file locked for {phone}, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                            await asyncio.sleep(retry_delay)
+                            retry_delay *= 2
+                            continue
+                        else:
+                            return (False, "Session file is locked. Another process is using this account. Please wait and try again.", None)
+                    else:
+                        raise
+                finally:
+                    if session_lock.locked():
+                        session_lock.release()
+            else:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    return (False, "Session file is locked by another process. Please try again in a few seconds.", None)
+        except Exception as e:
+            if "database is locked" in str(e).lower() or "locked" in str(e).lower():
+                if attempt < max_retries - 1:
+                    logger.warning(f"Session file locked for {phone}, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    return (False, "Session file is locked. Another process is using this account. Please wait and try again.", None)
+            else:
+                raise
+    
+    if client is None:
+        return (False, "Failed to create client after retries", None)
+    
+    try:
+        # Check authorization
+        try:
+            is_authorized = await client.is_user_authorized()
+        except Exception as auth_error:
+            logger.error(f"Error checking authorization for {phone}: {auth_error}")
+            await client.disconnect()
+            return (False, f"Authorization check failed: {str(auth_error)}. Please reconnect the account.", None)
+        
+        if not is_authorized:
+            await client.disconnect()
+            session_path = get_session_path(phone)
+            if os.path.exists(session_path):
+                try:
+                    os.remove(session_path)
+                    logger.warning(f"Session file existed but was not authorized for {phone} (subscribe_to_chat). Deleted session file.")
+                except Exception as rm_err:
+                    logger.error(f"Failed to delete unauthorized session file {session_path} for {phone}: {rm_err}")
+                return (False, "Session file existed but account was not authorized. Session has been reset, please reconnect the account.", None)
+            else:
+                return (False, "Account not authorized. Please connect first.", None)
+        
+        # Parse chat link
+        chat_link = chat_link.strip()
+        
+        # Check if it's an invite link (https://t.me/+...)
+        if chat_link.startswith('https://t.me/+') or chat_link.startswith('http://t.me/+'):
+            # Extract hash from invite link
+            invite_hash = chat_link.split('+')[-1]
+            logger.info(f"Subscribing to chat via invite link for {phone}, hash: {invite_hash[:10]}...")
+            telethon_logger.info(f"Subscribing to chat via invite link for {phone}, hash: {invite_hash[:10]}...")
+            
+            try:
+                # Import chat invite
+                result = await client(ImportChatInviteRequest(invite_hash))
+                
+                # Get chat info
+                chat_entity = None
+                if hasattr(result, 'chats') and result.chats:
+                    chat_entity = result.chats[0]
+                elif hasattr(result, 'chat'):
+                    chat_entity = result.chat
+                
+                if chat_entity:
+                    chat_id = str(chat_entity.id)
+                    title = getattr(chat_entity, 'title', None) or f'Chat {chat_id}'
+                    chat_type = 'channel' if isinstance(chat_entity, Channel) and chat_entity.broadcast else 'group'
+                    
+                    chat_info = {
+                        'telegram_chat_id': chat_id,
+                        'title': title,
+                        'type': chat_type,
+                    }
+                    
+                    logger.info(f"Successfully subscribed to chat {title} ({chat_id}) for {phone}")
+                    telethon_logger.info(f"Successfully subscribed to chat {title} ({chat_id}) for {phone}")
+                    await client.disconnect()
+                    return (True, None, chat_info)
+                else:
+                    await client.disconnect()
+                    return (False, "Subscribed but could not get chat info", None)
+                    
+            except FloodWaitError as e:
+                # Flood wait error - нужно подождать
+                wait_seconds = e.seconds
+                logger.warning(f"FloodWaitError for {phone}: wait {wait_seconds} seconds")
+                telethon_logger.warning(f"FloodWaitError for {phone}: wait {wait_seconds} seconds")
+                await client.disconnect()
+                return (False, f"FLOOD_WAIT:{wait_seconds}", None)
+            except UserAlreadyParticipantError:
+                # Уже подписан - получаем информацию о чате
+                logger.info(f"User {phone} already subscribed to chat, getting chat info")
+                # Пытаемся найти чат в диалогах
+                try:
+                    # Извлекаем username или ID из ссылки для поиска
+                    # Для invite ссылок сложнее, но попробуем найти по последним диалогам
+                    async for dialog in client.iter_dialogs(limit=100):
+                        if dialog.is_group or dialog.is_channel:
+                            entity = dialog.entity
+                            chat_id = str(entity.id)
+                            title = dialog.name or getattr(entity, 'title', None) or f'Chat {chat_id}'
+                            chat_type = 'channel' if isinstance(entity, Channel) and entity.broadcast else 'group'
+                            
+                            chat_info = {
+                                'telegram_chat_id': chat_id,
+                                'title': title,
+                                'type': chat_type,
+                            }
+                            
+                            await client.disconnect()
+                            return (True, None, chat_info)
+                except Exception as e:
+                    logger.error(f"Error getting chat info after UserAlreadyParticipantError: {e}")
+                    await client.disconnect()
+                    return (False, "Already subscribed but could not get chat info", None)
+            except InviteHashExpiredError:
+                await client.disconnect()
+                return (False, "Invite link has expired", None)
+            except Exception as e:
+                logger.error(f"Error subscribing to chat via invite link: {e}")
+                telethon_logger.error(f"Error subscribing to chat via invite link: {e}")
+                await client.disconnect()
+                return (False, f"Error subscribing: {str(e)}", None)
+        
+        # Check if it's a public chat (https://t.me/username)
+        elif chat_link.startswith('https://t.me/') or chat_link.startswith('http://t.me/'):
+            username = chat_link.split('/')[-1].replace('@', '')
+            # Skip invite links (they start with +)
+            if username.startswith('+'):
+                await client.disconnect()
+                return (False, "Invalid chat link format. Expected https://t.me/+... or https://t.me/username", None)
+            
+            logger.info(f"Subscribing to public chat @{username} for {phone}")
+            telethon_logger.info(f"Subscribing to public chat @{username} for {phone}")
+            
+            try:
+                # Get entity and join
+                entity = await client.get_entity(username)
+                
+                # Try to join if it's a channel or group
+                if isinstance(entity, Channel):
+                    from telethon.tl.functions.channels import JoinChannelRequest
+                    await client(JoinChannelRequest(entity))
+                else:
+                    # For groups/supergroups, use join_chat method
+                    from telethon.tl.functions.messages import ImportChatInviteRequest
+                    # Для публичных групп просто получаем entity, подписка происходит автоматически при get_entity
+                    # Но если нужно явно подписаться, используем JoinChannelRequest для supergroup
+                    if hasattr(entity, 'access_hash'):
+                        # Это supergroup, используем JoinChannelRequest
+                        from telethon.tl.functions.channels import JoinChannelRequest
+                        await client(JoinChannelRequest(entity))
+                
+                # Get chat info
+                chat_id = str(entity.id)
+                title = getattr(entity, 'title', None) or username
+                chat_type = 'channel' if isinstance(entity, Channel) and entity.broadcast else 'group'
+                
+                chat_info = {
+                    'telegram_chat_id': chat_id,
+                    'title': title,
+                    'type': chat_type,
+                }
+                
+                logger.info(f"Successfully subscribed to chat {title} ({chat_id}) for {phone}")
+                telethon_logger.info(f"Successfully subscribed to chat {title} ({chat_id}) for {phone}")
+                await client.disconnect()
+                return (True, None, chat_info)
+                
+            except FloodWaitError as e:
+                wait_seconds = e.seconds
+                logger.warning(f"FloodWaitError for {phone}: wait {wait_seconds} seconds")
+                telethon_logger.warning(f"FloodWaitError for {phone}: wait {wait_seconds} seconds")
+                await client.disconnect()
+                return (False, f"FLOOD_WAIT:{wait_seconds}", None)
+            except UserAlreadyParticipantError:
+                # Уже подписан
+                try:
+                    entity = await client.get_entity(username)
+                    chat_id = str(entity.id)
+                    title = getattr(entity, 'title', None) or username
+                    chat_type = 'channel' if isinstance(entity, Channel) and entity.broadcast else 'group'
+                    
+                    chat_info = {
+                        'telegram_chat_id': chat_id,
+                        'title': title,
+                        'type': chat_type,
+                    }
+                    
+                    await client.disconnect()
+                    return (True, None, chat_info)
+                except Exception as e:
+                    logger.error(f"Error getting chat info: {e}")
+                    await client.disconnect()
+                    return (False, "Already subscribed but could not get chat info", None)
+            except UsernameNotOccupiedError:
+                await client.disconnect()
+                return (False, "Chat not found", None)
+            except ChannelPrivateError:
+                await client.disconnect()
+                return (False, "Channel is private", None)
+            except Exception as e:
+                logger.error(f"Error subscribing to public chat: {e}")
+                telethon_logger.error(f"Error subscribing to public chat: {e}")
+                await client.disconnect()
+                return (False, f"Error subscribing: {str(e)}", None)
+        else:
+            await client.disconnect()
+            return (False, "Invalid chat link format. Expected https://t.me/+... or https://t.me/username", None)
+            
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Unexpected error subscribing to chat for {phone}: {e}")
+        telethon_logger.error(f"Unexpected error subscribing to chat for {phone}: {e}")
+        try:
+            await client.disconnect()
+        except:
+            pass
+        return (False, f"Unexpected error: {error_msg}", None)
+    finally:
+        # Ensure lock is released
+        if session_lock.locked():
+            try:
+                session_lock.release()
+            except:
+                pass
 
 
 # Helper function to run async code from sync context

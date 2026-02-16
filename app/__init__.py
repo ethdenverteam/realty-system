@@ -82,10 +82,12 @@ def create_app(config_class=Config):
     from app.routes.logs_viewer import logs_viewer_bp  # Legacy
     from app.routes.admin_routes import admin_routes_bp
     from app.routes.user_routes import user_routes_bp
+    from app.routes.chat_subscriptions import chat_subscriptions_bp
     
     # New structure
     app.register_blueprint(admin_routes_bp, url_prefix='/system/admin')
     app.register_blueprint(user_routes_bp, url_prefix='/system/user')
+    app.register_blueprint(chat_subscriptions_bp, url_prefix='/system/chat-subscriptions')
     
     # Legacy routes (keep for backward compatibility)
     app.register_blueprint(auth_bp, url_prefix='/system/auth')

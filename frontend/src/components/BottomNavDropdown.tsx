@@ -191,6 +191,24 @@ export function createNavigationOptions(isAdmin: boolean = false): DropdownOptio
       ),
     },
     {
+      label: 'Подписка на чаты',
+      value: '/user/dashboard/chat-subscriptions',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path
+            d="M2 5L10 9L18 5M2 15L10 19L18 15M2 10L10 14L18 10"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <circle cx="2" cy="5" r="1.5" fill="currentColor" />
+          <circle cx="2" cy="10" r="1.5" fill="currentColor" />
+          <circle cx="2" cy="15" r="1.5" fill="currentColor" />
+        </svg>
+      ),
+    },
+    {
       label: 'Настройки',
       value: '/user/dashboard/settings',
       icon: (
