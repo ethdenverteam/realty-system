@@ -158,7 +158,11 @@ export default function AdminChatLists(): JSX.Element {
   }
 
   const handleRemoveChat = async (group: AdminChatGroup, chat: AdminChat): Promise<void> => {
-    if (!confirm(`Удалить чат "${chat.title || chat.telegram_chat_id}" из списка "${group.name}"?`)) {
+    if (!chat.chat_id) {
+      alert('Нельзя удалить чат без ID из списка')
+      return
+    }
+    if (!confirm(`Удалить чат "${chat.title || chat.telegram_chat_id || chat.link}" из списка "${group.name}"?`)) {
       return
     }
     try {
@@ -216,23 +220,17 @@ export default function AdminChatLists(): JSX.Element {
                 const isExpanded = expandedGroupIds.has(group.group_id)
                 return (
                   <div key={group.group_id} className="chat-list-item">
-                    <div className="chat-list-header" onClick={() => toggleExpanded(group.group_id)}>
-                      <div className="chat-list-main">
+                    <div className="chat-list-header">
+                      <div className="chat-list-main" onClick={() => toggleExpanded(group.group_id)}>
                         <div className="chat-list-title">
                           <span className="chat-list-name">{group.name}</span>
                           <span className="chat-list-meta">
-                            ID {group.group_id} • user_id {group.user_id}
-                            {group.user_name ? ` (${group.user_name})` : ''}
+                            {group.chats.length} чатов • {group.user_name || `user_id ${group.user_id}`}
                           </span>
-                        </div>
-                        <div className="chat-list-stats">
-                          <span>{group.chats.length} чатов</span>
-                          <span>{new Date(group.created_at).toLocaleString('ru-RU')}</span>
-                          <span>{group.is_public ? 'Публичный' : 'Только для владельца'}</span>
                         </div>
                       </div>
                       <div className="chat-list-actions">
-                        <label className="public-toggle">
+                        <label className="public-toggle" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={!!group.is_public}
@@ -256,7 +254,7 @@ export default function AdminChatLists(): JSX.Element {
                         >
                           Удалить список
                         </button>
-                        <button className="btn-secondary" type="button">
+                        <button className="btn-secondary" type="button" onClick={() => toggleExpanded(group.group_id)}>
                           {isExpanded ? 'Свернуть' : 'Развернуть'}
                         </button>
                       </div>
@@ -280,26 +278,39 @@ export default function AdminChatLists(): JSX.Element {
                                 <tbody>
                                   {group.chats.map((chat, idx) => (
                                     <tr key={chat.chat_id || `link-${idx}`}>
-                                      <td>{chat.chat_id || '-'}</td>
-                                      <td>{chat.title || '-'}</td>
+                                      <td>{chat.chat_id ?? 'null'}</td>
+                                      <td>{chat.title ?? 'null'}</td>
                                       <td>{chat.telegram_chat_id || '-'}</td>
-                                      <td>{chat.link || '-'}</td>
                                       <td>
-                                        {chat.account_phone
-                                          ? `${chat.account_phone} (ID ${chat.account_id})`
-                                          : chat.owner_type || '-'}
+                                        {chat.link ? (
+                                          <a href={chat.link} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                            {chat.link}
+                                          </a>
+                                        ) : (
+                                          '-'
+                                        )}
                                       </td>
                                       <td>
-                                        {chat.chat_id && (
+                                        {chat.account_phone
+                                          ? `${chat.account_phone}${chat.account_id ? ` (ID ${chat.account_id})` : ''}`
+                                          : chat.account_id
+                                          ? `ID ${chat.account_id}`
+                                          : '-'}
+                                      </td>
+                                      <td>
+                                        {chat.chat_id ? (
                                           <button
                                             className="btn-danger small"
-                                            onClick={() => {
+                                            onClick={(e) => {
+                                              e.stopPropagation()
                                               void handleRemoveChat(group, chat)
                                             }}
                                             disabled={removeChatMutation.isLoading}
                                           >
                                             Удалить
                                           </button>
+                                        ) : (
+                                          '-'
                                         )}
                                       </td>
                                     </tr>

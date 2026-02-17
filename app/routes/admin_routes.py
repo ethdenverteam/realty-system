@@ -260,11 +260,11 @@ def admin_chat_lists(current_user):
                             break
                 
                 # Если чат не найден в БД, но есть данные из chat_links - добавляем
-                if not existing_chat and (telegram_chat_id or title):
+                if not existing_chat:
                     chat_dicts.append({
                         'chat_id': None,  # Еще не создан в БД
-                        'telegram_chat_id': telegram_chat_id or link,
-                        'title': title or link,
+                        'telegram_chat_id': telegram_chat_id or None,
+                        'title': title or None,
                         'owner_type': 'user',
                         'account_id': None,
                         'account_phone': None,

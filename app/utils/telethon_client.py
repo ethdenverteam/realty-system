@@ -910,7 +910,9 @@ async def subscribe_to_chat(phone: str, chat_link: str) -> Tuple[bool, Optional[
             else:
                 return (False, "Account not authorized. Please connect first.", None)
         
-        # Parse chat link
+        # Parse chat link - убеждаемся что это строка
+        if not isinstance(chat_link, str):
+            chat_link = str(chat_link)
         chat_link = chat_link.strip()
         
         # Check if it's an invite link (https://t.me/+...)

@@ -193,6 +193,12 @@
   color: #dc3545;
 }
 
+.error-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
 .flood-wait-info {
   padding: 1rem;
   background: rgba(255, 107, 107, 0.1);

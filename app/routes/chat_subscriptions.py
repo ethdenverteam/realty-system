@@ -256,6 +256,56 @@ def start_subscription(current_user):
         if not chat_links:
             return jsonify({'error': 'Не найдено ссылок на чаты в группе'}), 400
         
+        # Проверяем уже подписанные чаты перед началом подписки
+        from app.utils.telethon_client import get_chats, run_async
+        
+        # Получаем список чатов аккаунта
+        account_chats_success, account_chats, account_chats_error = run_async(get_chats(account.phone))
+        account_chat_ids = set()
+        if account_chats_success and account_chats:
+            # Собираем ID чатов аккаунта
+            for chat_info in account_chats:
+                chat_id_str = str(chat_info.get('id', ''))
+                if chat_id_str:
+                    account_chat_ids.add(chat_id_str)
+        
+        # Фильтруем ссылки - убираем уже подписанные чаты
+        filtered_chat_links = []
+        skipped_count = 0
+        
+        for link in chat_links:
+            # Проверяем, есть ли этот чат в базе данных
+            chat_in_db = None
+            # Пытаемся найти чат по ссылке в базе
+            for chat_id in group.chat_ids or []:
+                chat = Chat.query.get(chat_id)
+                if chat and chat.telegram_chat_id:
+                    # Проверяем соответствие ссылки и чата
+                    if link.startswith('https://t.me/+') or link.startswith('http://t.me/+'):
+                        hash_part = link.split('+')[-1]
+                        if hash_part in chat.telegram_chat_id:
+                            chat_in_db = chat
+                            break
+                    elif link.startswith('https://t.me/') or link.startswith('http://t.me/'):
+                        username = link.split('/')[-1].replace('@', '')
+                        if username in chat.telegram_chat_id:
+                            chat_in_db = chat
+                            break
+            
+            # Если чат есть в БД и его telegram_chat_id есть в списке чатов аккаунта - пропускаем
+            if chat_in_db and chat_in_db.telegram_chat_id and str(chat_in_db.telegram_chat_id) in account_chat_ids:
+                skipped_count += 1
+                logger.info(f"Skipping already subscribed chat {link} (found in DB and account chats)")
+                continue
+            
+            filtered_chat_links.append(link)
+        
+        # Используем отфильтрованный список
+        chat_links = filtered_chat_links
+        
+        if not chat_links:
+            return jsonify({'error': f'Все чаты уже подписаны (пропущено {skipped_count})'}), 400
+        
         # Режим интервала: safe (10 мин) или aggressive (2 мин)
         interval_mode = data.get('interval_mode', 'safe')
         if interval_mode not in ['safe', 'aggressive']:
@@ -334,6 +384,44 @@ def get_subscription_task(current_user, task_id):
         return jsonify(task.to_dict()), 200
     except Exception as e:
         logger.error(f"Error getting subscription task: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@chat_subscriptions_bp.route('/tasks/<int:task_id>/retry', methods=['POST'])
+@jwt_required
+def retry_subscription(current_user, task_id):
+    """Попробовать возобновить подписку после ошибки"""
+    try:
+        task = ChatSubscriptionTask.query.filter_by(task_id=task_id, user_id=current_user.user_id).first()
+        if not task:
+            return jsonify({'error': 'Задача не найдена'}), 404
+        
+        # Можно возобновить только задачи с ошибкой
+        if task.status != 'failed':
+            return jsonify({'error': f'Нельзя возобновить задачу в статусе {task.status}'}), 400
+        
+        # Возобновляем задачу с того же места
+        task.status = 'pending'
+        task.error_message = None
+        task.next_run_at = datetime.utcnow()
+        db.session.commit()
+        
+        log_action(
+            user_id=current_user.user_id,
+            action='retry_chat_subscription',
+            details={'task_id': task_id, 'current_index': task.current_index, 'total_chats': task.total_chats}
+        )
+        
+        return jsonify(task.to_dict()), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error retrying subscription: {e}", exc_info=True)
+        log_error(
+            error=e,
+            action='retry_chat_subscription',
+            user_id=current_user.user_id if current_user else None,
+        )
         return jsonify({'error': str(e)}), 500
 
 

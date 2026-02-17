@@ -561,7 +561,19 @@ def subscribe_to_chats_task(task_id: int):
                 app_db.session.commit()
             
             # Получаем список ссылок
-            chat_links = task.chat_links or []
+            chat_links_raw = task.chat_links or []
+            
+            # Преобразуем в список строк (поддерживаем старый формат - массив строк, и новый - массив объектов)
+            chat_links = []
+            for item in chat_links_raw:
+                if isinstance(item, str):
+                    chat_links.append(item)
+                elif isinstance(item, dict):
+                    link = item.get('link', '')
+                    if link:
+                        chat_links.append(link)
+                else:
+                    logger.warning(f"Unexpected chat_link format in task {task_id}: {type(item)}")
             
             # Начинаем подписку с current_index
             current_index = task.current_index
@@ -572,7 +584,7 @@ def subscribe_to_chats_task(task_id: int):
             logger.info(f"Starting subscription task {task_id}: {current_index}/{total_chats} chats, account: {account.phone}")
             
             # Подписываемся на текущий чат
-            if current_index >= total_chats:
+            if current_index >= len(chat_links) or current_index >= total_chats:
                 # Все чаты обработаны
                 task.status = 'completed'
                 task.completed_at = datetime.utcnow()
@@ -582,7 +594,10 @@ def subscribe_to_chats_task(task_id: int):
                 return True
             
             chat_link = chat_links[current_index]
-            logger.info(f"Subscribing to chat {current_index + 1}/{total_chats}: {chat_link[:50]}...")
+            # Убеждаемся что chat_link - строка
+            if not isinstance(chat_link, str):
+                chat_link = str(chat_link)
+            logger.info(f"Subscribing to chat {current_index + 1}/{total_chats}: {chat_link[:50] if len(chat_link) > 50 else chat_link}...")
             
             # Выполняем подписку
             success, error_msg, chat_info = run_async(subscribe_to_chat(account.phone, chat_link))

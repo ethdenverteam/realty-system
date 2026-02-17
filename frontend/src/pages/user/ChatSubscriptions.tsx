@@ -98,6 +98,14 @@ export default function ChatSubscriptions(): JSX.Element {
     },
   })
 
+  const retrySubscriptionMutation = useApiMutation<SubscriptionTask>({
+    url: `/chat-subscriptions/tasks/${selectedTaskId}/retry`,
+    method: 'POST',
+    onSuccess: () => {
+      reloadTasks()
+    },
+  })
+
   const cancelSubscriptionMutation = useApiMutation<SubscriptionTask>({
     url: `/chat-subscriptions/tasks/${selectedTaskId}/cancel`,
     method: 'POST',
@@ -221,6 +229,16 @@ export default function ChatSubscriptions(): JSX.Element {
     } catch (error) {
       logError(error, 'Pausing subscription')
       alert(getErrorMessage(error, 'Ошибка паузы задачи'))
+    }
+  }
+
+  const handleRetrySubscription = async (taskId: number) => {
+    setSelectedTaskId(taskId)
+    try {
+      await retrySubscriptionMutation.mutate({})
+    } catch (error) {
+      logError(error, 'Retrying subscription')
+      alert(getErrorMessage(error, 'Ошибка возобновления задачи'))
     }
   }
 
@@ -491,6 +509,16 @@ export default function ChatSubscriptions(): JSX.Element {
               {currentTask.error_message && (
                 <div className="error-message">
                   Ошибка: {currentTask.error_message}
+                </div>
+              )}
+              {currentTask.status === 'failed' && (
+                <div className="error-actions">
+                  <GlassButton
+                    onClick={() => handleRetrySubscription(currentTask.task_id)}
+                    disabled={retrySubscriptionMutation.isLoading}
+                  >
+                    {retrySubscriptionMutation.isLoading ? 'Возобновление...' : 'Попробовать возобновить'}
+                  </GlassButton>
                 </div>
               )}
               {currentTask.status === 'flood_wait' && currentTask.flood_wait_until && (
