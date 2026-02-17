@@ -409,11 +409,52 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
             # Get largest photo
             photo = photos[-1]
             
+            # Download photo file from Telegram and save to disk
+            # This allows web interface to display the photo
+            photo_path = None
+            try:
+                # Get file info from Telegram
+                file = await context.bot.get_file(photo.file_id)
+                
+                # Generate unique filename
+                import os
+                from datetime import datetime
+                from werkzeug.utils import secure_filename
+                from app.config import Config
+                
+                # Get file extension from file_path or use .jpg as default
+                file_ext = '.jpg'
+                if file.file_path:
+                    _, ext = os.path.splitext(file.file_path)
+                    if ext:
+                        file_ext = ext
+                
+                timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')
+                filename = f"{timestamp}_bot_photo{file_ext}"
+                
+                # Save to uploads folder
+                filepath = os.path.join(Config.UPLOAD_FOLDER, filename)
+                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                
+                # Download and save file
+                await file.download_to_drive(filepath)
+                
+                # Store relative path for web
+                photo_path = f"uploads/{filename}"
+            except Exception as e:
+                logger.error(f"Error downloading photo from Telegram: {e}", exc_info=True)
+                # Continue without path - will use file_id only
+            
             # Save photo info - только одно фото разрешено
-            photos_json = [{
+            # Store both file_id (for bot) and path (for web)
+            photo_data = {
                 'file_id': photo.file_id,
                 'file_unique_id': photo.file_unique_id
-            }]
+            }
+            if photo_path:
+                photo_data['path'] = photo_path
+            
+            photos_json = [photo_data]
             obj.photos_json = photos_json
             db_session.commit()
     finally:

@@ -2272,3 +2272,241 @@ def admin_publication_queues_data(current_user):
     except Exception as e:
         logger.error(f"Error getting publication queues: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+
+@admin_routes_bp.route('/dashboard/test-account-publication/objects', methods=['GET'])
+@jwt_required
+@role_required('admin')
+def admin_test_account_publication_objects(current_user):
+    """Get list of all objects for test publication"""
+    try:
+        objects = Object.query.order_by(Object.creation_date.desc()).limit(1000).all()
+        return jsonify([obj.to_dict() for obj in objects])
+    except Exception as e:
+        logger.error(f"Error getting objects for test publication: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_routes_bp.route('/dashboard/test-account-publication/accounts', methods=['GET'])
+@jwt_required
+@role_required('admin')
+def admin_test_account_publication_accounts(current_user):
+    """Get list of all accounts with their chats for test publication"""
+    try:
+        from app.models.telegram_account import TelegramAccount
+        accounts = TelegramAccount.query.filter_by(is_active=True).all()
+        
+        result = []
+        for account in accounts:
+            # Get chats for this account
+            chats = Chat.query.filter_by(
+                owner_type='user',
+                owner_account_id=account.account_id,
+                is_active=True
+            ).all()
+            
+            result.append({
+                **account.to_dict(),
+                'chats': [chat.to_dict() for chat in chats]
+            })
+        
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error getting accounts for test publication: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_routes_bp.route('/dashboard/test-account-publication/publish', methods=['POST'])
+@jwt_required
+@role_required('admin')
+def admin_test_account_publication_publish(current_user):
+    """Publish object via account (admin test)"""
+    from datetime import datetime
+    from app.models.telegram_account import TelegramAccount
+    from app.models.publication_history import PublicationHistory
+    from app.utils.telethon_client import send_object_message, run_async
+    from app.utils.rate_limiter import get_rate_limit_status
+    from bot.utils import format_publication_text
+    from bot.models import User as BotUser, Object as BotObject
+    from bot.database import get_db as get_bot_db
+    
+    data = request.get_json()
+    object_id = data.get('object_id')
+    account_id = data.get('account_id')
+    chat_id = data.get('chat_id')
+    
+    if not object_id or not account_id or not chat_id:
+        return jsonify({'error': 'object_id, account_id, and chat_id are required'}), 400
+    
+    # Get account
+    account = TelegramAccount.query.get(account_id)
+    if not account:
+        return jsonify({'error': 'Account not found'}), 404
+    
+    # Get chat
+    chat = Chat.query.get(chat_id)
+    if not chat:
+        return jsonify({'error': 'Chat not found'}), 404
+    
+    # Check chat belongs to account
+    if chat.owner_account_id != account_id or chat.owner_type != 'user':
+        return jsonify({'error': 'Chat does not belong to this account'}), 400
+    
+    # Get object (admin can access any object)
+    obj = Object.query.filter_by(object_id=object_id).first()
+    if not obj:
+        return jsonify({'error': 'Object not found'}), 404
+    
+    # Check rate limits
+    rate_status = get_rate_limit_status(account.phone)
+    if not rate_status['can_send']:
+        wait_seconds = rate_status['wait_seconds']
+        minutes = int(wait_seconds // 60)
+        seconds = int(wait_seconds % 60)
+        if minutes > 0:
+            wait_msg = f"{minutes} мин {seconds} сек"
+        else:
+            wait_msg = f"{seconds} сек"
+        
+        reason = "В эту минуту уже было отправлено сообщение" if wait_seconds < 60 else "Превышен часовой лимит (60 сообщений в час)"
+        
+        return jsonify({
+            'error': 'Превышен лимит отправки сообщений',
+            'details': f'{reason}. Подождите {wait_msg} перед следующей отправкой.',
+            'wait_seconds': wait_seconds,
+            'wait_message': wait_msg,
+            'reason': reason,
+            'next_available': rate_status['next_available']
+        }), 429
+    
+    try:
+        # Get bot user and object for formatting
+        bot_user = None
+        bot_db = get_bot_db()
+        try:
+            if obj.user_id:
+                # Try to find bot user by user_id
+                bot_user = bot_db.query(BotUser).filter_by(user_id=obj.user_id).first()
+        finally:
+            bot_db.close()
+        
+        bot_db = get_bot_db()
+        try:
+            bot_obj = bot_db.query(BotObject).filter_by(object_id=object_id).first()
+            if not bot_obj:
+                # Create bot object from web object
+                bot_obj = BotObject(
+                    object_id=obj.object_id,
+                    user_id=obj.user_id,
+                    rooms_type=obj.rooms_type,
+                    price=obj.price,
+                    districts_json=obj.districts_json,
+                    region=obj.region,
+                    city=obj.city,
+                    photos_json=obj.photos_json,
+                    area=obj.area,
+                    floor=obj.floor,
+                    address=obj.address,
+                    residential_complex=obj.residential_complex,
+                    renovation=obj.renovation,
+                    comment=obj.comment,
+                    contact_name=obj.contact_name,
+                    show_username=obj.show_username,
+                    phone_number=obj.phone_number,
+                    contact_name_2=obj.contact_name_2,
+                    phone_number_2=obj.phone_number_2,
+                    status=obj.status,
+                    source='web'
+                )
+                bot_db.add(bot_obj)
+                bot_db.commit()
+        finally:
+            bot_db.close()
+        
+        # Получаем формат публикации из конфигурации автопубликации
+        publication_format = 'default'
+        from app.models.autopublish_config import AutopublishConfig
+        autopublish_cfg = AutopublishConfig.query.filter_by(
+            object_id=object_id
+        ).first()
+        if autopublish_cfg and autopublish_cfg.accounts_config_json:
+            accounts_cfg = autopublish_cfg.accounts_config_json
+            if isinstance(accounts_cfg, dict):
+                publication_format = accounts_cfg.get('publication_format', 'default')
+        
+        # Format publication text
+        publication_text = format_publication_text(bot_obj, bot_user, is_preview=False, publication_format=publication_format)
+        
+        # Send message via telethon
+        logger.info(f"Admin test publication: object {object_id} via account {account_id} to chat {chat_id} (telegram_chat_id: {chat.telegram_chat_id})")
+        try:
+            success, error_msg, message_id = run_async(
+                send_object_message(
+                    account.phone,
+                    chat.telegram_chat_id,
+                    publication_text,
+                    obj.photos_json or []
+                )
+            )
+        except Exception as send_error:
+            logger.error(f"Exception in run_async(send_object_message): {send_error}", exc_info=True)
+            account.last_error = str(send_error)
+            account.last_used = datetime.utcnow()
+            db.session.commit()
+            return jsonify({'error': f'Ошибка при отправке сообщения: {str(send_error)}'}), 500
+        
+        if not success:
+            logger.error(f"Failed to publish object {object_id} via account {account_id}: {error_msg}")
+            account.last_error = error_msg
+            account.last_used = datetime.utcnow()
+            db.session.commit()
+            return jsonify({'error': error_msg or 'Ошибка публикации объекта'}), 500
+        
+        # Update chat statistics
+        chat.total_publications = (chat.total_publications or 0) + 1
+        chat.last_publication = datetime.utcnow()
+        
+        # Create publication history
+        history = PublicationHistory(
+            object_id=object_id,
+            chat_id=chat_id,
+            account_id=account_id,
+            published_at=datetime.utcnow(),
+            message_id=str(message_id) if message_id else None,
+            deleted=False
+        )
+        db.session.add(history)
+        
+        # Update account
+        account.last_used = datetime.utcnow()
+        account.last_error = None
+        
+        db.session.commit()
+        
+        # Log action
+        log_action(
+            action='admin_test_account_publication',
+            user_id=current_user.user_id,
+            details={
+                'object_id': object_id,
+                'account_id': account_id,
+                'chat_id': chat_id,
+                'message_id': message_id
+            }
+        )
+        
+        return jsonify({
+            'success': True,
+            'message_id': message_id,
+            'message': 'Object published successfully'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in admin test account publication: {e}", exc_info=True)
+        log_error(e, 'admin_test_account_publication_failed', current_user.user_id, {
+            'object_id': object_id,
+            'account_id': account_id,
+            'chat_id': chat_id
+        })
+        return jsonify({'error': str(e)}), 500

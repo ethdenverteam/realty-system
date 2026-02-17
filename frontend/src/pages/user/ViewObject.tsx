@@ -311,14 +311,15 @@ export default function ViewObject(): JSX.Element {
                 <label>Фотографии</label>
                 <div className="photos-grid">
                   {object.photos_json.map((photo, idx) => {
-                    // Обработка фото: может быть строкой (путь) или объектом (dict с file_id или path)
+                    // Обработка фото: может быть строкой (путь) или объектом (dict с path)
+                    // В вебе используем только path, file_id нужен только для бота
                     let photoUrl = ''
                     if (typeof photo === 'string') {
-                      // Если это строка - путь к файлу
+                      // Если это строка - путь к файлу (старый формат)
                       photoUrl = `/${photo}`
                     } else if (photo && typeof photo === 'object') {
-                      // Если это объект - извлекаем путь или file_id
-                      photoUrl = photo.path || photo.file_id || ''
+                      // Если это объект - извлекаем путь (path для веба, file_id для бота)
+                      photoUrl = photo.path || ''
                       if (photoUrl && !photoUrl.startsWith('/') && !photoUrl.startsWith('http')) {
                         photoUrl = `/${photoUrl}`
                       }
