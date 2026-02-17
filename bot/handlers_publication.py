@@ -266,7 +266,8 @@ async def confirm_publish_handler(update: Update, context: ContextTypes.DEFAULT_
     try:
         # Publish immediately
         await publish_object_immediate(update, context, object_id)
-        return ConversationHandler.END
+        # Возвращаемся к меню превью, а не END, чтобы пользователь мог продолжить работу
+        return OBJECT_PREVIEW_MENU
     except Exception as e:
         logger.error(f"Error in confirm_publish_handler: {e}", exc_info=True)
         await query.answer(f"Ошибка при публикации: {str(e)}", show_alert=True)
@@ -459,7 +460,7 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
     
-    # Send notification to user
+    # Send notification to user and show preview again
     if update.callback_query:
         if published_count > 0:
             notification_text = f"✅ <b>Объект успешно опубликован!</b>\n\n"
@@ -469,6 +470,10 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
             notification_text += f"📅 {publication_datetime}"
             
             await update.callback_query.message.reply_text(notification_text, parse_mode='HTML')
+            # Показываем превью объекта снова после публикации
+            await show_object_preview_with_menu(update, context, object_id)
         else:
             await update.callback_query.answer("Ошибка: не удалось опубликовать объект.", show_alert=True)
+            # Показываем превью объекта даже при ошибке
+            await show_object_preview_with_menu(update, context, object_id)
 

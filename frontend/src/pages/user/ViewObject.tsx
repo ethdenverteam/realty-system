@@ -310,14 +310,35 @@ export default function ViewObject(): JSX.Element {
               <div className="detail-item detail-item-full">
                 <label>Фотографии</label>
                 <div className="photos-grid">
-                  {object.photos_json.map((photo, idx) => (
-                    <img
-                      key={idx}
-                      src={`/${photo}`}
-                      alt={`Фото ${idx + 1}`}
-                      className="object-photo"
-                    />
-                  ))}
+                  {object.photos_json.map((photo, idx) => {
+                    // Обработка фото: может быть строкой (путь) или объектом (dict с file_id или path)
+                    let photoUrl = ''
+                    if (typeof photo === 'string') {
+                      // Если это строка - путь к файлу
+                      photoUrl = `/${photo}`
+                    } else if (photo && typeof photo === 'object') {
+                      // Если это объект - извлекаем путь или file_id
+                      photoUrl = photo.path || photo.file_id || ''
+                      if (photoUrl && !photoUrl.startsWith('/') && !photoUrl.startsWith('http')) {
+                        photoUrl = `/${photoUrl}`
+                      }
+                    }
+                    
+                    if (!photoUrl) return null
+                    
+                    return (
+                      <img
+                        key={idx}
+                        src={photoUrl}
+                        alt={`Фото ${idx + 1}`}
+                        className="object-photo"
+                        onError={(e) => {
+                          // Если загрузка не удалась, скрываем изображение
+                          e.currentTarget.style.display = 'none'
+                        }}
+                      />
+                    )
+                  })}
                 </div>
               </div>
             )}

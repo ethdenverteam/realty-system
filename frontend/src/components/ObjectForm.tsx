@@ -4,6 +4,7 @@ import api from '../utils/api'
 import { FilterSelect } from './FilterSelect'
 import { ROOMS_TYPES, RENOVATION_TYPES } from '../utils/constants'
 import './ObjectForm.css'
+import './Glass.css'
 
 // Компонент для предпросмотра фото с правильной очисткой URL
 function PhotoPreview({ file }: { file: File }): JSX.Element {
@@ -197,10 +198,10 @@ export default function ObjectForm({
           </div>
         </div>
 
-        <div className="form-section">
-          <h3 className="section-title">Описание</h3>
+        <div className="form-section glass-card" style={{ marginTop: '20px', marginBottom: '20px' }}>
+          <h3 className="section-title">Фото объекта</h3>
           <div className="form-group">
-            <label className="form-label">Фото объекта</label>
+            <label className="form-label">Выберите фото</label>
             <input
               type="file"
               accept="image/*"
@@ -228,6 +229,10 @@ export default function ObjectForm({
               Разрешены только файлы изображений (JPG, PNG, GIF, WEBP и др.)
             </small>
           </div>
+        </div>
+
+        <div className="form-section">
+          <h3 className="section-title">Описание</h3>
           <div className="form-group">
             <label className="form-label">Комментарий</label>
             <textarea

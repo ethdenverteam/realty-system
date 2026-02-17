@@ -510,6 +510,7 @@ async def show_object_preview_with_menu(update: Update, context: ContextTypes.DE
                 InlineKeyboardButton("Изменить комнаты", callback_data=f"edit_rooms_{object_id}"),
                 InlineKeyboardButton("Состояние ремонта", callback_data=f"edit_renovation_{object_id}")
             ],
+            [InlineKeyboardButton("Указать ЖК", callback_data=f"edit_residential_complex_{object_id}")],
             [
                 InlineKeyboardButton("Адрес", callback_data=f"edit_address_{object_id}"),
                 InlineKeyboardButton("Контакты", callback_data=f"edit_contacts_{object_id}")

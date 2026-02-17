@@ -27,6 +27,7 @@ OBJECT_WAITING_ADD_DISTRICT = 19
 OBJECT_WAITING_EDIT_AREA = 20
 OBJECT_WAITING_EDIT_FLOOR = 21
 OBJECT_WAITING_EDIT_COMMENT = 22
+OBJECT_WAITING_EDIT_RESIDENTIAL_COMPLEX = 24
 OBJECT_PREVIEW_MENU = 23
 
 
@@ -288,6 +289,61 @@ async def edit_comment_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     user_id=user_obj.user_id,
                     action='bot_object_comment_updated',
                     details_json={'object_id': object_id, 'comment': comment[:100]},
+                    created_at=datetime.utcnow()
+                )
+                db.add(action_log)
+                db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to log action: {e}")
+    
+    await show_object_preview_with_menu(update, context, object_id)
+    return OBJECT_PREVIEW_MENU
+
+
+async def edit_residential_complex_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик кнопки редактирования ЖК"""
+    query = update.callback_query
+    await query.answer()
+    
+    object_id = query.data.replace("edit_residential_complex_", "")
+    
+    user = update.effective_user
+    if user.id not in user_data:
+        user_data[user.id] = {}
+    user_data[user.id]["object_id"] = object_id
+    
+    await delete_preview_and_menu(context, user.id)
+    
+    keyboard = [[InlineKeyboardButton("🏠 Назад", callback_data="back_to_preview")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.message.reply_text("Введите название жилого комплекса (ЖК):", reply_markup=reply_markup)
+    return OBJECT_WAITING_EDIT_RESIDENTIAL_COMPLEX
+
+
+async def residential_complex_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка ввода ЖК"""
+    user = update.effective_user
+    
+    if user.id not in user_data or "object_id" not in user_data[user.id]:
+        await update.message.reply_text("Ошибка: данные объекта не найдены.")
+        return ConversationHandler.END
+    
+    residential_complex = update.message.text.strip()
+    object_id = user_data[user.id]["object_id"]
+    update_object(object_id, {"residential_complex": residential_complex if residential_complex else None})
+    
+    # Log action
+    try:
+        db = get_db()
+        try:
+            user_obj = get_user(str(user.id))
+            if user_obj:
+                action_log = ActionLog(
+                    user_id=user_obj.user_id,
+                    action='bot_object_residential_complex_updated',
+                    details_json={'object_id': object_id, 'residential_complex': residential_complex},
                     created_at=datetime.utcnow()
                 )
                 db.add(action_log)

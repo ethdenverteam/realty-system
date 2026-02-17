@@ -20,18 +20,18 @@ from bot.handlers_settings import create_settings_conversation_handler
 from bot.handlers_objects_view import my_objects_command, my_objects_callback, edit_object_from_list
 from bot.handlers_object_edit import (
     edit_price_handler, edit_area_handler, edit_floor_handler, edit_comment_handler,
-    edit_renovation_handler, edit_address_handler, edit_contacts_handler,
+    edit_residential_complex_handler, edit_renovation_handler, edit_address_handler, edit_contacts_handler,
     edit_rooms_handler, edit_district_handler, add_district_handler,
     add_media_handler, back_to_preview_handler,
     edit_price_input, edit_area_input, edit_floor_input, edit_comment_input,
-    edit_rooms_selected, edit_district_selected,
+    residential_complex_input, edit_rooms_selected, edit_district_selected,
     add_district_selected, renovation_selected, address_input,
     contacts_input, phone_from_settings_handler,
     phone_custom_handler, set_contact_name_handler, toggle_username_handler,
     delete_object_handler, confirm_delete_object_handler,
     OBJECT_WAITING_EDIT_ROOMS, OBJECT_WAITING_EDIT_DISTRICT, OBJECT_WAITING_EDIT_PRICE,
     OBJECT_WAITING_ADD_DISTRICT, OBJECT_WAITING_EDIT_AREA, OBJECT_WAITING_EDIT_FLOOR,
-    OBJECT_WAITING_EDIT_COMMENT, OBJECT_PREVIEW_MENU
+    OBJECT_WAITING_EDIT_COMMENT, OBJECT_WAITING_EDIT_RESIDENTIAL_COMPLEX, OBJECT_PREVIEW_MENU
 )
 from bot.handlers_publication import (
     publish_immediate_handler, confirm_publish_handler
@@ -105,6 +105,7 @@ def main():
             CallbackQueryHandler(edit_area_handler, pattern="^edit_area_"),
             CallbackQueryHandler(edit_floor_handler, pattern="^edit_floor_"),
             CallbackQueryHandler(edit_comment_handler, pattern="^edit_comment_"),
+            CallbackQueryHandler(edit_residential_complex_handler, pattern="^edit_residential_complex_"),
             CallbackQueryHandler(edit_renovation_handler, pattern="^edit_renovation_"),
             CallbackQueryHandler(edit_address_handler, pattern="^edit_address_"),
             CallbackQueryHandler(edit_contacts_handler, pattern="^edit_contacts_"),
@@ -125,6 +126,9 @@ def main():
             ],
             OBJECT_WAITING_EDIT_COMMENT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, edit_comment_input)
+            ],
+            OBJECT_WAITING_EDIT_RESIDENTIAL_COMPLEX: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, residential_complex_input)
             ],
             OBJECT_WAITING_RENOVATION: [
                 CallbackQueryHandler(renovation_selected, pattern="^renovation_")
@@ -159,6 +163,7 @@ def main():
                 CallbackQueryHandler(edit_area_handler, pattern="^edit_area_"),
                 CallbackQueryHandler(edit_floor_handler, pattern="^edit_floor_"),
                 CallbackQueryHandler(edit_comment_handler, pattern="^edit_comment_"),
+                CallbackQueryHandler(edit_residential_complex_handler, pattern="^edit_residential_complex_"),
                 CallbackQueryHandler(edit_renovation_handler, pattern="^edit_renovation_"),
                 CallbackQueryHandler(edit_address_handler, pattern="^edit_address_"),
                 CallbackQueryHandler(edit_contacts_handler, pattern="^edit_contacts_"),
@@ -174,6 +179,9 @@ def main():
                 CallbackQueryHandler(confirm_publish_handler, pattern="^confirm_publish_"),
                 CallbackQueryHandler(delete_object_handler, pattern="^delete_object_"),
                 CallbackQueryHandler(confirm_delete_object_handler, pattern="^confirm_delete_"),
+            ],
+            OBJECT_WAITING_EDIT_RESIDENTIAL_COMPLEX: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, residential_complex_input)
             ]
         },
         fallbacks=[
