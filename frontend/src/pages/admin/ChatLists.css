@@ -134,26 +134,52 @@
   gap: 1rem;
 }
 
-.chat-list-chats table {
+.chat-list-chats {
+  width: 100%;
+}
+
+.table-container {
+  overflow-x: auto;
+  border-radius: var(--radius-md, 0.5rem);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.2));
+}
+
+.table-container .table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.85rem;
+  min-width: 600px;
 }
 
-.chat-list-chats th,
-.chat-list-chats td {
-  padding: 0.4rem 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.chat-list-chats th {
+.table-container .table th,
+.table-container .table td {
+  padding: var(--spacing-md, 0.75rem);
   text-align: left;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
 }
 
-.chat-list-chats td {
-  color: rgba(255, 255, 255, 0.85);
+.table-container .table th {
+  font-weight: 600;
+  color: var(--color-text-secondary, rgba(255, 255, 255, 0.9));
+  font-size: var(--font-size-sm, 0.8rem);
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.table-container .table td {
+  color: var(--color-text, rgba(255, 255, 255, 0.85));
+}
+
+.table-container .table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.table-container .table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .chat-list-add-chat {

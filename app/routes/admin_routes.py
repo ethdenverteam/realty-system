@@ -215,13 +215,20 @@ def admin_chat_lists(current_user):
             user = users_by_id.get(group.user_id)
             group_data['user_name'] = user.username if user else None
 
+            # Получаем чаты из chat_ids (для обратной совместимости)
             chat_ids = group.chat_ids or []
+            chats_by_id = {}
             if chat_ids:
                 chats = Chat.query.filter(Chat.chat_id.in_(chat_ids)).all()
+                chats_by_id = {chat.chat_id: chat for chat in chats}
             else:
                 chats = []
 
+            # Получаем данные из chat_links (новый формат с названиями)
+            chat_links_list = group.get_chat_links_list()
+            
             chat_dicts = []
+            # Сначала добавляем чаты из БД
             for chat in chats:
                 chat_info = {
                     'chat_id': chat.chat_id,
@@ -237,6 +244,32 @@ def admin_chat_lists(current_user):
                         account_phone = acc.phone
                 chat_info['account_phone'] = account_phone
                 chat_dicts.append(chat_info)
+            
+            # Затем добавляем чаты из chat_links, которых нет в БД (еще не подписаны)
+            for link_item in chat_links_list:
+                link = link_item.get('link', '')
+                telegram_chat_id = link_item.get('telegram_chat_id')
+                title = link_item.get('title')
+                
+                # Ищем, есть ли уже этот чат в chat_dicts
+                existing_chat = None
+                if telegram_chat_id:
+                    for chat_dict in chat_dicts:
+                        if chat_dict.get('telegram_chat_id') == telegram_chat_id:
+                            existing_chat = chat_dict
+                            break
+                
+                # Если чат не найден в БД, но есть данные из chat_links - добавляем
+                if not existing_chat and (telegram_chat_id or title):
+                    chat_dicts.append({
+                        'chat_id': None,  # Еще не создан в БД
+                        'telegram_chat_id': telegram_chat_id or link,
+                        'title': title or link,
+                        'owner_type': 'user',
+                        'account_id': None,
+                        'account_phone': None,
+                        'link': link,  # Сохраняем ссылку для отображения
+                    })
 
             group_data['chats'] = chat_dicts
             result.append(group_data)

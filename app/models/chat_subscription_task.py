@@ -40,6 +40,8 @@ class ChatSubscriptionTask(db.Model):
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    # Расчетное время завершения (UTC)
+    estimated_completion = Column(DateTime, nullable=True)
     
     # Список ссылок на чаты (JSON массив строк)
     chat_links = Column(JSON, nullable=False)  # ["https://t.me/+...", ...]
@@ -56,17 +58,31 @@ class ChatSubscriptionTask(db.Model):
         """Convert to dictionary"""
         # Рассчитываем расчетное время завершения (по МСК)
         estimated_completion = None
-        if self.status == 'processing' and self.current_index < self.total_chats:
+        if hasattr(self, 'estimated_completion') and self.estimated_completion:
+            # Если есть сохраненное значение - используем его
+            from app.utils.time_utils import utc_to_msk
+            estimated_completion_msk = utc_to_msk(self.estimated_completion)
+            estimated_completion = estimated_completion_msk.strftime('%Y-%m-%d %H:%M:%S МСК')
+        elif self.status in ['pending', 'processing'] and self.current_index < self.total_chats:
+            # Рассчитываем динамически на основе оставшихся чатов
             remaining = self.total_chats - self.current_index
-            # Осталось подписок * 10 минут
             from datetime import timedelta
             from app.utils.time_utils import utc_to_msk
-            if self.started_at:
-                # Время начала в UTC, переводим в МСК
-                started_msk = utc_to_msk(self.started_at)
-                # Добавляем оставшееся время
-                estimated_completion_msk = started_msk + timedelta(minutes=remaining * 10)
-                estimated_completion = estimated_completion_msk.strftime('%Y-%m-%d %H:%M:%S МСК')
+            # Базовый интервал в секундах: safe=10 мин (600 сек), aggressive=2 мин (120 сек)
+            base_minutes = 10 if getattr(self, 'interval_mode', 'safe') == 'safe' else 2
+            base_seconds = base_minutes * 60
+            # Среднее время случайной переменной (1-99 секунд) = 50 секунд
+            average_jitter = 50
+            # Время на один чат = базовый интервал + средний джиттер
+            time_per_chat = base_seconds + average_jitter
+            # Общее время = время на чат * количество оставшихся чатов
+            total_seconds = time_per_chat * remaining
+            
+            # Используем текущее время или время начала
+            base_time = self.started_at if self.started_at else datetime.utcnow()
+            estimated_completion_utc = base_time + timedelta(seconds=total_seconds)
+            estimated_completion_msk = utc_to_msk(estimated_completion_utc)
+            estimated_completion = estimated_completion_msk.strftime('%Y-%m-%d %H:%M:%S МСК')
         
         return {
             'task_id': self.task_id,

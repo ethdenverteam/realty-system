@@ -4,16 +4,18 @@ import { GlassCard } from '../../components/GlassCard'
 import { useApiData } from '../../hooks/useApiData'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { getErrorMessage, logError } from '../../utils/errorHandler'
+import { useAuth } from '../../contexts/AuthContext'
 import api from '../../utils/api'
 import './ChatLists.css'
 
 interface AdminChat {
-  chat_id: number
+  chat_id: number | null
   telegram_chat_id: string
   title: string
   owner_type: string
   account_id?: number | null
   account_phone?: string | null
+  link?: string
 }
 
 interface AdminChatGroup {
@@ -23,14 +25,16 @@ interface AdminChatGroup {
   name: string
   description?: string | null
   purpose: string
+  is_public?: boolean
   chat_ids: number[]
-  chat_links?: string[]
+  chat_links?: Array<{ link: string; telegram_chat_id?: string | null; title?: string | null }>
   created_at: string
   updated_at: string
   chats: AdminChat[]
 }
 
 export default function AdminChatLists(): JSX.Element {
+  const { user } = useAuth()
   const { data: groups, loading, reload } = useApiData<AdminChatGroup[]>({
     url: '/admin/dashboard/chat-lists',
     errorContext: 'Loading admin chat lists',
@@ -38,7 +42,6 @@ export default function AdminChatLists(): JSX.Element {
   })
 
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<number>>(new Set())
-  const [newListUserId, setNewListUserId] = useState('')
   const [newListName, setNewListName] = useState('')
   const [newListLinks, setNewListLinks] = useState('')
   const [addingChatForGroup, setAddingChatForGroup] = useState<number | null>(null)
@@ -60,7 +63,6 @@ export default function AdminChatLists(): JSX.Element {
     url: '/admin/dashboard/chat-lists',
     method: 'POST',
     onSuccess: () => {
-      setNewListUserId('')
       setNewListName('')
       setNewListLinks('')
       reload()
@@ -102,8 +104,8 @@ export default function AdminChatLists(): JSX.Element {
   })
 
   const handleCreateList = async (): Promise<void> => {
-    if (!newListUserId.trim()) {
-      alert('Укажите user_id владельца списка')
+    if (!user) {
+      alert('Необходимо войти в систему')
       return
     }
     if (!newListName.trim()) {
@@ -117,7 +119,7 @@ export default function AdminChatLists(): JSX.Element {
 
     try {
       await createListMutation.mutate({
-        user_id: Number(newListUserId),
+        user_id: user.user_id,
         name: newListName.trim(),
         links: newListLinks,
       } as any)
@@ -175,25 +177,14 @@ export default function AdminChatLists(): JSX.Element {
       <div className="admin-chat-lists-page">
         <GlassCard className="chat-lists-create-card">
           <h2>Создать новый список чатов (для подписок)</h2>
-          <div className="form-grid">
-            <div className="form-group">
-              <label>user_id владельца списка</label>
-              <input
-                type="number"
-                value={newListUserId}
-                onChange={(e) => setNewListUserId(e.target.value)}
-                placeholder="Например: 1"
-              />
-            </div>
-            <div className="form-group">
-              <label>Название списка</label>
-              <input
-                type="text"
-                value={newListName}
-                onChange={(e) => setNewListName(e.target.value)}
-                placeholder="Например: Подписка аккаунта 1"
-              />
-            </div>
+          <div className="form-group">
+            <label>Название списка</label>
+            <input
+              type="text"
+              value={newListName}
+              onChange={(e) => setNewListName(e.target.value)}
+              placeholder="Например: Подписка аккаунта 1"
+            />
           </div>
           <div className="form-group">
             <label>Ссылки на чаты (каждая строка — отдельная ссылка t.me)</label>
@@ -235,7 +226,7 @@ export default function AdminChatLists(): JSX.Element {
                           </span>
                         </div>
                         <div className="chat-list-stats">
-                          <span>{group.chat_ids.length} чатов</span>
+                          <span>{group.chats.length} чатов</span>
                           <span>{new Date(group.created_at).toLocaleString('ru-RU')}</span>
                           <span>{group.is_public ? 'Публичный' : 'Только для владельца'}</span>
                         </div>
@@ -246,6 +237,7 @@ export default function AdminChatLists(): JSX.Element {
                             type="checkbox"
                             checked={!!group.is_public}
                             onChange={(e) => {
+                              e.stopPropagation()
                               void setPublicMutation.mutate(
                                 { is_public: e.target.checked } as any,
                                 { url: `/admin/dashboard/chat-lists/${group.group_id}/public` },
@@ -273,42 +265,48 @@ export default function AdminChatLists(): JSX.Element {
                       <div className="chat-list-body">
                         <div className="chat-list-chats">
                           {group.chats.length > 0 ? (
-                            <table>
-                              <thead>
-                                <tr>
-                                  <th>ID</th>
-                                  <th>Название</th>
-                                  <th>telegram_chat_id</th>
-                                  <th>Аккаунт</th>
-                                  <th />
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {group.chats.map((chat) => (
-                                  <tr key={chat.chat_id}>
-                                    <td>{chat.chat_id}</td>
-                                    <td>{chat.title || '-'}</td>
-                                    <td>{chat.telegram_chat_id}</td>
-                                    <td>
-                                      {chat.account_phone
-                                        ? `${chat.account_phone} (ID ${chat.account_id})`
-                                        : chat.owner_type}
-                                    </td>
-                                    <td>
-                                      <button
-                                        className="btn-danger small"
-                                        onClick={() => {
-                                          void handleRemoveChat(group, chat)
-                                        }}
-                                        disabled={removeChatMutation.isLoading}
-                                      >
-                                        Удалить
-                                      </button>
-                                    </td>
+                            <div className="table-container">
+                              <table className="table">
+                                <thead>
+                                  <tr>
+                                    <th>ID</th>
+                                    <th>Название</th>
+                                    <th>telegram_chat_id</th>
+                                    <th>Ссылка</th>
+                                    <th>Аккаунт</th>
+                                    <th />
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                                </thead>
+                                <tbody>
+                                  {group.chats.map((chat, idx) => (
+                                    <tr key={chat.chat_id || `link-${idx}`}>
+                                      <td>{chat.chat_id || '-'}</td>
+                                      <td>{chat.title || '-'}</td>
+                                      <td>{chat.telegram_chat_id || '-'}</td>
+                                      <td>{chat.link || '-'}</td>
+                                      <td>
+                                        {chat.account_phone
+                                          ? `${chat.account_phone} (ID ${chat.account_id})`
+                                          : chat.owner_type || '-'}
+                                      </td>
+                                      <td>
+                                        {chat.chat_id && (
+                                          <button
+                                            className="btn-danger small"
+                                            onClick={() => {
+                                              void handleRemoveChat(group, chat)
+                                            }}
+                                            disabled={removeChatMutation.isLoading}
+                                          >
+                                            Удалить
+                                          </button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
                           ) : (
                             <div>Нет чатов в этом списке</div>
                           )}

@@ -261,6 +261,17 @@ def start_subscription(current_user):
         if interval_mode not in ['safe', 'aggressive']:
             interval_mode = 'safe'
         
+        # Рассчитываем базовый интервал в секундах
+        base_minutes = 10 if interval_mode == 'safe' else 2
+        base_seconds = base_minutes * 60
+        # Среднее время случайной переменной (1-99 секунд) = 50 секунд
+        average_jitter = 50
+        # Время на один чат = базовый интервал + средний джиттер
+        time_per_chat = base_seconds + average_jitter
+        # Общее время = время на чат * количество чатов
+        total_seconds = time_per_chat * len(chat_links)
+        estimated_completion = datetime.utcnow() + timedelta(seconds=total_seconds)
+        
         # Создаем задачу подписки
         task = ChatSubscriptionTask(
             user_id=current_user.user_id,
@@ -275,6 +286,7 @@ def start_subscription(current_user):
             interval_mode=interval_mode,
             # Первый запуск можно делать сразу после создания
             next_run_at=datetime.utcnow(),
+            estimated_completion=estimated_completion,
         )
         db.session.add(task)
         db.session.commit()
