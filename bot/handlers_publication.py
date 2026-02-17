@@ -359,32 +359,26 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
                 finally:
                     db.close()
             
-            # Send message
-            if photos_json:
-                # Send with media
-                media_group = []
-                for photo_data in photos_json[:10]:
-                    if isinstance(photo_data, dict):
-                        file_id = photo_data.get('file_id')
-                        if file_id:
-                            media_group.append(InputMediaPhoto(
-                                file_id,
-                                caption=publication_text if len(media_group) == 0 else None,
-                                parse_mode='HTML' if len(media_group) == 0 else None
-                            ))
-                
-                if len(media_group) == 1:
-                    await context.bot.send_photo(
-                        chat_id=telegram_chat_id,
-                        photo=media_group[0].media,
-                        caption=publication_text,
-                        parse_mode='HTML'
-                    )
-                elif len(media_group) > 1:
-                    await context.bot.send_media_group(
-                        chat_id=telegram_chat_id,
-                        media=media_group
-                    )
+            # Send message - всегда отправляем фото если оно есть
+            if photos_json and len(photos_json) > 0:
+                # Берем первое фото (только одно фото разрешено)
+                photo_data = photos_json[0]
+                if isinstance(photo_data, dict):
+                    file_id = photo_data.get('file_id')
+                    if file_id:
+                        await context.bot.send_photo(
+                            chat_id=telegram_chat_id,
+                            photo=file_id,
+                            caption=publication_text,
+                            parse_mode='HTML'
+                        )
+                    else:
+                        # Если file_id нет, отправляем только текст
+                        await context.bot.send_message(
+                            chat_id=telegram_chat_id,
+                            text=publication_text,
+                            parse_mode='HTML'
+                        )
                 else:
                     await context.bot.send_message(
                         chat_id=telegram_chat_id,
@@ -392,7 +386,7 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
                         parse_mode='HTML'
                     )
             else:
-                # Send text only
+                # Если фото нет - отправляем только текст
                 await context.bot.send_message(
                     chat_id=telegram_chat_id,
                     text=publication_text,

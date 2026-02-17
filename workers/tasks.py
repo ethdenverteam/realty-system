@@ -129,16 +129,87 @@ def publish_to_telegram(queue_id: int):
         # Форматируем текст публикации
         publication_text = format_publication_text(obj, bot_user, is_preview=False, publication_format=publication_format)
         
-        # Отправляем сообщение
-        url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
-        payload = {
-            'chat_id': chat.telegram_chat_id,
-            'text': publication_text,
-            'parse_mode': 'HTML'
-        }
+        # Отправляем сообщение - всегда отправляем фото если оно есть
+        photos_json = obj.photos_json or []
         
         try:
-            response = requests.post(url, json=payload, timeout=10)
+            if photos_json and len(photos_json) > 0:
+                # Берем первое фото (только одно фото разрешено)
+                photo_data = photos_json[0]
+                
+                if isinstance(photo_data, dict):
+                    file_id = photo_data.get('file_id')
+                    if file_id:
+                        # Если это file_id из бота, отправляем напрямую
+                        url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto'
+                        payload = {
+                            'chat_id': chat.telegram_chat_id,
+                            'photo': file_id,
+                            'caption': publication_text,
+                            'parse_mode': 'HTML'
+                        }
+                        response = requests.post(url, json=payload, timeout=10)
+                    else:
+                        # Если это путь к файлу, читаем и отправляем
+                        photo_path = photo_data.get('path', '')
+                        if not photo_path and isinstance(photo_data, str):
+                            photo_path = photo_data
+                        
+                        if photo_path and (photo_path.startswith('uploads/') or '/' in photo_path):
+                            import os
+                            base_dir = os.path.dirname(os.path.dirname(__file__))
+                            if photo_path.startswith('uploads/'):
+                                full_path = os.path.join(base_dir, photo_path)
+                            else:
+                                full_path = os.path.join(base_dir, photo_path.lstrip('/'))
+                            
+                            if os.path.exists(full_path):
+                                url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto'
+                                with open(full_path, 'rb') as photo_file:
+                                    files = {'photo': photo_file}
+                                    payload = {
+                                        'chat_id': chat.telegram_chat_id,
+                                        'caption': publication_text,
+                                        'parse_mode': 'HTML'
+                                    }
+                                    response = requests.post(url, files=files, data=payload, timeout=30)
+                            else:
+                                logger.warning(f"Photo file not found: {full_path}, sending text only")
+                                url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
+                                payload = {
+                                    'chat_id': chat.telegram_chat_id,
+                                    'text': publication_text,
+                                    'parse_mode': 'HTML'
+                                }
+                                response = requests.post(url, json=payload, timeout=10)
+                        else:
+                            # Если не удалось определить тип фото, отправляем только текст
+                            url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
+                            payload = {
+                                'chat_id': chat.telegram_chat_id,
+                                'text': publication_text,
+                                'parse_mode': 'HTML'
+                            }
+                            response = requests.post(url, json=payload, timeout=10)
+                else:
+                    # Если формат неожиданный, отправляем только текст
+                    url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
+                    payload = {
+                        'chat_id': chat.telegram_chat_id,
+                        'text': publication_text,
+                        'parse_mode': 'HTML'
+                    }
+                    response = requests.post(url, json=payload, timeout=10)
+            else:
+                # Если фото нет - отправляем только текст
+                url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
+                payload = {
+                    'chat_id': chat.telegram_chat_id,
+                    'text': publication_text,
+                    'parse_mode': 'HTML'
+                }
+                response = requests.post(url, json=payload, timeout=10)
+            
             response.raise_for_status()
             result = response.json()
             

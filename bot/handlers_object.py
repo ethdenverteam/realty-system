@@ -380,7 +380,7 @@ async def object_comment_input(update: Update, context: ContextTypes.DEFAULT_TYP
                 [InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "📷 Отправьте фото объекта (до 10 фото). Нажмите 'Пропустить' если фото нет:",
+        "📷 Отправьте одно фото объекта. Нажмите 'Пропустить' если фото нет:",
         reply_markup=reply_markup
     )
     return OBJECT_WAITING_MEDIA
@@ -409,36 +409,26 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
             # Get largest photo
             photo = photos[-1]
             
-            # Save photo info (in production, download and save to uploads/)
-            # For now, just store file_id
-            photos_json = obj.photos_json or []
-            if len(photos_json) < 10:
-                photos_json.append({
-                    'file_id': photo.file_id,
-                    'file_unique_id': photo.file_unique_id
-                })
-                obj.photos_json = photos_json
-                db_session.commit()
+            # Save photo info - только одно фото разрешено
+            photos_json = [{
+                'file_id': photo.file_id,
+                'file_unique_id': photo.file_unique_id
+            }]
+            obj.photos_json = photos_json
+            db_session.commit()
     finally:
         db_session.close()
     
     # Handle photo response (outside of db session)
     if update.message.photo:
-        remaining = 10 - len(photos_json)
-        if remaining > 0:
-            await update.message.reply_text(
-                f"✅ Фото добавлено. Осталось мест: {remaining}. Отправьте еще фото или нажмите 'Пропустить':"
-            )
-            return OBJECT_WAITING_MEDIA
-        else:
-            await update.message.reply_text("✅ Все фото добавлены (максимум 10).")
-            # Check if this is editing (comment exists) or creation
-            obj = get_object(object_id)
-            if obj and obj.comment:
-                from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
-                await show_object_preview_with_menu(update, context, object_id)
-                return OBJECT_PREVIEW_MENU
-            return await finish_object_creation(update, context)
+        await update.message.reply_text("✅ Фото добавлено.")
+        # Check if this is editing (comment exists) or creation
+        obj = get_object(object_id)
+        if obj and obj.comment:
+            from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
+            await show_object_preview_with_menu(update, context, object_id)
+            return OBJECT_PREVIEW_MENU
+        return await finish_object_creation(update, context)
     
     await update.message.reply_text("❌ Отправьте фото или нажмите 'Пропустить'.")
     return OBJECT_WAITING_MEDIA
@@ -542,41 +532,31 @@ async def show_object_preview_with_menu(update: Update, context: ContextTypes.DE
         else:
             return ConversationHandler.END
         
-        # Send media if exists
+        # Send media if exists - всегда отправляем фото если оно есть
         photos_json = obj.photos_json or []
         preview_message = None
         
-        if photos_json:
+        if photos_json and len(photos_json) > 0:
             try:
-                media_group = []
-                for photo_data in photos_json[:10]:
-                    if isinstance(photo_data, dict):
-                        file_id = photo_data.get('file_id')
-                        if file_id:
-                            media_group.append(InputMediaPhoto(
-                                file_id,
-                                caption=text if len(media_group) == 0 else None
-                            ))
-                
-                if len(media_group) == 1:
-                    preview_message = await message.reply_photo(
-                        photo=media_group[0].media,
-                        caption=text,
-                        parse_mode='HTML'
-                    )
-                elif len(media_group) > 1:
-                    # Update first media with HTML parse mode
-                    if media_group[0].caption:
-                        media_group[0].parse_mode = 'HTML'
-                    sent_messages = await message.reply_media_group(media=media_group)
-                    if sent_messages:
-                        preview_message = sent_messages[0]
+                # Берем первое фото (только одно фото разрешено)
+                photo_data = photos_json[0]
+                if isinstance(photo_data, dict):
+                    file_id = photo_data.get('file_id')
+                    if file_id:
+                        preview_message = await message.reply_photo(
+                            photo=file_id,
+                            caption=text,
+                            parse_mode='HTML'
+                        )
+                    else:
+                        preview_message = await message.reply_text(text, parse_mode='HTML')
                 else:
                     preview_message = await message.reply_text(text, parse_mode='HTML')
             except Exception as e:
                 logger.error(f"Error sending media: {e}")
                 preview_message = await message.reply_text(text, parse_mode='HTML')
         else:
+            # Если фото нет - отправляем только текст
             preview_message = await message.reply_text(text, parse_mode='HTML')
         
         # Send menu

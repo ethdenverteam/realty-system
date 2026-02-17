@@ -752,46 +752,35 @@ async def send_object_message(phone: str, chat_id: str, message_text: str, photo
             else:
                 return (False, "Account not authorized. Please connect first.", None)
         
-        # Send message with photos if available
+        # Send message with photo if available - всегда отправляем фото если оно есть
         if photos and len(photos) > 0:
-            # Prepare photo files
-            photo_files = []
-            base_dir = os.path.dirname(os.path.dirname(__file__))
-            for photo_path in photos[:10]:  # Telegram allows max 10 photos
-                # Handle both relative and absolute paths
-                if photo_path.startswith('/'):
-                    full_path = os.path.join(base_dir, photo_path.lstrip('/'))
-                elif photo_path.startswith('uploads/'):
-                    full_path = os.path.join(base_dir, photo_path)
-                else:
-                    full_path = os.path.join(base_dir, photo_path)
-                
-                if os.path.exists(full_path):
-                    photo_files.append(full_path)
-                else:
-                    logger.warning(f"Photo file not found: {full_path} (original path: {photo_path})")
+            # Берем первое фото (только одно фото разрешено)
+            photo_path = photos[0]
             
-            if photo_files:
-                # Send as media group or single photo
-                if len(photo_files) > 1:
-                    # Send as media group
-                    from telethon.tl.types import InputMediaUploadedPhoto
-                    media = []
-                    for photo_file in photo_files:
-                        uploaded_file = await client.upload_file(photo_file)
-                        media.append(InputMediaUploadedPhoto(uploaded_file))
-                    sent_messages = await client.send_file(int(chat_id), media, caption=message_text, parse_mode='html')
-                    message_id = sent_messages[0].id if isinstance(sent_messages, list) else sent_messages.id
-                else:
-                    # Send single photo
-                    sent_message = await client.send_file(int(chat_id), photo_files[0], caption=message_text, parse_mode='html')
-                    message_id = sent_message.id
+            # Если это словарь с путем, извлекаем путь
+            if isinstance(photo_path, dict):
+                photo_path = photo_path.get('path', '')
+            
+            # Подготавливаем путь к файлу
+            base_dir = os.path.dirname(os.path.dirname(__file__))
+            if photo_path.startswith('/'):
+                full_path = os.path.join(base_dir, photo_path.lstrip('/'))
+            elif photo_path.startswith('uploads/'):
+                full_path = os.path.join(base_dir, photo_path)
             else:
-                # No valid photos, send text only
+                full_path = os.path.join(base_dir, photo_path)
+            
+            if os.path.exists(full_path):
+                # Отправляем одно фото
+                sent_message = await client.send_file(int(chat_id), full_path, caption=message_text, parse_mode='html')
+                message_id = sent_message.id
+            else:
+                logger.warning(f"Photo file not found: {full_path} (original path: {photo_path}), sending text only")
+                # Если файл не найден, отправляем только текст
                 sent_message = await client.send_message(int(chat_id), message_text, parse_mode='html')
                 message_id = sent_message.id
         else:
-            # Send text only
+            # Если фото нет - отправляем только текст
             sent_message = await client.send_message(int(chat_id), message_text, parse_mode='html')
             message_id = sent_message.id
         

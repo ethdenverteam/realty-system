@@ -18,7 +18,7 @@ class Object(db.Model):
     districts_json = Column(JSON, nullable=False)  # List of districts
     region = Column(String(100), nullable=True)  # Parent region
     city = Column(String(100), nullable=True)  # Parent city
-    photos_json = Column(JSON, default=list)  # List of photo paths (up to 10)
+    photos_json = Column(JSON, default=list)  # List with single photo (path or file_id dict)
     area = Column(Float, nullable=True)  # Area in m²
     floor = Column(String(20), nullable=True)  # Floor like "6/9"
     address = Column(String(255), nullable=True)

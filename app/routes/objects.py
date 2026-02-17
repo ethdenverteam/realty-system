@@ -193,11 +193,10 @@ def create_object(current_user):
         except:
             districts_json = []
         
-        # Handle photo uploads
+        # Handle photo upload - только одно фото разрешено
         photos_json = []
-        photo_index = 0
-        while f'photo_{photo_index}' in request.files:
-            file = request.files[f'photo_{photo_index}']
+        if 'photo_0' in request.files:
+            file = request.files['photo_0']
             if file and file.filename:
                 filename = secure_filename(file.filename)
                 # Create unique filename
@@ -209,7 +208,6 @@ def create_object(current_user):
                 os.makedirs(os.path.dirname(filepath), exist_ok=True)
                 file.save(filepath)
                 photos_json.append(f"uploads/{filename}")
-            photo_index += 1
     else:
         # Handle JSON data
         data = request.get_json()
@@ -347,7 +345,12 @@ def update_object(object_id, current_user):
         obj.districts_json = districts_json
         logger.info(f"Object {object_id} districts updated: {old_districts} -> {districts_json}")
     if 'photos_json' in data:
-        obj.photos_json = data['photos_json']
+        # Ограничиваем до одного фото
+        photos_data = data['photos_json']
+        if isinstance(photos_data, list) and len(photos_data) > 0:
+            obj.photos_json = [photos_data[0]]  # Берем только первое фото
+        else:
+            obj.photos_json = []
     if 'area' in data:
         obj.area = data['area']
     if 'floor' in data:
@@ -896,27 +899,62 @@ def publish_object_via_bot(current_user):
                 
                 telegram_chat_id = chat.telegram_chat_id
                 
-                # Send message
+                # Send message - всегда отправляем фото если оно есть
                 photos_json = obj.photos_json or []
                 
                 if photos_json and len(photos_json) > 0:
-                    # For now, send text only (photo upload from web requires file handling)
-                    # TODO: Implement photo sending via Telegram API
-                    send_url = f'{url}/sendMessage'
-                    payload = {
-                        'chat_id': telegram_chat_id,
-                        'text': publication_text,
-                        'parse_mode': 'HTML'
-                    }
+                    # Берем первое фото (только одно фото разрешено)
+                    photo_path = photos_json[0]
+                    if isinstance(photo_path, dict):
+                        photo_path = photo_path.get('file_id') or photo_path.get('path', '')
+                    
+                    # Если это путь к файлу на диске, отправляем через sendPhoto
+                    if isinstance(photo_path, str) and (photo_path.startswith('uploads/') or '/' in photo_path):
+                        from app.config import Config
+                        import os
+                        base_dir = os.path.dirname(os.path.dirname(__file__))
+                        if photo_path.startswith('uploads/'):
+                            full_path = os.path.join(base_dir, photo_path)
+                        else:
+                            full_path = os.path.join(base_dir, photo_path.lstrip('/'))
+                        
+                        if os.path.exists(full_path):
+                            send_url = f'{url}/sendPhoto'
+                            with open(full_path, 'rb') as photo_file:
+                                files = {'photo': photo_file}
+                                payload = {
+                                    'chat_id': telegram_chat_id,
+                                    'caption': publication_text,
+                                    'parse_mode': 'HTML'
+                                }
+                                response = requests.post(send_url, files=files, data=payload, timeout=30)
+                        else:
+                            logger.warning(f"Photo file not found: {full_path}, sending text only")
+                            send_url = f'{url}/sendMessage'
+                            payload = {
+                                'chat_id': telegram_chat_id,
+                                'text': publication_text,
+                                'parse_mode': 'HTML'
+                            }
+                            response = requests.post(send_url, json=payload, timeout=10)
+                    else:
+                        # Если это не путь к файлу, отправляем только текст
+                        send_url = f'{url}/sendMessage'
+                        payload = {
+                            'chat_id': telegram_chat_id,
+                            'text': publication_text,
+                            'parse_mode': 'HTML'
+                        }
+                        response = requests.post(send_url, json=payload, timeout=10)
                 else:
+                    # Если фото нет - отправляем только текст
                     send_url = f'{url}/sendMessage'
                     payload = {
                         'chat_id': telegram_chat_id,
                         'text': publication_text,
                         'parse_mode': 'HTML'
                     }
-                
-                response = requests.post(send_url, json=payload, timeout=10)
+                    response = requests.post(send_url, json=payload, timeout=10)
                 response.raise_for_status()
                 result = response.json()
                 
