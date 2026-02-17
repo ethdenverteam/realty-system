@@ -23,6 +23,7 @@ const initialFormData: ObjectFormData = {
   contact_name_2: '',
   phone_number_2: '',
   show_username: false,
+  photo: null,
 }
 
 interface UserSettings {
@@ -34,6 +35,8 @@ interface UserSettings {
 export default function UserCreateObject(): JSX.Element {
   const navigate = useNavigate()
   const [formData, setFormData] = useState<ObjectFormData>(initialFormData)
+  const [loading, setLoading] = useState<boolean>(false)
+  const [error, setError] = useState<string>('')
 
   // Загрузка настроек пользователя
   const { data: settingsData } = useApiData<UserSettings>({
@@ -67,8 +70,8 @@ export default function UserCreateObject(): JSX.Element {
     }
   }, [settingsData])
 
-  // Мутация для создания объекта
-  const { mutate: createObject, loading, error, clearError } = useApiMutation<CreateObjectRequest, CreateObjectResponse>({
+  // Мутация для создания объекта (используется только когда нет фото)
+  const { mutate: createObject, loading: mutationLoading, error: mutationError, clearError } = useApiMutation<CreateObjectRequest, CreateObjectResponse>({
     url: '/objects/',
     method: 'POST',
     errorContext: 'Creating object',
@@ -79,6 +82,10 @@ export default function UserCreateObject(): JSX.Element {
       }
     },
   })
+
+  // Используем локальное состояние loading и error для поддержки FormData
+  const currentLoading = loading || mutationLoading
+  const currentError = error || mutationError
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault()
@@ -107,24 +114,72 @@ export default function UserCreateObject(): JSX.Element {
           .filter((d) => d.length > 0)
       : []
 
-    const requestData: CreateObjectRequest = {
-      rooms_type: formData.rooms_type,
-      price: parseFloat(formData.price),
-      area: formData.area ? parseFloat(formData.area) : null,
-      floor: formData.floor || null,
-      districts_json: districts,
-      comment: formData.comment || null,
-      address: formData.address || null,
-      residential_complex: formData.residential_complex || null,
-      renovation: formData.renovation || null,
-      contact_name: formData.contact_name || null,
-      phone_number: formData.phone_number?.trim() || null,
-      contact_name_2: formData.contact_name_2 || null,
-      phone_number_2: formData.phone_number_2?.trim() || null,
-      show_username: formData.show_username,
-    }
+    // Если есть фото, отправляем через FormData
+    if (formData.photo) {
+      const formDataToSend = new FormData()
+      formDataToSend.append('rooms_type', formData.rooms_type)
+      formDataToSend.append('price', formData.price)
+      if (formData.area) formDataToSend.append('area', formData.area)
+      if (formData.floor) formDataToSend.append('floor', formData.floor)
+      formDataToSend.append('districts_json', JSON.stringify(districts))
+      if (formData.comment) formDataToSend.append('comment', formData.comment)
+      if (formData.address) formDataToSend.append('address', formData.address)
+      if (formData.residential_complex) formDataToSend.append('residential_complex', formData.residential_complex)
+      if (formData.renovation) formDataToSend.append('renovation', formData.renovation)
+      if (formData.contact_name) formDataToSend.append('contact_name', formData.contact_name)
+      if (formData.phone_number?.trim()) formDataToSend.append('phone_number', formData.phone_number.trim())
+      if (formData.contact_name_2) formDataToSend.append('contact_name_2', formData.contact_name_2)
+      if (formData.phone_number_2?.trim()) formDataToSend.append('phone_number_2', formData.phone_number_2.trim())
+      formDataToSend.append('show_username', formData.show_username.toString())
+      formDataToSend.append('photo_0', formData.photo)
 
-    await createObject(requestData)
+      try {
+        setLoading(true)
+        const token = localStorage.getItem('jwt_token')
+        const response = await fetch('/system/objects/', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formDataToSend,
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Ошибка при создании объекта' }))
+          throw new Error(errorData.error || 'Ошибка при создании объекта')
+        }
+
+        const data = await response.json()
+        if (data.success || data.object_id) {
+          navigate('/user/dashboard/objects', { replace: true })
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Ошибка при создании объекта'
+        setError(message)
+      } finally {
+        setLoading(false)
+      }
+    } else {
+      // Если фото нет, отправляем через JSON как раньше
+      const requestData: CreateObjectRequest = {
+        rooms_type: formData.rooms_type,
+        price: parseFloat(formData.price),
+        area: formData.area ? parseFloat(formData.area) : null,
+        floor: formData.floor || null,
+        districts_json: districts,
+        comment: formData.comment || null,
+        address: formData.address || null,
+        residential_complex: formData.residential_complex || null,
+        renovation: formData.renovation || null,
+        contact_name: formData.contact_name || null,
+        phone_number: formData.phone_number?.trim() || null,
+        contact_name_2: formData.contact_name_2 || null,
+        phone_number_2: formData.phone_number_2?.trim() || null,
+        show_username: formData.show_username,
+      }
+
+      await createObject(requestData)
+    }
   }
 
   const handleCancel = (): void => {
@@ -138,11 +193,11 @@ export default function UserCreateObject(): JSX.Element {
           formData={formData}
           onChange={setFormData}
           onSubmit={handleSubmit}
-          loading={loading}
+          loading={currentLoading}
           submitLabel="Создать объект"
           cancelLabel="Отмена"
           onCancel={handleCancel}
-          error={error || 
+          error={currentError || 
             (formData.phone_number && formData.phone_number.trim() && !PHONE_PATTERN.test(formData.phone_number.trim()) ? PHONE_ERROR_MESSAGE : '') ||
             (formData.phone_number_2 && formData.phone_number_2.trim() && !PHONE_PATTERN.test(formData.phone_number_2.trim()) ? 'Второй номер телефона должен быть в формате 89693386969' : '')
           }

@@ -5,6 +5,32 @@ import { FilterSelect } from './FilterSelect'
 import { ROOMS_TYPES, RENOVATION_TYPES } from '../utils/constants'
 import './ObjectForm.css'
 
+// Компонент для предпросмотра фото с правильной очисткой URL
+function PhotoPreview({ file }: { file: File }): JSX.Element {
+  const [previewUrl, setPreviewUrl] = useState<string>('')
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file)
+    setPreviewUrl(url)
+    return () => {
+      URL.revokeObjectURL(url)
+    }
+  }, [file])
+
+  return (
+    <div style={{ marginTop: '10px' }}>
+      <img
+        src={previewUrl}
+        alt="Предпросмотр"
+        style={{ maxWidth: '200px', maxHeight: '200px', borderRadius: '4px' }}
+      />
+      <p style={{ marginTop: '5px', fontSize: '14px', color: '#666' }}>
+        {file.name}
+      </p>
+    </div>
+  )
+}
+
 interface ObjectFormProps {
   formData: ObjectFormData
   onChange: (data: ObjectFormData) => void
@@ -173,6 +199,35 @@ export default function ObjectForm({
 
         <div className="form-section">
           <h3 className="section-title">Описание</h3>
+          <div className="form-group">
+            <label className="form-label">Фото объекта</label>
+            <input
+              type="file"
+              accept="image/*"
+              className="form-input"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null
+                if (file) {
+                  // Проверка типа файла
+                  if (!file.type.startsWith('image/')) {
+                    alert('Пожалуйста, выберите файл изображения')
+                    e.target.value = ''
+                    return
+                  }
+                }
+                onChange({
+                  ...formData,
+                  photo: file,
+                })
+              }}
+            />
+            {formData.photo && (
+              <PhotoPreview file={formData.photo} />
+            )}
+            <small className="form-hint">
+              Разрешены только файлы изображений (JPG, PNG, GIF, WEBP и др.)
+            </small>
+          </div>
           <div className="form-group">
             <label className="form-label">Комментарий</label>
             <textarea

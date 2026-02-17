@@ -117,6 +117,7 @@ export interface ObjectFormData {
   contact_name_2: string;
   phone_number_2: string;
   show_username: boolean;
+  photo?: File | null;
 }
 
 export interface CreateObjectRequest {
