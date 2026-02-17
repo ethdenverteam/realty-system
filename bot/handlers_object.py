@@ -541,20 +541,61 @@ async def show_object_preview_with_menu(update: Update, context: ContextTypes.DE
             try:
                 # Берем первое фото (только одно фото разрешено)
                 photo_data = photos_json[0]
+                photo_file = None
+                
+                # Определяем источник фото: file_id или путь к файлу
                 if isinstance(photo_data, dict):
                     file_id = photo_data.get('file_id')
                     if file_id:
+                        # Если есть file_id - используем его
                         preview_message = await message.reply_photo(
                             photo=file_id,
                             caption=text,
                             parse_mode='HTML'
                         )
                     else:
-                        preview_message = await message.reply_text(text, parse_mode='HTML')
+                        # Если нет file_id, но есть путь - загружаем файл
+                        photo_path = photo_data.get('path', '')
+                        if not photo_path:
+                            photo_path = ''
                 else:
+                    # Если это строка - это путь к файлу
+                    photo_path = photo_data if isinstance(photo_data, str) else ''
+                
+                # Если есть путь к файлу, загружаем и отправляем
+                if not preview_message and photo_path:
+                    import os
+                    # Путь к корню проекта (где находится app/)
+                    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                    if photo_path.startswith('uploads/'):
+                        # Если путь начинается с uploads/, добавляем static/
+                        full_path = os.path.join(base_dir, 'static', photo_path)
+                    elif photo_path.startswith('static/uploads/'):
+                        # Если уже есть static/uploads/
+                        full_path = os.path.join(base_dir, photo_path)
+                    elif photo_path.startswith('/'):
+                        # Если абсолютный путь
+                        full_path = photo_path
+                    else:
+                        # Относительный путь
+                        full_path = os.path.join(base_dir, 'static', 'uploads', photo_path)
+                    
+                    if os.path.exists(full_path):
+                        # Открываем файл и отправляем
+                        with open(full_path, 'rb') as f:
+                            preview_message = await message.reply_photo(
+                                photo=f,
+                                caption=text,
+                                parse_mode='HTML'
+                            )
+                    else:
+                        logger.warning(f"Photo file not found: {full_path} (original: {photo_path})")
+                        preview_message = await message.reply_text(text, parse_mode='HTML')
+                elif not preview_message:
+                    # Если не удалось определить фото - отправляем только текст
                     preview_message = await message.reply_text(text, parse_mode='HTML')
             except Exception as e:
-                logger.error(f"Error sending media: {e}")
+                logger.error(f"Error sending media: {e}", exc_info=True)
                 preview_message = await message.reply_text(text, parse_mode='HTML')
         else:
             # Если фото нет - отправляем только текст

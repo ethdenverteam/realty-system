@@ -364,23 +364,62 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
             if photos_json and len(photos_json) > 0:
                 # Берем первое фото (только одно фото разрешено)
                 photo_data = photos_json[0]
+                photo_sent = False
+                
+                # Определяем источник фото: file_id или путь к файлу
                 if isinstance(photo_data, dict):
                     file_id = photo_data.get('file_id')
                     if file_id:
+                        # Если есть file_id - используем его
                         await context.bot.send_photo(
                             chat_id=telegram_chat_id,
                             photo=file_id,
                             caption=publication_text,
                             parse_mode='HTML'
                         )
+                        photo_sent = True
                     else:
-                        # Если file_id нет, отправляем только текст
-                        await context.bot.send_message(
-                            chat_id=telegram_chat_id,
-                            text=publication_text,
-                            parse_mode='HTML'
-                        )
+                        # Если нет file_id, но есть путь - загружаем файл
+                        photo_path = photo_data.get('path', '')
+                        if not photo_path:
+                            photo_path = ''
                 else:
+                    # Если это строка - это путь к файлу
+                    photo_path = photo_data if isinstance(photo_data, str) else ''
+                
+                # Если есть путь к файлу и фото еще не отправлено, загружаем и отправляем
+                if not photo_sent and photo_path:
+                    import os
+                    # Путь к корню проекта (где находится app/)
+                    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                    if photo_path.startswith('uploads/'):
+                        # Если путь начинается с uploads/, добавляем static/
+                        full_path = os.path.join(base_dir, 'static', photo_path)
+                    elif photo_path.startswith('static/uploads/'):
+                        # Если уже есть static/uploads/
+                        full_path = os.path.join(base_dir, photo_path)
+                    elif photo_path.startswith('/'):
+                        # Если абсолютный путь
+                        full_path = photo_path
+                    else:
+                        # Относительный путь
+                        full_path = os.path.join(base_dir, 'static', 'uploads', photo_path)
+                    
+                    if os.path.exists(full_path):
+                        # Открываем файл и отправляем
+                        with open(full_path, 'rb') as f:
+                            await context.bot.send_photo(
+                                chat_id=telegram_chat_id,
+                                photo=f,
+                                caption=publication_text,
+                                parse_mode='HTML'
+                            )
+                        photo_sent = True
+                    else:
+                        logger.warning(f"Photo file not found: {full_path} (original: {photo_path})")
+                
+                # Если фото не было отправлено - отправляем только текст
+                if not photo_sent:
                     await context.bot.send_message(
                         chat_id=telegram_chat_id,
                         text=publication_text,
