@@ -361,37 +361,29 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
                     db.close()
             
             # Send message - всегда отправляем фото если оно есть
+            # Всегда используем путь к файлу на сервере
             if photos_json and len(photos_json) > 0:
                 # Берем первое фото (только одно фото разрешено)
                 photo_data = photos_json[0]
-                photo_sent = False
                 
-                # Определяем источник фото: file_id или путь к файлу
+                # Извлекаем путь к файлу
+                photo_path = None
                 if isinstance(photo_data, dict):
-                    file_id = photo_data.get('file_id')
-                    if file_id:
-                        # Если есть file_id - используем его
-                        await context.bot.send_photo(
-                            chat_id=telegram_chat_id,
-                            photo=file_id,
-                            caption=publication_text,
-                            parse_mode='HTML'
-                        )
-                        photo_sent = True
-                    else:
-                        # Если нет file_id, но есть путь - загружаем файл
-                        photo_path = photo_data.get('path', '')
-                        if not photo_path:
-                            photo_path = ''
-                else:
+                    # Если это объект - берем path
+                    photo_path = photo_data.get('path', '')
+                elif isinstance(photo_data, str):
                     # Если это строка - это путь к файлу
-                    photo_path = photo_data if isinstance(photo_data, str) else ''
+                    photo_path = photo_data
                 
-                # Если есть путь к файлу и фото еще не отправлено, загружаем и отправляем
-                if not photo_sent and photo_path:
+                # Загружаем файл с сервера и отправляем
+                if photo_path:
                     import os
+                    from app.config import Config
+                    
                     # Путь к корню проекта (где находится app/)
                     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                    
+                    # Нормализуем путь
                     if photo_path.startswith('uploads/'):
                         # Если путь начинается с uploads/, добавляем static/
                         full_path = os.path.join(base_dir, 'static', photo_path)
@@ -402,8 +394,8 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
                         # Если абсолютный путь
                         full_path = photo_path
                     else:
-                        # Относительный путь
-                        full_path = os.path.join(base_dir, 'static', 'uploads', photo_path)
+                        # Относительный путь - используем Config.UPLOAD_FOLDER
+                        full_path = os.path.join(Config.UPLOAD_FOLDER, photo_path)
                     
                     if os.path.exists(full_path):
                         # Открываем файл и отправляем
@@ -414,12 +406,16 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
                                 caption=publication_text,
                                 parse_mode='HTML'
                             )
-                        photo_sent = True
                     else:
                         logger.warning(f"Photo file not found: {full_path} (original: {photo_path})")
-                
-                # Если фото не было отправлено - отправляем только текст
-                if not photo_sent:
+                        # Отправляем только текст если файл не найден
+                        await context.bot.send_message(
+                            chat_id=telegram_chat_id,
+                            text=publication_text,
+                            parse_mode='HTML'
+                        )
+                else:
+                    # Если путь не найден - отправляем только текст
                     await context.bot.send_message(
                         chat_id=telegram_chat_id,
                         text=publication_text,

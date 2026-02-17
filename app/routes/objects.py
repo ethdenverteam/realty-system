@@ -208,66 +208,9 @@ def create_object(current_user):
                 os.makedirs(os.path.dirname(filepath), exist_ok=True)
                 file.save(filepath)
                 
-                # Upload photo to Telegram bot to get file_id
-                # This allows bot to use the photo without downloading
-                file_id = None
-                try:
-                    from bot.config import BOT_TOKEN
-                    import requests
-                    
-                    if BOT_TOKEN:
-                        # Send photo to bot itself to get file_id
-                        # We'll send it to the bot's own chat (bot can send to itself)
-                        # Or use a special method - send to getUpdates chat
-                        # Actually, we need to send to a chat - let's use bot's own user_id if available
-                        # Or better - send to a test chat or use getMe to get bot info
-                        
-                        # Get bot info to get bot's user_id
-                        bot_info_url = f'https://api.telegram.org/bot{BOT_TOKEN}/getMe'
-                        bot_info_response = requests.get(bot_info_url, timeout=10)
-                        if bot_info_response.status_code == 200:
-                            bot_info = bot_info_response.json()
-                            if bot_info.get('ok'):
-                                bot_user_id = bot_info['result']['id']
-                                
-                                # Send photo to bot itself
-                                send_url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto'
-                                with open(filepath, 'rb') as photo_file:
-                                    files = {'photo': photo_file}
-                                    data = {
-                                        'chat_id': bot_user_id,  # Send to bot itself
-                                        'caption': 'temp'  # Temporary caption
-                                    }
-                                    response = requests.post(send_url, files=files, data=data, timeout=30)
-                                    
-                                    if response.status_code == 200:
-                                        result = response.json()
-                                        if result.get('ok') and result.get('result', {}).get('photo'):
-                                            # Get largest photo
-                                            photos = result['result']['photo']
-                                            largest_photo = photos[-1]  # Last is largest
-                                            file_id = largest_photo.get('file_id')
-                                            
-                                            # Delete the temporary message
-                                            if result.get('result', {}).get('message_id'):
-                                                delete_url = f'https://api.telegram.org/bot{BOT_TOKEN}/deleteMessage'
-                                                delete_data = {
-                                                    'chat_id': bot_user_id,
-                                                    'message_id': result['result']['message_id']
-                                                }
-                                                requests.post(delete_url, json=delete_data, timeout=10)
-                except Exception as e:
-                    logger.warning(f"Failed to get file_id from Telegram for web-uploaded photo: {e}")
-                    # Continue without file_id - will use path only
-                
-                # Store both path (for web) and file_id (for bot)
-                photo_data = {
-                    'path': f"uploads/{filename}"
-                }
-                if file_id:
-                    photo_data['file_id'] = file_id
-                
-                photos_json.append(photo_data)
+                # Always store only path to file on server
+                # Bot will load file from server when needed
+                photos_json.append(f"uploads/{filename}")
     else:
         # Handle JSON data
         data = request.get_json()

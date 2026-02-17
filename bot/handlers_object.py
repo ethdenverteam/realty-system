@@ -410,7 +410,7 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
             photo = photos[-1]
             
             # Download photo file from Telegram and save to disk
-            # This allows web interface to display the photo
+            # Always save to server - this is the only way we store photos
             photo_path = None
             try:
                 # Get file info from Telegram
@@ -419,7 +419,6 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
                 # Generate unique filename
                 import os
                 from datetime import datetime
-                from werkzeug.utils import secure_filename
                 from app.config import Config
                 
                 # Get file extension from file_path or use .jpg as default
@@ -439,22 +438,19 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
                 # Download and save file
                 await file.download_to_drive(filepath)
                 
-                # Store relative path for web
+                # Store relative path - always use path, never file_id
                 photo_path = f"uploads/{filename}"
             except Exception as e:
                 logger.error(f"Error downloading photo from Telegram: {e}", exc_info=True)
-                # Continue without path - will use file_id only
+                await update.message.reply_text("❌ Ошибка при сохранении фото. Попробуйте еще раз.")
+                return OBJECT_WAITING_MEDIA
             
             # Save photo info - только одно фото разрешено
-            # Store both file_id (for bot) and path (for web)
-            photo_data = {
-                'file_id': photo.file_id,
-                'file_unique_id': photo.file_unique_id
-            }
+            # Always store only path to file on server
             if photo_path:
-                photo_data['path'] = photo_path
-            
-            photos_json = [photo_data]
+                photos_json = [photo_path]
+            else:
+                photos_json = []
             obj.photos_json = photos_json
             db_session.commit()
     finally:
@@ -584,30 +580,24 @@ async def show_object_preview_with_menu(update: Update, context: ContextTypes.DE
                 photo_data = photos_json[0]
                 photo_file = None
                 
-                # Определяем источник фото: file_id или путь к файлу
+                # Извлекаем путь к файлу - всегда используем путь к файлу на сервере
+                photo_path = None
                 if isinstance(photo_data, dict):
-                    file_id = photo_data.get('file_id')
-                    if file_id:
-                        # Если есть file_id - используем его
-                        preview_message = await message.reply_photo(
-                            photo=file_id,
-                            caption=text,
-                            parse_mode='HTML'
-                        )
-                    else:
-                        # Если нет file_id, но есть путь - загружаем файл
-                        photo_path = photo_data.get('path', '')
-                        if not photo_path:
-                            photo_path = ''
-                else:
+                    # Если это объект - берем path
+                    photo_path = photo_data.get('path', '')
+                elif isinstance(photo_data, str):
                     # Если это строка - это путь к файлу
-                    photo_path = photo_data if isinstance(photo_data, str) else ''
+                    photo_path = photo_data
                 
                 # Если есть путь к файлу, загружаем и отправляем
-                if not preview_message and photo_path:
+                if photo_path:
                     import os
+                    from app.config import Config
+                    
                     # Путь к корню проекта (где находится app/)
                     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                    
+                    # Нормализуем путь
                     if photo_path.startswith('uploads/'):
                         # Если путь начинается с uploads/, добавляем static/
                         full_path = os.path.join(base_dir, 'static', photo_path)
@@ -618,8 +608,8 @@ async def show_object_preview_with_menu(update: Update, context: ContextTypes.DE
                         # Если абсолютный путь
                         full_path = photo_path
                     else:
-                        # Относительный путь
-                        full_path = os.path.join(base_dir, 'static', 'uploads', photo_path)
+                        # Относительный путь - используем Config.UPLOAD_FOLDER
+                        full_path = os.path.join(Config.UPLOAD_FOLDER, photo_path)
                     
                     if os.path.exists(full_path):
                         # Открываем файл и отправляем
@@ -632,7 +622,7 @@ async def show_object_preview_with_menu(update: Update, context: ContextTypes.DE
                     else:
                         logger.warning(f"Photo file not found: {full_path} (original: {photo_path})")
                         preview_message = await message.reply_text(text, parse_mode='HTML')
-                elif not preview_message:
+                else:
                     # Если не удалось определить фото - отправляем только текст
                     preview_message = await message.reply_text(text, parse_mode='HTML')
             except Exception as e:
