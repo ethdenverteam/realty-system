@@ -135,6 +135,18 @@
   font-weight: 500;
 }
 
+.status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.status-account {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
 .progress-info {
   display: flex;
   flex-direction: column;

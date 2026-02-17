@@ -5,6 +5,7 @@ import { ThemeProvider } from './contexts/ThemeContext'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
 import AdminBotChats from './pages/admin/BotChats'
+import AdminChatLists from './pages/admin/ChatLists'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminLogs from './pages/admin/Logs'
 import AdminUsers from './pages/admin/Users'
@@ -51,6 +52,14 @@ export default function App(): JSX.Element {
               element={
                 <ProtectedRoute requireAdmin>
                   <AdminBotChats />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard/chat-lists"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminChatLists />
                 </ProtectedRoute>
               }
             />

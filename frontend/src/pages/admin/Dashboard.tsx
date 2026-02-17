@@ -71,6 +71,7 @@ export default function AdminDashboard(): JSX.Element {
             {[
               { path: '/admin/dashboard', label: 'Главная', icon: '🏠' },
               { path: '/admin/dashboard/bot-chats', label: 'Управление чатами бота', icon: '💬' },
+              { path: '/admin/dashboard/chat-lists', label: 'Списки чатов (подписки)', icon: '📂' },
               { path: '/admin/dashboard/logs', label: 'Просмотр логов', icon: '📋' },
               { path: '/admin/dashboard/publication-queues', label: 'Очереди публикаций', icon: '📤' },
               { path: '/admin/dashboard/users', label: 'Управление пользователями', icon: '👥' },

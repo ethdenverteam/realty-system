@@ -34,6 +34,10 @@ celery_app.conf.update(
             'task': 'workers.tasks.process_autopublish',
             'schedule': 60.0,
         },
+        'process-chat-subscriptions-every-minute': {
+            'task': 'workers.tasks.process_chat_subscriptions',
+            'schedule': 60.0,
+        },
         # Ежедневное создание задач автопубликации (09:00 МСК ~= 06:00 UTC)
         'schedule-daily-autopublish-9-msk': {
             'task': 'workers.tasks.schedule_daily_autopublish',

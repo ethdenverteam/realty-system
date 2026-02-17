@@ -160,6 +160,21 @@ export default function Layout({
               <span>Чаты</span>
             </Link>
             <Link
+              to="/admin/dashboard/chat-lists"
+              className={`top-nav-item ${location.pathname.includes('/chat-lists') ? 'active' : ''}`}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M3 4H17M3 10H17M3 16H11"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Списки чатов</span>
+            </Link>
+            <Link
               to="/admin/dashboard/logs"
               className={`top-nav-item ${location.pathname.includes('/logs') ? 'active' : ''}`}
             >

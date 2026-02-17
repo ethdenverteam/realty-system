@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import or_
 import logging
 import asyncio
+import random
 
 from bot.utils import get_districts_config
 from app.utils.time_utils import (
@@ -479,6 +480,42 @@ def process_scheduled_publications():
         db.close()
 
 
+@celery_app.task(name='workers.tasks.process_chat_subscriptions')
+def process_chat_subscriptions():
+    """
+    Process chat subscriptions based on next_run_at (устойчивая к перезапуску схема).
+    Выбирает задачи из app БД и запускает шаг подписки через subscribe_to_chats_task.
+    """
+    from app import app
+
+    with app.app_context():
+        try:
+            now = datetime.utcnow()
+            # Выбираем задачи, которые нужно выполнять сейчас или которые ещё не имеют next_run_at
+            tasks = ChatSubscriptionTask.query.filter(
+                ChatSubscriptionTask.status.in_(['pending', 'processing', 'flood_wait']),
+                or_(ChatSubscriptionTask.next_run_at.is_(None), ChatSubscriptionTask.next_run_at <= now),
+            ).all()
+
+            if not tasks:
+                return 0
+
+            count = 0
+            for task in tasks:
+                logger.info(
+                    f"Scheduling chat subscription step for task {task.task_id} "
+                    f"(status={task.status}, current_index={task.current_index}/{task.total_chats}, "
+                    f"next_run_at={task.next_run_at})"
+                )
+                subscribe_to_chats_task.delay(task.task_id)
+                count += 1
+
+            return count
+        except Exception as e:
+            logger.error(f"Error in process_chat_subscriptions: {e}", exc_info=True)
+            return 0
+
+
 @celery_app.task(name='workers.tasks.subscribe_to_chats_task')
 def subscribe_to_chats_task(task_id: int):
     """
@@ -497,8 +534,8 @@ def subscribe_to_chats_task(task_id: int):
                 return False
             
             # Проверяем статус задачи
-            if task.status not in ['pending', 'processing']:
-                logger.info(f"Task {task_id} is not in pending/processing status: {task.status}")
+            if task.status not in ['pending', 'processing', 'flood_wait']:
+                logger.info(f"Task {task_id} is not in pending/processing/flood_wait status: {task.status}")
                 return False
             
             # Получаем аккаунт
@@ -511,24 +548,15 @@ def subscribe_to_chats_task(task_id: int):
                 app_db.session.commit()
                 return False
             
-            # Обновляем статус на processing
+            # Если задача на паузе (ручной pause) и нет flood_wait_until - выходим
+            if task.status == 'flood_wait' and task.flood_wait_until is None:
+                logger.info(f"Task {task_id} is paused by user, skipping execution")
+                return False
+
+            # Обновляем статус на processing при первом запуске
             if task.status == 'pending':
                 task.status = 'processing'
                 task.started_at = datetime.utcnow()
-                app_db.session.commit()
-            
-            # Проверяем, не нужно ли ждать после flood
-            if task.flood_wait_until and task.flood_wait_until > datetime.utcnow():
-                wait_seconds = int((task.flood_wait_until - datetime.utcnow()).total_seconds())
-                logger.info(f"Task {task_id} waiting for flood: {wait_seconds} seconds remaining")
-                # Запускаем задачу снова через wait_seconds
-                subscribe_to_chats_task.apply_async(args=[task_id], countdown=wait_seconds)
-                return True
-            
-            # Если был flood_wait и время прошло, сбрасываем статус
-            if task.status == 'flood_wait' and task.flood_wait_until and task.flood_wait_until <= datetime.utcnow():
-                task.status = 'processing'
-                task.flood_wait_until = None
                 app_db.session.commit()
             
             # Получаем список ссылок
@@ -600,15 +628,31 @@ def subscribe_to_chats_task(task_id: int):
                 
                 logger.info(f"Successfully subscribed to chat {current_index}/{total_chats}: {title}")
                 
-                # Если это не последний чат, планируем следующую подписку через 10 минут
+                # Определяем базовый интервал: 1 минута для уже подписанных чатов, 10 минут для новых
+                base_minutes = 10
+                if chat_info.get('already_subscribed'):
+                    base_minutes = 1
+                
+                # Добавляем случайный джиттер 1-99 секунд
+                jitter_seconds = random.randint(1, 99)
+                delay_seconds = base_minutes * 60 + jitter_seconds
+                
+                # Если это не последний чат, планируем следующую подписку через next_run_at
                 if current_index < total_chats:
-                    subscribe_to_chats_task.apply_async(args=[task_id], countdown=600)  # 10 минут = 600 секунд
+                    next_run = datetime.utcnow() + timedelta(seconds=delay_seconds)
+                    task.next_run_at = next_run
+                    app_db.session.commit()
+                    logger.info(
+                        f"Scheduled next subscription step for task {task_id} at {next_run} "
+                        f"(base {base_minutes} min + jitter {jitter_seconds}s)"
+                    )
                     return True
                 else:
                     # Все чаты обработаны
                     task.status = 'completed'
                     task.completed_at = datetime.utcnow()
                     task.result = f"Успешная подписка {successful_count}/{total_chats}"
+                    task.next_run_at = None
                     app_db.session.commit()
                     logger.info(f"Task {task_id} completed: {successful_count}/{total_chats} chats subscribed")
                     return True
@@ -627,12 +671,14 @@ def subscribe_to_chats_task(task_id: int):
                     # Первые 3 flood ошибки - ждем и продолжаем автоматически
                     task.flood_count = flood_count
                     task.flood_wait_until = flood_wait_until
-                    task.status = 'processing'  # Остаемся в processing, просто ждем
+                    task.status = 'processing'
+                    task.next_run_at = flood_wait_until
                     app_db.session.commit()
                     
-                    # Планируем продолжение после окончания flood
-                    subscribe_to_chats_task.apply_async(args=[task_id], countdown=wait_seconds)
-                    logger.info(f"Task {task_id} will continue after flood wait ({wait_seconds}s), flood count: {flood_count}")
+                    logger.info(
+                        f"Task {task_id} will continue after flood wait ({wait_seconds}s) "
+                        f"(auto-continue, flood count: {flood_count})"
+                    )
                     return True
                 else:
                     # После 3-го flood - останавливаем и сохраняем место
@@ -641,6 +687,7 @@ def subscribe_to_chats_task(task_id: int):
                     task.flood_wait_until = flood_wait_until
                     task.current_index = current_index  # Сохраняем место остановки
                     task.result = f"Flood ошибка (flood count: {flood_count}), остановка на чате {current_index + 1}/{total_chats}, подождите до {flood_wait_until.strftime('%Y-%m-%d %H:%M:%S')} UTC"
+                    task.next_run_at = None
                     app_db.session.commit()
                     logger.warning(f"Task {task_id} stopped due to flood (count: {flood_count}), stopped at chat {current_index + 1}/{total_chats}")
                     return False
@@ -654,15 +701,37 @@ def subscribe_to_chats_task(task_id: int):
                 task.error_message = f"Ошибка на чате {current_index}/{total_chats}: {error_msg}"
                 app_db.session.commit()
                 
-                # Продолжаем со следующего чата через 10 минут
+                # Определяем, является ли ошибка "ошибкой ссылки" (инвайт истёк, чат не найден, неверный формат)
+                link_error = False
+                if error_msg:
+                    msg_lower = error_msg.lower()
+                    if (
+                        'invite link has expired' in msg_lower
+                        or 'chat not found' in msg_lower
+                        or 'invalid chat link format' in msg_lower
+                    ):
+                        link_error = True
+                
+                base_minutes = 1 if link_error else 10
+                jitter_seconds = random.randint(1, 99)
+                delay_seconds = base_minutes * 60 + jitter_seconds
+                
+                # Продолжаем со следующего чата с задержкой через next_run_at
                 if current_index < total_chats:
-                    subscribe_to_chats_task.apply_async(args=[task_id], countdown=600)
+                    next_run = datetime.utcnow() + timedelta(seconds=delay_seconds)
+                    task.next_run_at = next_run
+                    app_db.session.commit()
+                    logger.info(
+                        f"Scheduled next subscription step after error for task {task_id} at {next_run} "
+                        f"(base {base_minutes} min + jitter {jitter_seconds}s, link_error={link_error})"
+                    )
                     return True
                 else:
                     # Все чаты обработаны (с ошибками)
                     task.status = 'completed'
                     task.completed_at = datetime.utcnow()
                     task.result = f"Подписка завершена с ошибками: {successful_count}/{total_chats} успешно"
+                    task.next_run_at = None
                     app_db.session.commit()
                     logger.info(f"Task {task_id} completed with errors: {successful_count}/{total_chats} chats subscribed")
                     return True

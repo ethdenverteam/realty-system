@@ -104,6 +104,23 @@ export default function ChatSubscriptions(): JSX.Element {
     },
   })
 
+  const pauseSubscriptionMutation = useApiMutation<SubscriptionTask>({
+    url: `/chat-subscriptions/tasks/${selectedTaskId}/pause`,
+    method: 'POST',
+    onSuccess: () => {
+      reloadTasks()
+    },
+  })
+
+  const cancelSubscriptionMutation = useApiMutation<SubscriptionTask>({
+    url: `/chat-subscriptions/tasks/${selectedTaskId}/cancel`,
+    method: 'POST',
+    onSuccess: () => {
+      setSelectedTaskId(null)
+      reloadTasks()
+    },
+  })
+
   const deleteGroupMutation = useApiMutation({
     url: `/chat-subscriptions/groups/${selectedGroupId}`,
     method: 'DELETE',
@@ -125,6 +142,13 @@ export default function ChatSubscriptions(): JSX.Element {
       return () => clearInterval(interval)
     }
   }, [currentTask?.status, reloadTasks])
+
+  const getAccountLabel = (accountId: number | null | undefined): string => {
+    if (!accountId) return '-'
+    const acc = accounts?.find((a) => a.account_id === accountId)
+    if (!acc) return `ID ${accountId}`
+    return `${acc.phone} ${acc.is_active ? '(активен)' : '(неактивен)'}`
+  }
 
   const handleCreateGroup = async () => {
     if (!groupName.trim()) {
@@ -192,6 +216,16 @@ export default function ChatSubscriptions(): JSX.Element {
     } catch (error) {
       logError(error, 'Canceling subscription')
       alert(getErrorMessage(error, 'Ошибка отмены задачи'))
+    }
+  }
+
+  const handlePauseSubscription = async (taskId: number) => {
+    setSelectedTaskId(taskId)
+    try {
+      await pauseSubscriptionMutation.mutate({})
+    } catch (error) {
+      logError(error, 'Pausing subscription')
+      alert(getErrorMessage(error, 'Ошибка паузы задачи'))
     }
   }
 
@@ -366,25 +400,35 @@ export default function ChatSubscriptions(): JSX.Element {
                 <span className="status-badge" style={{ backgroundColor: getStatusColor(currentTask.status) }}>
                   {getStatusText(currentTask)}
                 </span>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  {(currentTask.status === 'processing' || currentTask.status === 'pending' || currentTask.status === 'flood_wait') && (
+                <div className="status-actions">
+                  {(currentTask.status === 'processing' || currentTask.status === 'pending') && (
+                    <GlassButton
+                      onClick={() => handlePauseSubscription(currentTask.task_id)}
+                      disabled={pauseSubscriptionMutation.isLoading}
+                      small
+                    >
+                      {pauseSubscriptionMutation.isLoading ? 'Пауза...' : 'Пауза'}
+                    </GlassButton>
+                  )}
+                  {(currentTask.status === 'processing' ||
+                    currentTask.status === 'pending' ||
+                    currentTask.status === 'flood_wait') && (
                     <GlassButton
                       onClick={() => handleCancelSubscription(currentTask.task_id)}
                       disabled={cancelSubscriptionMutation.isLoading}
                       small
                       style={{ backgroundColor: '#dc3545' }}
                     >
-                      {cancelSubscriptionMutation.isLoading ? 'Отмена...' : 'Отменить'}
+                      {cancelSubscriptionMutation.isLoading ? 'Отменить...' : 'Отменить'}
                     </GlassButton>
                   )}
-                  <GlassButton
-                    onClick={() => reloadTasks()}
-                    disabled={tasksLoading}
-                    small
-                  >
+                  <GlassButton onClick={() => reloadTasks()} disabled={tasksLoading} small>
                     Обновить статус
                   </GlassButton>
                 </div>
+              </div>
+              <div className="status-account">
+                Аккаунт: {getAccountLabel(currentTask.account_id)}
               </div>
               <div className="progress-info">
                 <div className="progress-bar">

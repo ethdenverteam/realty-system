@@ -256,13 +256,11 @@ def start_subscription(current_user):
             successful_count=0,
             flood_count=0,
             chat_links=chat_links,
+            # Первый запуск можно делать сразу после создания
+            next_run_at=datetime.utcnow(),
         )
         db.session.add(task)
         db.session.commit()
-        
-        # Запускаем Celery задачу
-        from workers.tasks import subscribe_to_chats_task
-        subscribe_to_chats_task.delay(task.task_id)
         
         log_action(
             user_id=current_user.user_id,
@@ -327,14 +325,11 @@ def continue_subscription(current_user, task_id):
             wait_seconds = int((task.flood_wait_until - datetime.utcnow()).total_seconds())
             return jsonify({'error': f'Нужно подождать еще {wait_seconds} секунд'}), 400
         
-        # Обновляем статус и запускаем задачу
+        # Обновляем статус и планируем следующий запуск
         task.status = 'pending'
         task.flood_wait_until = None
+        task.next_run_at = datetime.utcnow()
         db.session.commit()
-        
-        # Запускаем Celery задачу
-        from workers.tasks import subscribe_to_chats_task
-        subscribe_to_chats_task.delay(task.task_id)
         
         log_action(
             user_id=current_user.user_id,
@@ -368,6 +363,7 @@ def cancel_subscription(current_user, task_id):
         task.status = 'failed'
         task.error_message = 'Отменено пользователем'
         task.completed_at = datetime.utcnow()
+        task.next_run_at = None
         db.session.commit()
         
         log_action(
@@ -384,6 +380,52 @@ def cancel_subscription(current_user, task_id):
         log_error(
             error=e,
             action='cancel_chat_subscription',
+            user_id=current_user.user_id if current_user else None,
+        )
+        return jsonify({'error': str(e)}), 500
+
+
+@chat_subscriptions_bp.route('/tasks/<int:task_id>/pause', methods=['POST'])
+@jwt_required
+def pause_subscription(current_user, task_id):
+    """Поставить задачу подписки на паузу (сохранить место и остановить авто-продолжение)"""
+    try:
+        task = ChatSubscriptionTask.query.filter_by(task_id=task_id, user_id=current_user.user_id).first()
+        if not task:
+            return jsonify({'error': 'Задача не найдена'}), 404
+
+        # На паузу можно ставить только активные задачи
+        previous_status = task.status
+        if task.status not in ['pending', 'processing']:
+            return jsonify({'error': f'Нельзя поставить на паузу задачу в статусе {task.status}'}), 400
+
+        # Ставим задачу на паузу:
+        # - статус 'flood_wait' используется как "ожидание", но без времени окончания
+        # - current_index уже хранит позицию следующего чата
+        task.status = 'flood_wait'
+        task.flood_wait_until = None
+        task.next_run_at = None
+        db.session.commit()
+
+        log_action(
+            user_id=current_user.user_id,
+            action='pause_chat_subscription',
+            details={
+                'task_id': task_id,
+                'previous_status': previous_status,
+                'current_index': task.current_index,
+                'total_chats': task.total_chats,
+            },
+        )
+
+        return jsonify(task.to_dict()), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error pausing subscription: {e}", exc_info=True)
+        log_error(
+            error=e,
+            action='pause_chat_subscription',
             user_id=current_user.user_id if current_user else None,
         )
         return jsonify({'error': str(e)}), 500

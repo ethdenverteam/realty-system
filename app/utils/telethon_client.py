@@ -975,6 +975,7 @@ async def subscribe_to_chat(phone: str, chat_link: str) -> Tuple[bool, Optional[
                                 'telegram_chat_id': chat_id,
                                 'title': title,
                                 'type': chat_type,
+                                'already_subscribed': True,  # Помечаем, что аккаунт уже был подписан
                             }
                             
                             await client.disconnect()
@@ -1052,6 +1053,7 @@ async def subscribe_to_chat(phone: str, chat_link: str) -> Tuple[bool, Optional[
                         'telegram_chat_id': chat_id,
                         'title': title,
                         'type': chat_type,
+                        'already_subscribed': True,  # Помечаем, что аккаунт уже был подписан
                     }
                     
                     await client.disconnect()
