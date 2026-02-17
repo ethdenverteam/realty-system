@@ -9,6 +9,7 @@ Create Date: 2026-02-17 20:00:00.000000
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import JSONB
 import json
 
 # revision identifiers, used by Alembic.
@@ -59,10 +60,13 @@ def upgrade() -> None:
                 {"link": link, "telegram_chat_id": None, "title": None}
                 for link in chat_links
             ]
-            # Обновляем в БД (PostgreSQL JSONB колонка принимает JSON строку)
+            # Обновляем в БД (PostgreSQL JSONB колонка)
+            # Передаем Python объект напрямую - SQLAlchemy автоматически сериализует в JSONB
             conn.execute(
-                text("UPDATE chat_groups SET chat_links = :links::jsonb WHERE group_id = :group_id"),
-                {"links": json.dumps(new_format), "group_id": group_id}
+                text("UPDATE chat_groups SET chat_links = :links WHERE group_id = :group_id").bindparams(
+                    sa.bindparam('links', new_format, type_=JSONB),
+                    sa.bindparam('group_id', group_id)
+                )
             )
 
 
@@ -101,7 +105,9 @@ def downgrade() -> None:
                 old_format = [item.get('link', '') for item in chat_links if item.get('link')]
                 # Обновляем в БД
                 conn.execute(
-                    text("UPDATE chat_groups SET chat_links = :links::jsonb WHERE group_id = :group_id"),
-                    {"links": json.dumps(old_format), "group_id": group_id}
+                    text("UPDATE chat_groups SET chat_links = :links WHERE group_id = :group_id").bindparams(
+                        sa.bindparam('links', old_format, type_=JSONB),
+                        sa.bindparam('group_id', group_id)
+                    )
                 )
 
