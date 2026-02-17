@@ -104,7 +104,9 @@ def create_chat_group(current_user):
         if existing_group:
             # Обновляем существующую группу
             existing_group.chat_ids = chat_ids
-            existing_group.chat_links = links  # Сохраняем исходные ссылки
+            # Сохраняем ссылки в новом формате
+            links_list = [{"link": link, "telegram_chat_id": None, "title": None} for link in links]
+            existing_group.set_chat_links_list(links_list)
             existing_group.purpose = 'subscription'  # Убеждаемся, что purpose правильный
             existing_group.updated_at = datetime.utcnow()
             db.session.commit()
@@ -118,11 +120,13 @@ def create_chat_group(current_user):
             return jsonify(existing_group.to_dict()), 200
         else:
             # Создаем новую группу для подписки
+            # Сохраняем ссылки в новом формате
+            links_list = [{"link": link, "telegram_chat_id": None, "title": None} for link in links]
             group = ChatGroup(
                 user_id=current_user.user_id,
                 name=name,
                 chat_ids=chat_ids,
-                chat_links=links,  # Сохраняем исходные ссылки
+                chat_links=links_list,  # Сохраняем исходные ссылки в новом формате
                 purpose='subscription',  # Группа для подписки на чаты
             )
             db.session.add(group)
@@ -230,8 +234,11 @@ def start_subscription(current_user):
         if active_task:
             return jsonify({'error': 'У этого аккаунта уже есть активная задача подписки'}), 400
         
-        # Получаем ссылки на чаты из группы
-        chat_links = group.chat_links or []
+        # Получаем ссылки на чаты из группы в новом формате
+        links_list = group.get_chat_links_list()
+        
+        # Извлекаем только ссылки для задачи подписки (обратная совместимость)
+        chat_links = [item.get('link', '') for item in links_list if item.get('link')]
         
         # Если ссылок нет в группе, пытаемся восстановить из chat_ids
         if not chat_links:
@@ -240,10 +247,10 @@ def start_subscription(current_user):
                 if chat:
                     # Восстанавливаем ссылку из telegram_chat_id
                     if chat.telegram_chat_id.startswith('invite_'):
-                        hash_part = chat.telegram_chat_id.replace('invite_', '')
+                        hash_part = chat.telegram_chat_id.replace('invite_', '').split('_', 1)[-1] if '_' in chat.telegram_chat_id.replace('invite_', '') else chat.telegram_chat_id.replace('invite_', '')
                         chat_links.append(f"https://t.me/+{hash_part}")
                     elif chat.telegram_chat_id.startswith('public_'):
-                        username = chat.telegram_chat_id.replace('public_', '')
+                        username = chat.telegram_chat_id.replace('public_', '').split('_', 1)[-1] if '_' in chat.telegram_chat_id.replace('public_', '') else chat.telegram_chat_id.replace('public_', '')
                         chat_links.append(f"https://t.me/{username}")
         
         if not chat_links:

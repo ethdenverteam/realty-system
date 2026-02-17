@@ -304,11 +304,13 @@ def admin_create_chat_list(current_user):
 
             chat_ids.append(chat.chat_id)
 
+        # Сохраняем ссылки в новом формате
+        links_list = [{"link": link, "telegram_chat_id": None, "title": None} for link in links]
         group = ChatGroup(
             user_id=user.user_id,
             name=name,
             chat_ids=chat_ids,
-            chat_links=links,
+            chat_links=links_list,
             purpose='subscription',
         )
         db.session.add(group)
@@ -403,10 +405,13 @@ def admin_add_chat_to_list(current_user, group_id):
             chat_ids.append(chat.chat_id)
         group.chat_ids = chat_ids
 
-        links = group.chat_links or []
-        if link not in links:
-            links.append(link)
-        group.chat_links = links
+        # Обновляем ссылки в новом формате
+        links_list = group.get_chat_links_list()
+        # Проверяем, нет ли уже такой ссылки
+        link_exists = any(item.get('link') == link for item in links_list)
+        if not link_exists:
+            links_list.append({"link": link, "telegram_chat_id": None, "title": None})
+        group.set_chat_links_list(links_list)
 
         db.session.commit()
 

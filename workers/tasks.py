@@ -24,6 +24,7 @@ from app.utils.telethon_client import subscribe_to_chat, run_async
 from app.database import db as app_db
 from app.models.chat_subscription_task import ChatSubscriptionTask
 from app.models.chat import Chat as AppChat
+from app.models.chat_group import ChatGroup as AppChatGroup
 from app.models.telegram_account import TelegramAccount as AppTelegramAccount
 
 logger = logging.getLogger(__name__)
@@ -619,6 +620,18 @@ def subscribe_to_chats_task(task_id: int):
                     )
                     app_db.session.add(new_chat)
                     app_db.session.commit()
+                
+                # Обновляем информацию о чате в ChatGroup (сохраняем telegram_chat_id и title)
+                if task.group_id:
+                    group = AppChatGroup.query.get(task.group_id)
+                    if group:
+                        group.update_chat_link_info(
+                            link=chat_link,
+                            telegram_chat_id=telegram_chat_id,
+                            title=title
+                        )
+                        app_db.session.commit()
+                        logger.info(f"Updated chat info in ChatGroup {task.group_id} for link {chat_link[:50]}...")
                 
                 # Обновляем задачу
                 task.current_index = current_index
