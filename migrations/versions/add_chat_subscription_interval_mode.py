@@ -1,8 +1,8 @@
 """
 Add interval_mode to chat_subscription_tasks
 
-Revision ID: add_chat_subscription_interval_mode
-Revises: add_chat_subscription_next_run_at
+Revision ID: chat_subs_interval_mode
+Revises: chat_subs_next_run
 Create Date: 2026-02-17 00:20:00.000000
 
 """
@@ -10,8 +10,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = 'add_chat_subscription_interval_mode'
-down_revision = 'add_chat_subscription_next_run_at'
+revision = 'chat_subs_interval_mode'
+down_revision = 'chat_subs_next_run'
 branch_labels = None
 depends_on = None
 

@@ -1,7 +1,7 @@
 """
 Add next_run_at to chat_subscription_tasks for resilient scheduling
 
-Revision ID: add_chat_subscription_next_run_at
+Revision ID: chat_subs_next_run
 Revises: add_chat_group_purpose
 Create Date: 2026-02-17 00:00:00.000000
 
@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = 'add_chat_subscription_next_run_at'
+revision = 'chat_subs_next_run'
 down_revision = 'add_chat_group_purpose'
 branch_labels = None
 depends_on = None

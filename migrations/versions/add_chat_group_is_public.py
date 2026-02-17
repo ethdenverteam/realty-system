@@ -1,8 +1,8 @@
 """
 Add is_public to chat_groups table
 
-Revision ID: add_chat_group_is_public
-Revises: add_chat_subscription_interval_mode
+Revision ID: chat_group_is_public
+Revises: chat_subs_interval_mode
 Create Date: 2026-02-17 00:10:00.000000
 
 """
@@ -10,8 +10,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = 'add_chat_group_is_public'
-down_revision = 'add_chat_subscription_interval_mode'
+revision = 'chat_group_is_public'
+down_revision = 'chat_subs_interval_mode'
 branch_labels = None
 depends_on = None
 

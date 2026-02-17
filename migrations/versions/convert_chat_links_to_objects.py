@@ -1,8 +1,8 @@
 """
 Convert chat_links from array of strings to array of objects
 
-Revision ID: convert_chat_links_to_objects
-Revises: add_chat_group_is_public
+Revision ID: convert_chat_links
+Revises: chat_group_is_public
 Create Date: 2026-02-17 20:00:00.000000
 
 """
@@ -12,8 +12,8 @@ from sqlalchemy import text
 import json
 
 # revision identifiers, used by Alembic.
-revision = 'convert_chat_links_to_objects'
-down_revision = 'add_chat_group_is_public'
+revision = 'convert_chat_links'
+down_revision = 'chat_group_is_public'
 branch_labels = None
 depends_on = None
 
