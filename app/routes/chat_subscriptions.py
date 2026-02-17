@@ -150,11 +150,15 @@ def create_chat_group(current_user):
 @chat_subscriptions_bp.route('/groups', methods=['GET'])
 @jwt_required
 def list_chat_groups(current_user):
-    """Получить список групп чатов пользователя для подписки (только purpose='subscription')"""
+    """Получить список групп чатов пользователя для подписки (включая публичные списки)"""
     try:
-        groups = ChatGroup.query.filter_by(
-            user_id=current_user.user_id,
-            purpose='subscription'
+        from sqlalchemy import or_
+        groups = ChatGroup.query.filter(
+            ChatGroup.purpose == 'subscription',
+            or_(
+                ChatGroup.user_id == current_user.user_id,
+                ChatGroup.is_public == True,  # Публичные списки видны всем
+            ),
         ).all()
         return jsonify([group.to_dict() for group in groups]), 200
     except Exception as e:
@@ -245,6 +249,11 @@ def start_subscription(current_user):
         if not chat_links:
             return jsonify({'error': 'Не найдено ссылок на чаты в группе'}), 400
         
+        # Режим интервала: safe (10 мин) или aggressive (2 мин)
+        interval_mode = data.get('interval_mode', 'safe')
+        if interval_mode not in ['safe', 'aggressive']:
+            interval_mode = 'safe'
+        
         # Создаем задачу подписки
         task = ChatSubscriptionTask(
             user_id=current_user.user_id,
@@ -256,6 +265,7 @@ def start_subscription(current_user):
             successful_count=0,
             flood_count=0,
             chat_links=chat_links,
+            interval_mode=interval_mode,
             # Первый запуск можно делать сразу после создания
             next_run_at=datetime.utcnow(),
         )

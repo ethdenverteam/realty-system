@@ -3,7 +3,7 @@ ChatGroup model - Группы чатов для удобного выбора
 """
 from app.database import db
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
 
 
@@ -21,6 +21,8 @@ class ChatGroup(db.Model):
     chat_links = Column(JSON, nullable=True)  # ["https://t.me/+...", ...]
     # Назначение группы: 'subscription' (для подписки на чаты) или 'autopublish' (для автопубликации)
     purpose = Column(String(50), nullable=False, default='autopublish', index=True)  # 'subscription' | 'autopublish'
+    # Публичный список (виден всем пользователям на странице подписок)
+    is_public = Column(Boolean, nullable=False, default=False, index=True)
     # Категория связи (как в админских чатах)
     category = Column(String(100), nullable=True)  # rooms_1k/rooms_2k/district_center/price_4000_6000 (legacy)
     filters_json = Column(JSON, nullable=True)  # Extended filters: {rooms_types: [], districts: [], price_min: 0, price_max: 0}
@@ -43,6 +45,7 @@ class ChatGroup(db.Model):
             'chat_ids': self.chat_ids or [],
             'chat_links': self.chat_links or [],
             'purpose': getattr(self, 'purpose', 'autopublish'),  # Default для старых записей
+            'is_public': getattr(self, 'is_public', False),
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

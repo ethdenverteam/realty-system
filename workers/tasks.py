@@ -628,10 +628,18 @@ def subscribe_to_chats_task(task_id: int):
                 
                 logger.info(f"Successfully subscribed to chat {current_index}/{total_chats}: {title}")
                 
-                # Определяем базовый интервал: 1 минута для уже подписанных чатов, 10 минут для новых
+                # Определяем базовый интервал:
+                # - 1 минута для уже подписанных чатов
+                # - иначе по режиму interval_mode: safe=10 мин, aggressive=2 мин
                 base_minutes = 10
                 if chat_info.get('already_subscribed'):
                     base_minutes = 1
+                else:
+                    try:
+                        if getattr(task, 'interval_mode', 'safe') == 'aggressive':
+                            base_minutes = 2
+                    except Exception:
+                        pass
                 
                 # Добавляем случайный джиттер 1-99 секунд
                 jitter_seconds = random.randint(1, 99)
@@ -712,7 +720,15 @@ def subscribe_to_chats_task(task_id: int):
                     ):
                         link_error = True
                 
-                base_minutes = 1 if link_error else 10
+                if link_error:
+                    base_minutes = 1
+                else:
+                    base_minutes = 10
+                    try:
+                        if getattr(task, 'interval_mode', 'safe') == 'aggressive':
+                            base_minutes = 2
+                    except Exception:
+                        pass
                 jitter_seconds = random.randint(1, 99)
                 delay_seconds = base_minutes * 60 + jitter_seconds
                 

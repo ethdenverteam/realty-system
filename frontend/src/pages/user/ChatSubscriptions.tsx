@@ -7,6 +7,7 @@ import { useApiMutation } from '../../hooks/useApiMutation'
 import { getErrorMessage, logError } from '../../utils/errorHandler'
 import api from '../../utils/api'
 import './ChatSubscriptions.css'
+import { useAuth } from '../../contexts/AuthContext'
 
 interface TelegramAccount {
   account_id: number
@@ -45,11 +46,13 @@ interface SubscriptionTask {
 }
 
 export default function ChatSubscriptions(): JSX.Element {
+  const { user } = useAuth()
   const [groupName, setGroupName] = useState('')
   const [chatLinks, setChatLinks] = useState('')
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null)
+  const [intervalMode, setIntervalMode] = useState<'safe' | 'aggressive'>('safe')
 
   // Загрузка данных
   const { data: accounts, loading: accountsLoading } = useApiData<TelegramAccount[]>({
@@ -108,15 +111,6 @@ export default function ChatSubscriptions(): JSX.Element {
     url: `/chat-subscriptions/tasks/${selectedTaskId}/pause`,
     method: 'POST',
     onSuccess: () => {
-      reloadTasks()
-    },
-  })
-
-  const cancelSubscriptionMutation = useApiMutation<SubscriptionTask>({
-    url: `/chat-subscriptions/tasks/${selectedTaskId}/cancel`,
-    method: 'POST',
-    onSuccess: () => {
-      setSelectedTaskId(null)
       reloadTasks()
     },
   })
@@ -185,6 +179,7 @@ export default function ChatSubscriptions(): JSX.Element {
       await startSubscriptionMutation.mutate({
         account_id: selectedAccountId,
         group_id: selectedGroupId,
+        interval_mode: intervalMode,
       })
     } catch (error) {
       logError(error, 'Starting subscription')
@@ -276,6 +271,9 @@ export default function ChatSubscriptions(): JSX.Element {
     }
   }
 
+  const myGroups = (groups || []).filter((g) => !user || g.user_id === user.user_id)
+  const publicGroups = (groups || []).filter((g) => user && g.user_id !== user.user_id)
+
   return (
     <Layout title="Подписка на чаты">
       <div className="chat-subscriptions-page">
@@ -308,14 +306,14 @@ export default function ChatSubscriptions(): JSX.Element {
           </GlassButton>
         </GlassCard>
 
-        {/* Список сохраненных групп */}
+        {/* Список сохраненных групп пользователя */}
         <GlassCard className="groups-section">
-          <h2>Сохраненные списки чатов</h2>
+          <h2>Мои сохраненные списки чатов</h2>
           {groupsLoading ? (
             <div>Загрузка...</div>
-          ) : groups && groups.length > 0 ? (
+          ) : myGroups && myGroups.length > 0 ? (
             <div className="groups-list">
-              {groups.map((group) => (
+              {myGroups.map((group) => (
                 <div key={group.group_id} className="group-item">
                   <div className="group-header">
                     <h3>{group.name}</h3>
@@ -350,6 +348,35 @@ export default function ChatSubscriptions(): JSX.Element {
           )}
         </GlassCard>
 
+        {/* Публичные списки чатов */}
+        {publicGroups && publicGroups.length > 0 && (
+          <GlassCard className="groups-section">
+            <h2>Общие списки чатов (публичные)</h2>
+            <div className="groups-list">
+              {publicGroups.map((group) => (
+                <div key={group.group_id} className="group-item">
+                  <div className="group-header">
+                    <h3>{group.name}</h3>
+                    <div className="group-info">
+                      <span>Владелец user_id: {group.user_id}</span>
+                      <span>Чатов: {group.chat_ids.length}</span>
+                    </div>
+                  </div>
+                  <div className="group-select">
+                    <input
+                      type="radio"
+                      name="selectedGroup"
+                      checked={selectedGroupId === group.group_id}
+                      onChange={() => setSelectedGroupId(group.group_id)}
+                    />
+                    <label>Использовать для подписки</label>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </GlassCard>
+        )}
+
         {/* Запуск подписки */}
         <GlassCard className="subscription-section">
           <h2>Запустить подписку</h2>
@@ -366,6 +393,16 @@ export default function ChatSubscriptions(): JSX.Element {
                   {account.phone} {account.is_active ? '(активен)' : '(неактивен)'}
                 </option>
               ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Режим интервала:</label>
+            <select
+              value={intervalMode}
+              onChange={(e) => setIntervalMode(e.target.value === 'aggressive' ? 'aggressive' : 'safe')}
+            >
+              <option value="safe">Safe — ~10 минут между чатами</option>
+              <option value="aggressive">Aggressive — ~2 минуты между чатами</option>
             </select>
           </div>
           <div className="form-group">

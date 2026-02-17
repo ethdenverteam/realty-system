@@ -123,6 +123,7 @@
 .chat-list-actions {
   display: flex;
   gap: 0.5rem;
+  align-items: center;
 }
 
 .chat-list-body {
@@ -163,6 +164,19 @@
 .chat-list-add-chat h4 {
   margin: 0 0 0.5rem;
   font-size: 0.95rem;
+}
+
+.public-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.public-toggle input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
 }
 
 .form-inline {

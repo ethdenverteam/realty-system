@@ -423,6 +423,39 @@ def admin_add_chat_to_list(current_user, group_id):
         return jsonify({'error': str(e)}), 500
 
 
+@admin_routes_bp.route('/dashboard/chat-lists/<int:group_id>/public', methods=['PUT'])
+@jwt_required
+@role_required('admin')
+def admin_set_chat_list_public(current_user, group_id):
+    """
+    Установить/снять публичность списка чатов.
+    Body: {is_public: bool}
+    """
+    data = request.get_json() or {}
+    is_public = bool(data.get('is_public', False))
+
+    try:
+        group = ChatGroup.query.filter_by(group_id=group_id, purpose='subscription').first()
+        if not group:
+            return jsonify({'error': 'Список не найден'}), 404
+
+        previous = getattr(group, 'is_public', False)
+        group.is_public = is_public
+        db.session.commit()
+
+        log_action(
+            user_id=current_user.user_id,
+            action='admin_set_chat_list_public',
+            details={'group_id': group_id, 'previous_is_public': previous, 'is_public': is_public},
+        )
+
+        return jsonify(group.to_dict()), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error setting chat list public flag: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 @admin_routes_bp.route('/dashboard/chat-lists/<int:group_id>/chats/<int:chat_id>', methods=['DELETE'])
 @jwt_required
 @role_required('admin')

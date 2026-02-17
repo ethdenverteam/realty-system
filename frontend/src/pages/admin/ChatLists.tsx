@@ -85,6 +85,14 @@ export default function AdminChatLists(): JSX.Element {
     },
   })
 
+  const setPublicMutation = useApiMutation<AdminChatGroup>({
+    url: '',
+    method: 'PUT',
+    onSuccess: () => {
+      reload()
+    },
+  })
+
   const removeChatMutation = useApiMutation<AdminChatGroup>({
     url: '', // будет переопределён перед вызовом
     method: 'DELETE',
@@ -229,9 +237,23 @@ export default function AdminChatLists(): JSX.Element {
                         <div className="chat-list-stats">
                           <span>{group.chat_ids.length} чатов</span>
                           <span>{new Date(group.created_at).toLocaleString('ru-RU')}</span>
+                          <span>{group.is_public ? 'Публичный' : 'Только для владельца'}</span>
                         </div>
                       </div>
                       <div className="chat-list-actions">
+                        <label className="public-toggle">
+                          <input
+                            type="checkbox"
+                            checked={!!group.is_public}
+                            onChange={(e) => {
+                              void setPublicMutation.mutate(
+                                { is_public: e.target.checked } as any,
+                                { url: `/admin/dashboard/chat-lists/${group.group_id}/public` },
+                              )
+                            }}
+                          />
+                          <span>Публичный</span>
+                        </label>
                         <button
                           className="btn-danger"
                           onClick={(e) => {

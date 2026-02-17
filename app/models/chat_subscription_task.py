@@ -27,6 +27,8 @@ class ChatSubscriptionTask(db.Model):
     # Обработка flood ошибок
     flood_count = Column(Integer, default=0, nullable=False)  # Количество flood ошибок
     flood_wait_until = Column(DateTime, nullable=True)  # До какого времени ждем после flood
+    # Режим интервала: safe/aggressive (safe=10 минут, aggressive=2 минуты)
+    interval_mode = Column(String(20), default='safe', nullable=False)
     # Следующий запуск задачи (UTC) для устойчивого планирования через Celery beat
     next_run_at = Column(DateTime, nullable=True, index=True)
     
@@ -77,6 +79,7 @@ class ChatSubscriptionTask(db.Model):
             'successful_count': self.successful_count,
             'flood_count': self.flood_count,
             'flood_wait_until': self.flood_wait_until.isoformat() if self.flood_wait_until else None,
+            'interval_mode': self.interval_mode,
             'result': self.result,
             'error_message': self.error_message,
             'started_at': self.started_at.isoformat() if self.started_at else None,
