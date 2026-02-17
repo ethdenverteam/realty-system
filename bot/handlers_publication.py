@@ -378,7 +378,6 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
                 # Загружаем файл с сервера и отправляем
                 if photo_path:
                     import os
-                    from app.config import Config
                     
                     # Путь к корню проекта (где находится app/)
                     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -394,8 +393,14 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
                         # Если абсолютный путь
                         full_path = photo_path
                     else:
-                        # Относительный путь - используем Config.UPLOAD_FOLDER
-                        full_path = os.path.join(Config.UPLOAD_FOLDER, photo_path)
+                        # Относительный путь - используем UPLOAD_FOLDER
+                        try:
+                            from app.config import Config
+                            upload_folder = Config.UPLOAD_FOLDER
+                        except (ImportError, AttributeError):
+                            # Fallback to default path
+                            upload_folder = os.path.join(base_dir, 'static', 'uploads')
+                        full_path = os.path.join(upload_folder, photo_path)
                     
                     if os.path.exists(full_path):
                         # Открываем файл и отправляем

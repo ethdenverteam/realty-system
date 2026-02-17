@@ -2104,15 +2104,6 @@ def admin_publish_object_to_chat(chat_id, current_user):
                 }
                 response = requests.post(url, json=payload, timeout=10)
         else:
-                # Если формат неожиданный, отправляем только текст
-                url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
-                payload = {
-                    'chat_id': chat.telegram_chat_id,
-                    'text': publication_text,
-                    'parse_mode': 'HTML'
-                }
-                response = requests.post(url, json=payload, timeout=10)
-        else:
             # Если фото нет - отправляем только текст
             url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
             payload = {

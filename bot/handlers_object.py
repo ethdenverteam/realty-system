@@ -419,7 +419,15 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
                 # Generate unique filename
                 import os
                 from datetime import datetime
-                from app.config import Config
+                
+                # Get UPLOAD_FOLDER - try app.config first, fallback to default
+                try:
+                    from app.config import Config
+                    upload_folder = Config.UPLOAD_FOLDER
+                except (ImportError, AttributeError):
+                    # Fallback to default path
+                    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                    upload_folder = os.path.join(base_dir, 'static', 'uploads')
                 
                 # Get file extension from file_path or use .jpg as default
                 file_ext = '.jpg'
@@ -432,7 +440,7 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
                 filename = f"{timestamp}_bot_photo{file_ext}"
                 
                 # Save to uploads folder
-                filepath = os.path.join(Config.UPLOAD_FOLDER, filename)
+                filepath = os.path.join(upload_folder, filename)
                 os.makedirs(os.path.dirname(filepath), exist_ok=True)
                 
                 # Download and save file
@@ -592,7 +600,6 @@ async def show_object_preview_with_menu(update: Update, context: ContextTypes.DE
                 # Если есть путь к файлу, загружаем и отправляем
                 if photo_path:
                     import os
-                    from app.config import Config
                     
                     # Путь к корню проекта (где находится app/)
                     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -608,8 +615,14 @@ async def show_object_preview_with_menu(update: Update, context: ContextTypes.DE
                         # Если абсолютный путь
                         full_path = photo_path
                     else:
-                        # Относительный путь - используем Config.UPLOAD_FOLDER
-                        full_path = os.path.join(Config.UPLOAD_FOLDER, photo_path)
+                        # Относительный путь - используем UPLOAD_FOLDER
+                        try:
+                            from app.config import Config
+                            upload_folder = Config.UPLOAD_FOLDER
+                        except (ImportError, AttributeError):
+                            # Fallback to default path
+                            upload_folder = os.path.join(base_dir, 'static', 'uploads')
+                        full_path = os.path.join(upload_folder, photo_path)
                     
                     if os.path.exists(full_path):
                         # Открываем файл и отправляем

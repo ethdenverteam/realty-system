@@ -1333,15 +1333,6 @@ def user_preview_object_in_bot(object_id, current_user):
                 }
                 response = requests.post(url, json=payload, timeout=10)
         else:
-                # Если формат неожиданный, отправляем только текст
-                url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
-                payload = {
-                    'chat_id': int(current_user.telegram_id),
-                    'text': publication_text,
-                    'parse_mode': 'HTML'
-                }
-                response = requests.post(url, json=payload, timeout=10)
-        else:
             # Если фото нет - отправляем только текст
             url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
             payload = {
