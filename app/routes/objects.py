@@ -452,14 +452,11 @@ def publish_object_via_account(current_user):
     from datetime import datetime, timedelta
     import logging
     from app.models.telegram_account import TelegramAccount
-from app.models.chat import Chat
-from app.models.telegram_account_chat import TelegramAccountChat
+    from app.models.chat import Chat
+    from app.models.telegram_account_chat import TelegramAccountChat
     from app.models.publication_history import PublicationHistory
     from app.utils.telethon_client import send_object_message, run_async
-    from app.utils.rate_limiter import get_rate_limit_status
-    from bot.utils import format_publication_text
-    from bot.models import User as BotUser, Object as BotObject
-    from bot.database import get_db as get_bot_db
+    from app.utils.rate_limit
     
     data = request.get_json()
     object_id = data.get('object_id')
