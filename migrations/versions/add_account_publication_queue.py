@@ -1,7 +1,8 @@
-"""Add account_publication_queues table
+"""
+Add account_publication_queues table
 
 Revision ID: add_account_publication_queue
-Revises: add_autopublish_config
+Revises: add_est_completion
 Create Date: 2024-12-19 12:00:00.000000
 
 """
@@ -11,7 +12,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'add_account_publication_queue'
-down_revision = 'add_autopublish_config'
+down_revision = 'add_est_completion'
 branch_labels = None
 depends_on = None
 
