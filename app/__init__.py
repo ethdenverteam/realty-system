@@ -76,6 +76,7 @@ def create_app(config_class=Config):
     from app.routes.accounts import accounts_bp
     from app.routes.chats import chats_bp
     from app.routes.publications import publications_bp
+    from app.routes.account_publications import account_publications_bp
     from app.routes.admin import admin_bp  # Legacy, keep for backward compatibility
     from app.routes.dashboard import dashboard_bp  # Legacy
     from app.routes.logs import logs_bp  # Legacy
@@ -95,6 +96,7 @@ def create_app(config_class=Config):
     app.register_blueprint(accounts_bp, url_prefix='/system/accounts')
     app.register_blueprint(chats_bp, url_prefix='/system/chats')
     app.register_blueprint(publications_bp, url_prefix='/system/publications')
+    app.register_blueprint(account_publications_bp, url_prefix='/system/account-publications')
     app.register_blueprint(admin_bp, url_prefix='/system/admin/legacy')
     app.register_blueprint(dashboard_bp, url_prefix='/system/dashboard/legacy')
     app.register_blueprint(logs_bp, url_prefix='/system/logs/legacy')

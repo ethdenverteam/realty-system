@@ -74,24 +74,27 @@ def publish_to_telegram(queue_id: int):
                 db.commit()
                 return False
         
-        # Check if object was published to this chat within last 24 hours
-        # Ограничение 24 часа применяется только для ручной публикации (mode != 'autopublish')
-        # Для автопубликации ограничение не применяется
-        if queue.mode != 'autopublish':
-            yesterday = datetime.utcnow() - timedelta(days=1)
-            recent_publication = db.query(PublicationHistory).filter(
-                PublicationHistory.object_id == queue.object_id,
-                PublicationHistory.chat_id == queue.chat_id,
-                PublicationHistory.published_at >= yesterday,
-                PublicationHistory.deleted == False
-            ).first()
-            
-            if recent_publication:
-                logger.info(f"Object {queue.object_id} was already published to chat {queue.chat_id} within 24 hours, skipping")
-                queue.status = 'failed'
-                queue.error_message = 'Object was already published to this chat within 24 hours'
-                db.commit()
-                return False
+        # Проверка дубликатов через унифицированную утилиту
+        from app.utils.duplicate_checker import check_duplicate_publication
+        
+        # Определяем тип публикации
+        publication_type = 'autopublish_bot' if queue.mode == 'autopublish' else 'manual_bot'
+        
+        can_publish, reason = check_duplicate_publication(
+            object_id=queue.object_id,
+            chat_id=queue.chat_id,
+            account_id=None,  # Бот
+            publication_type=publication_type,
+            user_id=queue.user_id,
+            allow_duplicates_setting=None  # Получит из SystemSetting автоматически
+        )
+        
+        if not can_publish:
+            logger.info(f"Object {queue.object_id} cannot be published to chat {queue.chat_id} via bot: {reason}")
+            queue.status = 'failed'
+            queue.error_message = reason
+            db.commit()
+            return False
         
         # Реализация публикации через Telegram API
         import requests
@@ -392,6 +395,11 @@ def schedule_daily_autopublish():
     """
     Создать задачи автопубликации для всех объектов с включенной автопубликацией.
     Предполагается запуск через celery beat раз в день в 05:00 UTC (08:00 МСК).
+    
+    Логика распределения для аккаунтов:
+    - Сначала все чаты первого объекта, потом второго и т.д.
+    - Задачи группируются по аккаунтам
+    - Расписание рассчитывается с учетом режима аккаунта и интервалов
     """
     from app import app
     from app.models.account_publication_queue import AccountPublicationQueue
@@ -444,98 +452,111 @@ def schedule_daily_autopublish():
         db.commit()
         logger.info(f"schedule_daily_autopublish: created {created_bot_queues} bot queue items")
         
-            # Через аккаунты: создаем задачи в account_publication_queues
-            with app.app_context():
-                from app.models.account_publication_queue import AccountPublicationQueue
-                from app.models.autopublish_config import AutopublishConfig as AppAutopublishConfig
-                from app.models.object import Object as AppObject
+        # Через аккаунты: создаем задачи в account_publication_queues
+        with app.app_context():
+            from app.models.account_publication_queue import AccountPublicationQueue
+            from app.models.autopublish_config import AutopublishConfig as AppAutopublishConfig
+            from app.models.object import Object as AppObject
+            
+            app_configs = AppAutopublishConfig.query.filter_by(enabled=True).all()
+            created_account_queues = 0
+            
+            # Группируем задачи по аккаунтам
+            # Структура: {account_id: [(object_id, chat_id, user_id), ...]}
+            # ВАЖНО: задачи добавляются в порядке объектов - сначала все чаты первого объекта, потом второго
+            account_tasks = {}  # {account_id: [(object_id, chat_id, user_id), ...]}
+            
+            for cfg in app_configs:
+                obj = AppObject.query.filter_by(object_id=cfg.object_id).first()
+                if not obj or obj.status == 'архив':
+                    continue
                 
-                app_configs = AppAutopublishConfig.query.filter_by(enabled=True).all()
-                created_account_queues = 0
+                accounts_cfg = getattr(cfg, 'accounts_config_json', None) or {}
+                accounts_list = accounts_cfg.get('accounts') if isinstance(accounts_cfg, dict) else None
                 
-                # Группируем задачи по аккаунтам для расчета расписания
-                account_tasks = {}  # {account_id: [(object_id, chat_id, user_id), ...]}
+                if accounts_list and isinstance(accounts_list, list):
+                    for acc_entry in accounts_list:
+                        try:
+                            account_id = int(acc_entry.get('account_id'))
+                        except Exception:
+                            continue
+                        chat_ids = acc_entry.get('chat_ids') or []
+                        if not chat_ids:
+                            continue
+                        
+                        # Проверяем, что аккаунт существует и активен
+                        account = AppTelegramAccount.query.get(account_id)
+                        if not account or not account.is_active:
+                            continue
+                        
+                        # Ограничиваемся чатами этого аккаунта
+                        user_chats = AppChat.query.filter(
+                            AppChat.owner_type == 'user',
+                            AppChat.owner_account_id == account_id,
+                            AppChat.chat_id.in_(chat_ids),
+                            AppChat.is_active == True,
+                        ).all()
+                        
+                        if account_id not in account_tasks:
+                            account_tasks[account_id] = []
+                        
+                        # Добавляем все чаты этого объекта для этого аккаунта
+                        # Порядок важен: сначала все чаты первого объекта, потом второго
+                        for chat in user_chats:
+                            account_tasks[account_id].append((obj.object_id, chat.chat_id, obj.user_id))
+            
+            # Создаем задачи для каждого аккаунта с учетом режима и лимитов
+            now_msk = get_moscow_time()
+            start_time_msk = now_msk.replace(hour=8, minute=0, second=0, microsecond=0)
+            
+            for account_id, tasks_list in account_tasks.items():
+                account = AppTelegramAccount.query.get(account_id)
+                if not account or not account.is_active:
+                    continue
                 
-                for cfg in app_configs:
-                    obj = AppObject.query.filter_by(object_id=cfg.object_id).first()
-                    if not obj or obj.status == 'архив':
-                        continue
-                    
-                    accounts_cfg = getattr(cfg, 'accounts_config_json', None) or {}
-                    accounts_list = accounts_cfg.get('accounts') if isinstance(accounts_cfg, dict) else None
-                    
-                    if accounts_list and isinstance(accounts_list, list):
-                        for acc_entry in accounts_list:
-                            try:
-                                account_id = int(acc_entry.get('account_id'))
-                            except Exception:
-                                continue
-                            chat_ids = acc_entry.get('chat_ids') or []
-                            if not chat_ids:
-                                continue
-                            
-                            # Проверяем, что аккаунт существует и активен
-                            account = AppTelegramAccount.query.get(account_id)
-                            if not account or not account.is_active:
-                                continue
-                            
-                            # Ограничиваемся чатами этого аккаунта
-                            user_chats = AppChat.query.filter(
-                                AppChat.owner_type == 'user',
-                                AppChat.owner_account_id == account_id,
-                                AppChat.chat_id.in_(chat_ids),
-                                AppChat.is_active == True,
-                            ).all()
-                            
-                            if account_id not in account_tasks:
-                                account_tasks[account_id] = []
-                            
-                            for chat in user_chats:
-                                account_tasks[account_id].append((obj.object_id, chat.chat_id, obj.user_id))
+                # Получаем fix_interval_minutes для режима 'fix'
+                fix_interval = getattr(account, 'fix_interval_minutes', None) if account.mode == 'fix' else None
                 
-                # Создаем задачи для каждого аккаунта с учетом режима и лимитов
-                now_msk = get_moscow_time()
-                start_time_msk = now_msk.replace(hour=8, minute=0, second=0, microsecond=0)
+                # Рассчитываем расписание для этого аккаунта
+                scheduled_times = calculate_scheduled_times_for_account(
+                    mode=account.mode,
+                    total_tasks=len(tasks_list),
+                    daily_limit=account.daily_limit,
+                    start_time_msk=start_time_msk,
+                    fix_interval=fix_interval
+                )
                 
-                for account_id, tasks_list in account_tasks.items():
-                    account = AppTelegramAccount.query.get(account_id)
-                    if not account or not account.is_active:
-                        continue
-                    
-                    # Рассчитываем расписание для этого аккаунта
-                    scheduled_times = calculate_scheduled_times_for_account(
-                        mode=account.mode,
-                        total_tasks=len(tasks_list),
-                        daily_limit=account.daily_limit,
-                        start_time_msk=start_time_msk
-                    )
-                    
-                    # Создаем задачи с рассчитанным временем
-                    for i, (object_id, chat_id, user_id) in enumerate(tasks_list):
-                        if i < len(scheduled_times):
-                            scheduled_time_utc = msk_to_utc(scheduled_times[i])
-                            
-                            queue = AccountPublicationQueue(
-                                object_id=object_id,
-                                chat_id=chat_id,
-                                account_id=account_id,
-                                user_id=user_id,
-                                status='pending',
-                                scheduled_time=scheduled_time_utc,
-                                created_at=datetime.utcnow(),
-                            )
-                            app_db.session.add(queue)
-                            created_account_queues += 1
+                logger.info(f"Account {account_id} ({account.phone}): mode={account.mode}, tasks={len(tasks_list)}, scheduled_times={len(scheduled_times)}")
                 
-                app_db.session.commit()
-                logger.info(f"schedule_daily_autopublish: created {created_account_queues} account queue items")
+                # Создаем задачи с рассчитанным временем
+                for i, (object_id, chat_id, user_id) in enumerate(tasks_list):
+                    if i < len(scheduled_times):
+                        scheduled_time_utc = msk_to_utc(scheduled_times[i])
+                        
+                        queue = AccountPublicationQueue(
+                            object_id=object_id,
+                            chat_id=chat_id,
+                            account_id=account_id,
+                            user_id=user_id,
+                            status='pending',
+                            scheduled_time=scheduled_time_utc,
+                            created_at=datetime.utcnow(),
+                        )
+                        app_db.session.add(queue)
+                        created_account_queues += 1
+            
+            app_db.session.commit()
+            logger.info(f"schedule_daily_autopublish: created {created_account_queues} account queue items")
         
         return created_bot_queues + created_account_queues
     except Exception as e:
         logger.error(f"Error in schedule_daily_autopublish: {e}", exc_info=True)
         db.rollback()
-        if app.app_context():
-            app_db.session.rollback()
+        try:
+            with app.app_context():
+                app_db.session.rollback()
+        except:
+            pass
         return 0
     finally:
         db.close()
@@ -976,23 +997,23 @@ def process_account_autopublish():
                             app_db.session.commit()
                             continue
                         
-                        # Проверка дубликатов (если включена)
-                        if not allow_duplicates:
-                            yesterday = datetime.utcnow() - timedelta(days=1)
-                            recent_pub = AppPublicationHistory.query.filter(
-                                AppPublicationHistory.object_id == queue.object_id,
-                                AppPublicationHistory.chat_id == queue.chat_id,
-                                AppPublicationHistory.account_id == queue.account_id,
-                                AppPublicationHistory.published_at >= yesterday,
-                                AppPublicationHistory.deleted == False
-                            ).first()
-                            
-                            if recent_pub:
-                                logger.info(f"Object {queue.object_id} was already published to chat {queue.chat_id} via account {queue.account_id} within 24 hours, skipping")
-                                queue.status = 'failed'
-                                queue.error_message = 'Object was already published to this chat within 24 hours'
-                                app_db.session.commit()
-                                continue
+                        # Проверка дубликатов через унифицированную утилиту
+                        from app.utils.duplicate_checker import check_duplicate_publication
+                        can_publish, reason = check_duplicate_publication(
+                            object_id=queue.object_id,
+                            chat_id=queue.chat_id,
+                            account_id=queue.account_id,
+                            publication_type='autopublish_account',
+                            user_id=queue.user_id,
+                            allow_duplicates_setting=None  # Получит из SystemSetting автоматически
+                        )
+                        
+                        if not can_publish:
+                            logger.info(f"Object {queue.object_id} cannot be published to chat {queue.chat_id} via account {queue.account_id}: {reason}")
+                            queue.status = 'failed'
+                            queue.error_message = reason
+                            app_db.session.commit()
+                            continue
                         
                         # Проверка rate limit
                         rate_status = get_rate_limit_status(account.phone)

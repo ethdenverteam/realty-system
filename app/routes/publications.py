@@ -33,23 +33,31 @@ def create_publication(current_user):
     if not obj:
         return jsonify({'error': 'Object not found'}), 404
     
-    # Check if object was published to any of the chats within last 24 hours
-    # Проверка не применяется для админов (они могут публиковать без ограничений)
-    if current_user.web_role != 'admin':
-        yesterday = datetime.utcnow() - timedelta(days=1)
-        recent_publications = PublicationHistory.query.filter(
-            PublicationHistory.object_id == object_id,
-            PublicationHistory.chat_id.in_(chat_ids),
-            PublicationHistory.published_at >= yesterday,
-            PublicationHistory.deleted == False
-        ).all()
+    # Проверка дубликатов через унифицированную утилиту
+    from app.utils.duplicate_checker import check_duplicate_publication
+    
+    publication_type = 'manual_account' if account_id else 'manual_bot'
+    blocked_chats = []
+    
+    for chat_id in chat_ids:
+        can_publish, reason = check_duplicate_publication(
+            object_id=object_id,
+            chat_id=chat_id,
+            account_id=account_id,
+            publication_type=publication_type,
+            user_id=current_user.user_id,
+            allow_duplicates_setting=None
+        )
         
-        if recent_publications:
-            blocked_chats = [p.chat_id for p in recent_publications]
-            return jsonify({
-                'error': 'Object was already published to some chats within 24 hours',
-                'blocked_chat_ids': blocked_chats
-            }), 400
+        if not can_publish:
+            blocked_chats.append(chat_id)
+    
+    if blocked_chats:
+        return jsonify({
+            'error': 'Object was already published to some chats within 24 hours',
+            'blocked_chat_ids': blocked_chats,
+            'reason': 'Duplicate publication check failed'
+        }), 400
     
     # Create queue entries
     queue_ids = []
@@ -82,7 +90,10 @@ def create_publication(current_user):
             }
         )
         
-        # TODO: Add to Celery queue
+        # Добавляем задачи в Celery очередь
+        from workers.tasks import publish_to_telegram
+        for queue_id in queue_ids:
+            publish_to_telegram.delay(queue_id)
         
         return jsonify({
             'success': True,
