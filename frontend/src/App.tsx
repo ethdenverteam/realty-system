@@ -17,6 +17,7 @@ import AdminTypeScriptTypes from './pages/admin/TypeScriptTypes'
 import AdminMobXStore from './pages/admin/MobXStore'
 import AdminPublicationQueues from './pages/admin/PublicationQueues'
 import AdminTestAccountPublication from './pages/admin/TestAccountPublication'
+import AdminSettings from './pages/admin/Settings'
 import UserCreateObject from './pages/user/CreateObject'
 import UserDashboard from './pages/user/Dashboard'
 import UserEditObject from './pages/user/EditObject'
@@ -149,6 +150,14 @@ export default function App(): JSX.Element {
               element={
                 <ProtectedRoute requireAdmin>
                   <AdminTestAccountPublication />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard/settings"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminSettings />
                 </ProtectedRoute>
               }
             />

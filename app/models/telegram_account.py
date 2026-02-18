@@ -15,7 +15,7 @@ class TelegramAccount(db.Model):
     owner_id = Column(Integer, ForeignKey('users.user_id'), nullable=False, index=True)
     phone = Column(String(20), unique=True, nullable=False)
     session_file = Column(String(255), nullable=False)  # Path to encrypted session file
-    mode = Column(String(20), default='normal', nullable=False)  # aggressive/normal/safe
+    mode = Column(String(20), default='normal', nullable=False)  # aggressive/normal/safe/smart
     daily_limit = Column(Integer, default=200, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     last_used = Column(DateTime, nullable=True)
@@ -26,6 +26,7 @@ class TelegramAccount(db.Model):
     owner = relationship('User', back_populates='telegram_accounts')
     chats = relationship('Chat', back_populates='account')
     publication_queues = relationship('PublicationQueue', back_populates='account')
+    account_publication_queues = relationship('AccountPublicationQueue', back_populates='account')
     publication_history = relationship('PublicationHistory', back_populates='account')
     
     def __repr__(self):

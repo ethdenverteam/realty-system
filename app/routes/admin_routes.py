@@ -2502,3 +2502,69 @@ def admin_test_account_publication_publish(current_user):
             'chat_id': chat_id
         })
         return jsonify({'error': str(e)}), 500
+
+
+@admin_routes_bp.route('/dashboard/settings', methods=['GET'])
+@jwt_required
+@role_required('admin')
+def admin_settings_data(current_user):
+    """Get admin settings"""
+    from app.models.system_setting import SystemSetting
+    
+    try:
+        settings = {}
+        
+        # Получаем настройку дубликатов
+        duplicates_setting = SystemSetting.query.filter_by(key='allow_duplicates').first()
+        settings['allow_duplicates'] = duplicates_setting.value_json.get('enabled', False) if duplicates_setting else False
+        
+        return jsonify({
+            'success': True,
+            'settings': settings
+        })
+    except Exception as e:
+        logger.error(f"Error getting admin settings: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_routes_bp.route('/dashboard/settings/allow-duplicates', methods=['PUT'])
+@jwt_required
+@role_required('admin')
+def admin_settings_allow_duplicates(current_user):
+    """Update allow duplicates setting"""
+    from app.models.system_setting import SystemSetting
+    
+    try:
+        data = request.get_json()
+        enabled = data.get('enabled', False)
+        
+        setting = SystemSetting.query.filter_by(key='allow_duplicates').first()
+        if not setting:
+            setting = SystemSetting(
+                key='allow_duplicates',
+                value_json={'enabled': enabled},
+                description='Разрешить дубликаты публикаций (24 часа)',
+                updated_by=current_user.user_id
+            )
+            db.session.add(setting)
+        else:
+            setting.value_json = {'enabled': enabled}
+            setting.updated_by = current_user.user_id
+        
+        db.session.commit()
+        
+        log_action(
+            action='admin_settings_updated',
+            user_id=current_user.user_id,
+            details={'setting': 'allow_duplicates', 'enabled': enabled}
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Setting updated successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating allow duplicates setting: {e}", exc_info=True)
+        log_error(e, 'admin_settings_update_failed', current_user.user_id, {'setting': 'allow_duplicates'})
+        return jsonify({'error': str(e)}), 500

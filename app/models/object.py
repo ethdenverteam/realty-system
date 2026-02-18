@@ -39,6 +39,7 @@ class Object(db.Model):
     # Relationships
     user = relationship('User', back_populates='objects')
     publication_queues = relationship('PublicationQueue', back_populates='object')
+    account_publication_queues = relationship('AccountPublicationQueue', back_populates='object')
     publication_history = relationship('PublicationHistory', back_populates='object')
     autopublish_config = relationship('AutopublishConfig', back_populates='object', uselist=False)
     

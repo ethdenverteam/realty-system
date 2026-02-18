@@ -29,6 +29,7 @@ class Chat(db.Model):
     # Relationships
     account = relationship('TelegramAccount', back_populates='chats')
     publication_queues = relationship('PublicationQueue', back_populates='chat')
+    account_publication_queues = relationship('AccountPublicationQueue', back_populates='chat')
     publication_history = relationship('PublicationHistory', back_populates='chat')
     
     def __repr__(self):

@@ -75,6 +75,7 @@ export default function AdminDashboard(): JSX.Element {
               { path: '/admin/dashboard/logs', label: 'Просмотр логов', icon: '📋' },
               { path: '/admin/dashboard/publication-queues', label: 'Очереди публикаций', icon: '📤' },
               { path: '/admin/dashboard/test-account-publication', label: 'Проверка публикации аккаунт', icon: '🧪' },
+              { path: '/admin/dashboard/settings', label: 'Настройки', icon: '⚙️' },
               { path: '/admin/dashboard/users', label: 'Управление пользователями', icon: '👥' },
               { path: '/admin/dashboard/database-schema', label: 'Структура БД', icon: '🗄️' },
               { path: '/admin/dashboard/dropdown-test', label: 'Тест Dropdown', icon: '🧪' },

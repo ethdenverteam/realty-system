@@ -26,6 +26,7 @@ class User(db.Model):
     objects = relationship('Object', back_populates='user', cascade='all, delete-orphan')
     telegram_accounts = relationship('TelegramAccount', back_populates='owner')
     publication_queues = relationship('PublicationQueue', back_populates='user')
+    account_publication_queues = relationship('AccountPublicationQueue', back_populates='user')
     action_logs = relationship('ActionLog', back_populates='user')
     bot_web_codes = relationship('BotWebCode', back_populates='user')
     quick_access_items = relationship('QuickAccess', back_populates='user', cascade='all, delete-orphan')

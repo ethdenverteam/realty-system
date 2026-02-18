@@ -38,10 +38,15 @@ celery_app.conf.update(
             'task': 'workers.tasks.process_chat_subscriptions',
             'schedule': 60.0,
         },
-        # Ежедневное создание задач автопубликации (09:00 МСК ~= 06:00 UTC)
-        'schedule-daily-autopublish-9-msk': {
+        # Ежедневное создание задач автопубликации (08:00 МСК ~= 05:00 UTC)
+        'schedule-daily-autopublish-8-msk': {
             'task': 'workers.tasks.schedule_daily_autopublish',
-            'schedule': crontab(minute=0, hour=6),
+            'schedule': crontab(minute=0, hour=5),
+        },
+        # Обработка очередей аккаунтов (каждую минуту)
+        'process-account-autopublish-every-minute': {
+            'task': 'workers.tasks.process_account_autopublish',
+            'schedule': 60.0,
         },
     },
 )

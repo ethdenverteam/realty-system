@@ -15,6 +15,7 @@ from app.models.quick_access import QuickAccess
 from app.models.autopublish_config import AutopublishConfig
 from app.models.chat_group import ChatGroup
 from app.models.chat_subscription_task import ChatSubscriptionTask
+from app.models.account_publication_queue import AccountPublicationQueue
 
 __all__ = [
     'User',
@@ -22,6 +23,7 @@ __all__ = [
     'TelegramAccount',
     'Chat',
     'PublicationQueue',
+    'AccountPublicationQueue',
     'PublicationHistory',
     'ActionLog',
     'Statistics',
