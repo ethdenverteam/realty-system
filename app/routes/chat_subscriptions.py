@@ -224,16 +224,6 @@ def start_subscription(current_user):
         if not group:
             return jsonify({'error': 'Группа не найдена или не предназначена для подписки'}), 404
         
-        # Проверяем, нет ли уже активной задачи подписки для этого аккаунта
-        # Активные статусы: pending, processing, flood_wait
-        active_task = ChatSubscriptionTask.query.filter(
-            ChatSubscriptionTask.account_id == account_id,
-            ChatSubscriptionTask.status.in_(['pending', 'processing', 'flood_wait'])
-        ).first()
-        
-        if active_task:
-            return jsonify({'error': 'У этого аккаунта уже есть активная задача подписки'}), 400
-        
         # Получаем ссылки на чаты из группы в новом формате
         links_list = group.get_chat_links_list()
         

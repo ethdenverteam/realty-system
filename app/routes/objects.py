@@ -456,7 +456,10 @@ def publish_object_via_account(current_user):
     from app.models.telegram_account_chat import TelegramAccountChat
     from app.models.publication_history import PublicationHistory
     from app.utils.telethon_client import send_object_message, run_async
-    from app.utils.rate_limit
+    from app.utils.rate_limiter import get_rate_limit_status
+    from bot.utils import format_publication_text
+    from bot.models import User as BotUser, Object as BotObject
+    from bot.database import get_db as get_bot_db
     
     data = request.get_json()
     object_id = data.get('object_id')
