@@ -915,11 +915,17 @@ def publish_object_via_bot(current_user):
                     if isinstance(photo_path, str) and (photo_path.startswith('uploads/') or '/' in photo_path):
                         from app.config import Config
                         import os
-                        base_dir = os.path.dirname(os.path.dirname(__file__))
+                        # Используем Config.UPLOAD_FOLDER напрямую
                         if photo_path.startswith('uploads/'):
-                            full_path = os.path.join(base_dir, photo_path)
+                            # Убираем префикс "uploads/" и используем Config.UPLOAD_FOLDER
+                            filename = photo_path.replace('uploads/', '', 1)
+                            full_path = os.path.join(Config.UPLOAD_FOLDER, filename)
+                        elif photo_path.startswith('/'):
+                            # Абсолютный путь
+                            full_path = photo_path
                         else:
-                            full_path = os.path.join(base_dir, photo_path.lstrip('/'))
+                            # Относительный путь - используем Config.UPLOAD_FOLDER
+                            full_path = os.path.join(Config.UPLOAD_FOLDER, photo_path)
                         
                         if os.path.exists(full_path):
                             send_url = f'{url}/sendPhoto'

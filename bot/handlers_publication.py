@@ -379,29 +379,28 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
                 if photo_path:
                     import os
                     
-                    # Путь к корню проекта (где находится app/)
-                    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                    # Используем Config.UPLOAD_FOLDER напрямую
+                    try:
+                        from app.config import Config
+                        upload_folder = Config.UPLOAD_FOLDER
+                    except (ImportError, AttributeError):
+                        # Fallback to default path
+                        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                        upload_folder = os.path.join(base_dir, 'static', 'uploads')
                     
-                    # Нормализуем путь
+                    # photo_path может быть "uploads/filename.jpg" или просто "filename.jpg"
                     if photo_path.startswith('uploads/'):
-                        # Если путь начинается с uploads/, добавляем static/
-                        full_path = os.path.join(base_dir, 'static', photo_path)
-                    elif photo_path.startswith('static/uploads/'):
-                        # Если уже есть static/uploads/
-                        full_path = os.path.join(base_dir, photo_path)
+                        # Убираем префикс "uploads/" и используем upload_folder
+                        filename = photo_path.replace('uploads/', '', 1)
+                        full_path = os.path.join(upload_folder, filename)
                     elif photo_path.startswith('/'):
-                        # Если абсолютный путь
+                        # Абсолютный путь
                         full_path = photo_path
                     else:
-                        # Относительный путь - используем UPLOAD_FOLDER
-                        try:
-                            from app.config import Config
-                            upload_folder = Config.UPLOAD_FOLDER
-                        except (ImportError, AttributeError):
-                            # Fallback to default path
-                            upload_folder = os.path.join(base_dir, 'static', 'uploads')
+                        # Относительный путь - используем upload_folder
                         full_path = os.path.join(upload_folder, photo_path)
                     
+                    logger.info(f"Trying to send photo in publication: photo_path={photo_path}, full_path={full_path}, exists={os.path.exists(full_path)}")
                     if os.path.exists(full_path):
                         # Открываем файл и отправляем
                         with open(full_path, 'rb') as f:

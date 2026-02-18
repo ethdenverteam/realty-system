@@ -1291,19 +1291,20 @@ def user_preview_object_in_bot(object_id, current_user):
                 import os
                 from app.config import Config
                 
-                base_dir = os.path.dirname(os.path.dirname(__file__))
-                
-                # Нормализуем путь
+                # Используем Config.UPLOAD_FOLDER напрямую
+                # photo_path может быть "uploads/filename.jpg" или просто "filename.jpg"
                 if photo_path.startswith('uploads/'):
-                    full_path = os.path.join(base_dir, 'static', photo_path)
-                elif photo_path.startswith('static/uploads/'):
-                    full_path = os.path.join(base_dir, photo_path)
+                    # Убираем префикс "uploads/" и используем Config.UPLOAD_FOLDER
+                    filename = photo_path.replace('uploads/', '', 1)
+                    full_path = os.path.join(Config.UPLOAD_FOLDER, filename)
                 elif photo_path.startswith('/'):
+                    # Абсолютный путь
                     full_path = photo_path
                 else:
                     # Относительный путь - используем Config.UPLOAD_FOLDER
                     full_path = os.path.join(Config.UPLOAD_FOLDER, photo_path)
                 
+                logger.info(f"Trying to send photo: photo_path={photo_path}, full_path={full_path}, exists={os.path.exists(full_path)}")
                 if os.path.exists(full_path):
                     url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto'
                     with open(full_path, 'rb') as photo_file:

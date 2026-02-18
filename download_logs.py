@@ -106,7 +106,9 @@ def download_log_file(api_url, token, log_type, output_dir):
             pass
         return False
     except Exception as e:
-        print(f"  [ERROR] {TEST_LOG_FILENAMES[log_type]} - ошибка: {e}")
+        from datetime import datetime
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        print(f"  [ERROR] {TEST_LOG_FILENAMES[log_type]} - ошибка: {e} | Время: {current_time}")
         return False
 
 
@@ -114,12 +116,15 @@ def main():
     """Основная функция"""
     # Set UTF-8 encoding for Windows
     import sys
+    from datetime import datetime
     if sys.platform == 'win32':
         import io
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
     
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print("Скачивание логов с сервера...")
+    print(f"Время скачивания: {current_time}")
     print()
     
     # Получить URL и токен
