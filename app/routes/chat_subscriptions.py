@@ -312,18 +312,20 @@ def start_subscription(current_user):
         total_seconds = time_per_chat * len(chat_links)
         estimated_completion = datetime.utcnow() + timedelta(seconds=total_seconds)
         
-        # Создаем задачу подписки
+        # Создаем задачу подписки и сразу помечаем как "в процессе",
+        # чтобы в UI пользователь видел, что задача запущена, а не "Ожидание"
         task = ChatSubscriptionTask(
             user_id=current_user.user_id,
             account_id=account_id,
             group_id=group_id,
-            status='pending',
+            status='processing',
             current_index=0,
             total_chats=len(chat_links),
             successful_count=0,
             flood_count=0,
             chat_links=chat_links,
             interval_mode=interval_mode,
+            started_at=datetime.utcnow(),
             # Первый запуск можно делать сразу после создания
             next_run_at=datetime.utcnow(),
             estimated_completion=estimated_completion,

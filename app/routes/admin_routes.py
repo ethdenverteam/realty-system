@@ -2324,8 +2324,7 @@ def admin_test_account_publication_publish(current_user):
     from app.utils.telethon_client import send_object_message, run_async
     from app.utils.rate_limiter import get_rate_limit_status
     from bot.utils import format_publication_text
-    from bot.models import User as BotUser, Object as BotObject
-    from bot.database import get_db as get_bot_db
+    from bot.models import Object as BotObject
     
     data = request.get_json()
     object_id = data.get('object_id')
@@ -2381,48 +2380,31 @@ def admin_test_account_publication_publish(current_user):
         }), 429
     
     try:
-        # Get bot user and object for formatting
-        bot_user = None
-        bot_db = get_bot_db()
-        try:
-            if obj.user_id:
-                # Try to find bot user by user_id
-                bot_user = bot_db.query(BotUser).filter_by(user_id=obj.user_id).first()
-        finally:
-            bot_db.close()
-        
-        bot_db = get_bot_db()
-        try:
-            bot_obj = bot_db.query(BotObject).filter_by(object_id=object_id).first()
-            if not bot_obj:
-                # Create bot object from web object
-                bot_obj = BotObject(
-                    object_id=obj.object_id,
-                    user_id=obj.user_id,
-                    rooms_type=obj.rooms_type,
-                    price=obj.price,
-                    districts_json=obj.districts_json,
-                    region=obj.region,
-                    city=obj.city,
-                    photos_json=obj.photos_json,
-                    area=obj.area,
-                    floor=obj.floor,
-                    address=obj.address,
-                    residential_complex=obj.residential_complex,
-                    renovation=obj.renovation,
-                    comment=obj.comment,
-                    contact_name=obj.contact_name,
-                    show_username=obj.show_username,
-                    phone_number=obj.phone_number,
-                    contact_name_2=obj.contact_name_2,
-                    phone_number_2=obj.phone_number_2,
-                    status=obj.status,
-                    source='web'
-                )
-                bot_db.add(bot_obj)
-                bot_db.commit()
-        finally:
-            bot_db.close()
+        # Формируем BotObject в памяти, не обращаясь к базе бота
+        bot_obj = BotObject(
+            object_id=obj.object_id,
+            user_id=obj.user_id,
+            rooms_type=obj.rooms_type,
+            price=obj.price,
+            districts_json=obj.districts_json,
+            region=obj.region,
+            city=obj.city,
+            photos_json=obj.photos_json,
+            area=obj.area,
+            floor=obj.floor,
+            address=obj.address,
+            residential_complex=obj.residential_complex,
+            renovation=obj.renovation,
+            comment=obj.comment,
+            contact_name=obj.contact_name,
+            show_username=obj.show_username,
+            phone_number=obj.phone_number,
+            contact_name_2=obj.contact_name_2,
+            phone_number_2=obj.phone_number_2,
+            status=obj.status,
+            source='web',
+        )
+        bot_user = None  # Для тестовой публикации нам достаточно текста объекта
         
         # Получаем формат публикации из конфигурации автопубликации
         publication_format = 'default'
