@@ -6,6 +6,7 @@ from app.database import db
 from app.models.user import User
 from app.models.object import Object
 from app.models.chat import Chat
+from app.models.telegram_account_chat import TelegramAccountChat
 from app.models.chat_group import ChatGroup
 from app.models.action_log import ActionLog
 from app.utils.decorators import jwt_required, role_required
@@ -2290,13 +2291,17 @@ def admin_test_account_publication_accounts(current_user):
         
         result = []
         for account in accounts:
-            # Get chats for this account
-            chats = Chat.query.filter_by(
-                owner_type='user',
-                owner_account_id=account.account_id,
-                is_active=True
-            ).all()
-            
+            # Чаты аккаунта через связь many-to-many TelegramAccountChat
+            chats = (
+                Chat.query
+                .join(TelegramAccountChat, TelegramAccountChat.chat_id == Chat.chat_id)
+                .filter(
+                    TelegramAccountChat.account_id == account.account_id,
+                    Chat.is_active == True,
+                )
+                .all()
+            )
+
             result.append({
                 **account.to_dict(),
                 'chats': [chat.to_dict() for chat in chats]
@@ -2340,8 +2345,12 @@ def admin_test_account_publication_publish(current_user):
     if not chat:
         return jsonify({'error': 'Chat not found'}), 404
     
-    # Check chat belongs to account
-    if chat.owner_account_id != account_id or chat.owner_type != 'user':
+    # Check chat is linked to this account (many-to-many связь)
+    link = TelegramAccountChat.query.filter_by(
+        account_id=account_id,
+        chat_id=chat.chat_id
+    ).first()
+    if not link:
         return jsonify({'error': 'Chat does not belong to this account'}), 400
     
     # Get object (admin can access any object)

@@ -27,7 +27,18 @@ class Chat(db.Model):
     cached_at = Column(DateTime, nullable=True)  # When this chat was cached from user account
     
     # Relationships
+    # ЛЕГАСИ: прямое поле владельца аккаунта (один аккаунт на чат)
     account = relationship('TelegramAccount', back_populates='chats')
+
+    # Новая many-to-many привязка аккаунт ↔ чаты
+    account_links = relationship('TelegramAccountChat', back_populates='chat', cascade='all, delete-orphan')
+    linked_accounts = relationship(
+        'TelegramAccount',
+        secondary='telegram_account_chats',
+        back_populates='linked_chats',
+        viewonly=True,
+    )
+
     publication_queues = relationship('PublicationQueue', back_populates='chat')
     account_publication_queues = relationship('AccountPublicationQueue', back_populates='chat')
     publication_history = relationship('PublicationHistory', back_populates='chat')

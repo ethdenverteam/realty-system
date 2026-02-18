@@ -452,7 +452,8 @@ def publish_object_via_account(current_user):
     from datetime import datetime, timedelta
     import logging
     from app.models.telegram_account import TelegramAccount
-    from app.models.chat import Chat
+from app.models.chat import Chat
+from app.models.telegram_account_chat import TelegramAccountChat
     from app.models.publication_history import PublicationHistory
     from app.utils.telethon_client import send_object_message, run_async
     from app.utils.rate_limiter import get_rate_limit_status
@@ -482,8 +483,12 @@ def publish_object_via_account(current_user):
     if not chat:
         return jsonify({'error': 'Chat not found'}), 404
     
-    # Check chat belongs to account
-    if chat.owner_account_id != account_id or chat.owner_type != 'user':
+    # Check chat is linked to this account (many-to-many связь)
+    link = TelegramAccountChat.query.filter_by(
+        account_id=account_id,
+        chat_id=chat.chat_id
+    ).first()
+    if not link:
         return jsonify({'error': 'Chat does not belong to this account'}), 400
     
     # Get object

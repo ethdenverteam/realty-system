@@ -5,6 +5,7 @@ from flask import Blueprint, request, jsonify
 from app.database import db
 from app.models.telegram_account import TelegramAccount
 from app.models.chat import Chat
+from app.models.telegram_account_chat import TelegramAccountChat
 from app.models.publication_queue import PublicationQueue
 from app.models.publication_history import PublicationHistory
 from app.utils.decorators import jwt_required, role_required
@@ -364,23 +365,22 @@ def get_account_chats(account_id, current_user):
                 telegram_chat_id = str(chat_data.get('id', ''))
                 if not telegram_chat_id:
                     continue
-                
-                # Find existing chat or create new
+
+                # Чат в БД должен быть один (уникальный telegram_chat_id)
                 existing_chat = Chat.query.filter_by(
-                    telegram_chat_id=telegram_chat_id,
-                    owner_type='user',
-                    owner_account_id=account_id
+                    telegram_chat_id=telegram_chat_id
                 ).first()
-                
+
                 if existing_chat:
-                    # Update existing chat
+                    # Обновляем базовую информацию о чате
                     existing_chat.title = chat_data.get('title', existing_chat.title)
                     existing_chat.type = chat_data.get('type', existing_chat.type)
-                    existing_chat.members_count = chat_data.get('members_count', 0)
+                    existing_chat.members_count = chat_data.get('members_count', existing_chat.members_count or 0)
                     existing_chat.cached_at = cache_time
                     existing_chat.is_active = True
+                    chat_obj = existing_chat
                 else:
-                    # Create new cached chat
+                    # Чат ещё не известен системе — создаём единственную запись
                     new_chat = Chat(
                         telegram_chat_id=telegram_chat_id,
                         title=chat_data.get('title', 'Unknown'),
@@ -392,6 +392,21 @@ def get_account_chats(account_id, current_user):
                         is_active=True
                     )
                     db.session.add(new_chat)
+                    # После flush у нового объекта появится chat_id, нужен для связи аккаунт ↔ чат
+                    db.session.flush()
+                    chat_obj = new_chat
+
+                # Создаем/обновляем связь аккаунта с чатом в таблице TelegramAccountChat
+                if chat_obj and chat_obj.chat_id:
+                    link = TelegramAccountChat.query.filter_by(
+                        account_id=account_id,
+                        chat_id=chat_obj.chat_id
+                    ).first()
+                    if not link:
+                        db.session.add(TelegramAccountChat(
+                            account_id=account_id,
+                            chat_id=chat_obj.chat_id
+                        ))
         
         # Update last_used
         account.last_used = datetime.utcnow()

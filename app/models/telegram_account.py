@@ -24,7 +24,20 @@ class TelegramAccount(db.Model):
     
     # Relationships
     owner = relationship('User', back_populates='telegram_accounts')
+
+    # ЛЕГАСИ: прямая связь один-ко-многим через поле owner_account_id в Chat.
+    # Новая каноническая связь many-to-many реализована через TelegramAccountChat.
     chats = relationship('Chat', back_populates='account')
+
+    # Новая many-to-many привязка аккаунт ↔ чаты
+    chat_links = relationship('TelegramAccountChat', back_populates='account', cascade='all, delete-orphan')
+    linked_chats = relationship(
+        'Chat',
+        secondary='telegram_account_chats',
+        back_populates='linked_accounts',
+        viewonly=True,
+    )
+
     publication_queues = relationship('PublicationQueue', back_populates='account')
     account_publication_queues = relationship('AccountPublicationQueue', back_populates='account')
     publication_history = relationship('PublicationHistory', back_populates='account')

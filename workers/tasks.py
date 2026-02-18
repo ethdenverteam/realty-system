@@ -25,6 +25,7 @@ from app.database import db as app_db
 from app.models.chat_subscription_task import ChatSubscriptionTask
 from app.models.chat import Chat as AppChat
 from app.models.chat_group import ChatGroup as AppChatGroup
+from app.models.telegram_account_chat import TelegramAccountChat as AppTelegramAccountChat
 from app.models.telegram_account import TelegramAccount as AppTelegramAccount
 from app.utils.account_publication_utils import calculate_scheduled_times_for_account
 
@@ -687,23 +688,28 @@ def subscribe_to_chats_task(task_id: int):
                 # Успешная подписка
                 successful_count += 1
                 current_index += 1
-                
+
                 # Сохраняем или обновляем чат в БД
                 telegram_chat_id = chat_info['telegram_chat_id']
                 title = chat_info['title']
                 chat_type = chat_info['type']
-                
-                # Ищем существующий чат
+
+                # Ищем существующий чат (чат в БД должен быть один на telegram_chat_id)
                 existing_chat = AppChat.query.filter_by(telegram_chat_id=telegram_chat_id).first()
-                
+
                 if existing_chat:
                     # Обновляем название только если его еще нет или оно временное
-                    if not existing_chat.title or existing_chat.title.startswith('Chat ') or existing_chat.title.startswith('invite_') or existing_chat.title.startswith('public_'):
+                    if (
+                        not existing_chat.title
+                        or existing_chat.title.startswith('Chat ')
+                        or existing_chat.title.startswith('invite_')
+                        or existing_chat.title.startswith('public_')
+                    ):
                         existing_chat.title = title
                     existing_chat.type = chat_type
-                    existing_chat.owner_account_id = account.account_id
                     existing_chat.is_active = True
                     app_db.session.commit()
+                    chat_obj = existing_chat
                 else:
                     # Создаем новый чат
                     new_chat = AppChat(
@@ -716,6 +722,21 @@ def subscribe_to_chats_task(task_id: int):
                     )
                     app_db.session.add(new_chat)
                     app_db.session.commit()
+                    chat_obj = new_chat
+
+                # Создаем/обновляем связь аккаунт ↔ чат в таблице TelegramAccountChat
+                if chat_obj and chat_obj.chat_id:
+                    link = AppTelegramAccountChat.query.filter_by(
+                        account_id=account.account_id,
+                        chat_id=chat_obj.chat_id,
+                    ).first()
+                    if not link:
+                        link = AppTelegramAccountChat(
+                            account_id=account.account_id,
+                            chat_id=chat_obj.chat_id,
+                        )
+                        app_db.session.add(link)
+                        app_db.session.commit()
                 
                 # Обновляем информацию о чате в ChatGroup (сохраняем telegram_chat_id и title)
                 if task.group_id:
