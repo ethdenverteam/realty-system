@@ -15,7 +15,8 @@ class TelegramAccount(db.Model):
     owner_id = Column(Integer, ForeignKey('users.user_id'), nullable=False, index=True)
     phone = Column(String(20), unique=True, nullable=False)
     session_file = Column(String(255), nullable=False)  # Path to encrypted session file
-    mode = Column(String(20), default='normal', nullable=False)  # aggressive/normal/safe/smart
+    mode = Column(String(20), default='normal', nullable=False)  # aggressive/normal/safe/smart/fix
+    fix_interval_minutes = Column(Integer, nullable=True)  # Фиксированный интервал для режима 'fix' (в минутах)
     daily_limit = Column(Integer, default=200, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     last_used = Column(DateTime, nullable=True)
@@ -52,6 +53,7 @@ class TelegramAccount(db.Model):
             'owner_id': self.owner_id,
             'phone': self.phone,
             'mode': self.mode,
+            'fix_interval_minutes': self.fix_interval_minutes,
             'daily_limit': self.daily_limit,
             'is_active': self.is_active,
             'last_used': self.last_used.isoformat() if self.last_used else None,
