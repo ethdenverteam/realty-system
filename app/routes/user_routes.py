@@ -207,64 +207,64 @@ def get_autopublish_chats_for_object(object_id, current_user):
                     all_districts.update(parent_districts)
         
         bot_chats = db.session.query(BotChat).filter_by(owner_type='bot', is_active=True).all()
+        
+        for bot_chat in bot_chats:
+            matches = False
             
-            for bot_chat in bot_chats:
-                matches = False
+            # Check filters_json
+            if bot_chat.filters_json:
+                filters = bot_chat.filters_json
+                rooms_match = True
+                districts_match = True
+                price_match = True
                 
-                # Check filters_json
-                if bot_chat.filters_json:
-                    filters = bot_chat.filters_json
-                    rooms_match = True
-                    districts_match = True
-                    price_match = True
-                    
-                    rooms_types = filters.get('rooms_types', [])
-                    if rooms_types and rooms_type not in rooms_types:
-                        rooms_match = False
-                    
-                    filter_districts = filters.get('districts', [])
-                    if filter_districts:
-                        if not any(d in all_districts for d in filter_districts):
-                            districts_match = False
-                    
-                    price_min = filters.get('price_min')
-                    price_max = filters.get('price_max')
-                    if price_min is not None or price_max is not None:
-                        price_min = price_min or 0
-                        price_max = price_max if price_max is not None else float('inf')
-                        price_match = price_min <= price < price_max
-                    
-                    if rooms_match and districts_match and price_match:
-                        matches = True
-                else:
-                    # Legacy category support
-                    category = bot_chat.category or ""
-                    if category.startswith("rooms_") and category.replace("rooms_", "") == rooms_type:
-                        matches = True
-                    if category.startswith("district_"):
-                        district_name = category.replace("district_", "")
-                        if district_name in all_districts:
-                            matches = True
-                    if category.startswith("price_"):
-                        try:
-                            parts = category.replace("price_", "").split("_")
-                            if len(parts) == 2:
-                                min_price = float(parts[0])
-                                max_price = float(parts[1])
-                                if min_price <= price < max_price:
-                                    matches = True
-                        except:
-                            pass
+                rooms_types = filters.get('rooms_types', [])
+                if rooms_types and rooms_type not in rooms_types:
+                    rooms_match = False
                 
-                if matches:
-                    web_chat = Chat.query.filter_by(telegram_chat_id=bot_chat.telegram_chat_id, owner_type='bot').first()
-                    if web_chat:
-                        result['bot_chats'].append({
-                            'chat_id': web_chat.chat_id,
-                            'title': web_chat.title,
-                            'telegram_chat_id': web_chat.telegram_chat_id,
-                            'type': 'bot'
-                        })
+                filter_districts = filters.get('districts', [])
+                if filter_districts:
+                    if not any(d in all_districts for d in filter_districts):
+                        districts_match = False
+                
+                price_min = filters.get('price_min')
+                price_max = filters.get('price_max')
+                if price_min is not None or price_max is not None:
+                    price_min = price_min or 0
+                    price_max = price_max if price_max is not None else float('inf')
+                    price_match = price_min <= price < price_max
+                
+                if rooms_match and districts_match and price_match:
+                    matches = True
+            else:
+                # Legacy category support
+                category = bot_chat.category or ""
+                if category.startswith("rooms_") and category.replace("rooms_", "") == rooms_type:
+                    matches = True
+                if category.startswith("district_"):
+                    district_name = category.replace("district_", "")
+                    if district_name in all_districts:
+                        matches = True
+                if category.startswith("price_"):
+                    try:
+                        parts = category.replace("price_", "").split("_")
+                        if len(parts) == 2:
+                            min_price = float(parts[0])
+                            max_price = float(parts[1])
+                            if min_price <= price < max_price:
+                                matches = True
+                    except:
+                        pass
+            
+            if matches:
+                web_chat = Chat.query.filter_by(telegram_chat_id=bot_chat.telegram_chat_id, owner_type='bot').first()
+                if web_chat:
+                    result['bot_chats'].append({
+                        'chat_id': web_chat.chat_id,
+                        'title': web_chat.title,
+                        'telegram_chat_id': web_chat.telegram_chat_id,
+                        'type': 'bot'
+                    })
         finally:
     
     # Get user account chats from config

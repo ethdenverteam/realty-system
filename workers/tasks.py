@@ -271,15 +271,15 @@ def publish_to_telegram(queue_id: int):
             db.session.commit()
             return False
         
-    except Exception as e:
-        logger.error(f"Error publishing to Telegram: {e}")
-        if queue:
-            queue.status = 'failed'
-            queue.error_message = str(e)
-            queue.attempts += 1
-            db.session.commit()
-        return False
-    finally:
+        except Exception as e:
+            logger.error(f"Error publishing to Telegram: {e}")
+            if queue:
+                queue.status = 'failed'
+                queue.error_message = str(e)
+                queue.attempts += 1
+                db.session.commit()
+            return False
+        finally:
 
 
 @celery_app.task(name='workers.tasks.process_autopublish')
