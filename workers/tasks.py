@@ -617,10 +617,12 @@ def process_chat_subscriptions():
         try:
             now = datetime.utcnow()
             # Выбираем задачи, которые нужно выполнять сейчас или которые ещё не имеют next_run_at
-            tasks = ChatSubscriptionTask.query.filter(
+            # Используем явный запрос через app_db для избежания проблем с закрытыми результатами
+            tasks_query = app_db.session.query(ChatSubscriptionTask).filter(
                 ChatSubscriptionTask.status.in_(['pending', 'processing', 'flood_wait']),
                 or_(ChatSubscriptionTask.next_run_at.is_(None), ChatSubscriptionTask.next_run_at <= now),
-            ).all()
+            )
+            tasks = tasks_query.all()
 
             if not tasks:
                 return 0
@@ -962,20 +964,20 @@ def process_account_autopublish():
             now = datetime.utcnow()
             
             # Получаем настройку проверки дубликатов
-            duplicates_setting = SystemSetting.query.filter_by(key='allow_duplicates').first()
+            duplicates_setting = app_db.session.query(SystemSetting).filter_by(key='allow_duplicates').first()
             allow_duplicates = False
             if duplicates_setting and isinstance(duplicates_setting.value_json, dict):
                 allow_duplicates = duplicates_setting.value_json.get('enabled', False)
             
             # Получаем все активные аккаунты
-            accounts = AppTelegramAccount.query.filter_by(is_active=True).all()
+            accounts = app_db.session.query(AppTelegramAccount).filter_by(is_active=True).all()
             
             processed_count = 0
             
             for account in accounts:
                 # Проверяем лимит аккаунта (по успешным публикациям за сегодня)
                 today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-                today_publications = AppPublicationHistory.query.filter(
+                today_publications = app_db.session.query(AppPublicationHistory).filter(
                     AppPublicationHistory.account_id == account.account_id,
                     AppPublicationHistory.published_at >= today_start,
                     AppPublicationHistory.deleted == False
@@ -987,7 +989,7 @@ def process_account_autopublish():
                     continue
                 
                 # Получаем задачи аккаунта, готовые к публикации
-                queues = AccountPublicationQueue.query.filter(
+                queues = app_db.session.query(AccountPublicationQueue).filter(
                     AccountPublicationQueue.account_id == account.account_id,
                     AccountPublicationQueue.status == 'pending',
                     AccountPublicationQueue.scheduled_time <= now
@@ -1009,8 +1011,8 @@ def process_account_autopublish():
                         app_db.session.commit()
                         
                         # Получаем объект и чат
-                        obj = AppObject.query.get(queue.object_id)
-                        chat = AppChat.query.get(queue.chat_id)
+                        obj = app_db.session.query(AppObject).get(queue.object_id)
+                        chat = app_db.session.query(AppChat).get(queue.chat_id)
                         
                         if not obj or not chat:
                             queue.status = 'failed'
@@ -1086,7 +1088,7 @@ def process_account_autopublish():
                         # Получаем формат публикации
                         publication_format = 'default'
                         from app.models.autopublish_config import AutopublishConfig
-                        autopublish_cfg = AutopublishConfig.query.filter_by(
+                        autopublish_cfg = app_db.session.query(AutopublishConfig).filter_by(
                             object_id=obj.object_id
                         ).first()
                         if autopublish_cfg and autopublish_cfg.accounts_config_json:

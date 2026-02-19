@@ -118,6 +118,20 @@ export default function TelegramAccounts(): JSX.Element {
     }
   }
 
+  // Изменение режима аккаунта
+  const handleModeChange = async (accountId: number, mode: string): Promise<void> => {
+    try {
+      setError('')
+      await api.put(`/accounts/${accountId}`, { mode })
+      setSuccess('Режим аккаунта обновлен')
+      void reloadAccounts()
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, 'Ошибка обновления режима')
+      setError(message)
+      logError(err, 'Changing account mode')
+    }
+  }
+
   // Удаление аккаунта
   const handleDeleteAccount = async (accountId: number): Promise<void> => {
     const confirmed = window.confirm(
@@ -182,7 +196,20 @@ export default function TelegramAccounts(): JSX.Element {
                       <span className={`status ${account.is_active ? 'active' : 'inactive'}`}>
                         {account.is_active ? 'Активен' : 'Неактивен'}
                       </span>
-                      <span>Режим: {account.mode}</span>
+                      <span>
+                        Режим:{' '}
+                        <select
+                          value={account.mode}
+                          onChange={(e) => handleModeChange(account.account_id, e.target.value)}
+                          style={{ marginLeft: '4px', padding: '2px 4px', fontSize: '14px' }}
+                        >
+                          <option value="safe">Safe</option>
+                          <option value="normal">Normal</option>
+                          <option value="aggressive">Aggressive</option>
+                          <option value="smart">Smart</option>
+                          <option value="fix">Fix</option>
+                        </select>
+                      </span>
                       <span>Лимит: {account.daily_limit}/день</span>
                     </div>
                   </div>

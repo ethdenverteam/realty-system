@@ -55,6 +55,7 @@ export default function ObjectForm({
 }: ObjectFormProps): JSX.Element {
   const [districts, setDistricts] = useState<string[]>([])
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>([])
+  const [districtSearch, setDistrictSearch] = useState<string>('')
   // Флаг для предотвращения циклических обновлений при синхронизации formData -> selectedDistricts
   const isSyncingFromFormData = useRef(false)
 
@@ -179,19 +180,46 @@ export default function ObjectForm({
           </div>
           <div className="form-group">
             <label className="form-label">Районы</label>
-            <select
-              multiple
-              className="form-input form-input-multiple"
-              value={selectedDistricts}
-              onChange={handleDistrictsChange}
-              size={Math.min(districts.length + 1, 8)}
-            >
-              {districts.map((district) => (
-                <option key={district} value={district}>
-                  {district}
-                </option>
-              ))}
-            </select>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Поиск района..."
+                value={districtSearch}
+                onChange={(e) => setDistrictSearch(e.target.value)}
+                style={{ marginBottom: '8px', paddingRight: '30px' }}
+                autoComplete="off"
+              />
+              <select
+                multiple
+                className="form-input form-input-multiple"
+                value={selectedDistricts}
+                onChange={handleDistrictsChange}
+                size={Math.min(
+                  districts.filter(d => 
+                    !districtSearch || 
+                    d.toLowerCase().includes(districtSearch.toLowerCase())
+                  ).length + 1, 
+                  8
+                )}
+                style={{ 
+                  overflowY: 'auto', 
+                  overflowX: 'hidden',
+                  maxHeight: '250px'
+                }}
+              >
+                {districts
+                  .filter(d => 
+                    !districtSearch || 
+                    d.toLowerCase().includes(districtSearch.toLowerCase())
+                  )
+                  .map((district) => (
+                    <option key={district} value={district}>
+                      {district}
+                    </option>
+                  ))}
+              </select>
+            </div>
             <small className="form-hint">
               Удерживайте Ctrl (или Cmd на Mac) для выбора нескольких районов. Выбрано: {selectedDistricts.length}
             </small>
