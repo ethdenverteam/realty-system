@@ -443,9 +443,15 @@ def create_or_update_autopublish_config(current_user):
                     ).first()
                     if not existing:
                         # Получаем время для публикации (8:00-22:00 МСК)
-                        from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc, get_moscow_time
+                        from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc, get_moscow_time, is_within_publish_hours
                         now_msk = get_moscow_time()
-                        scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                        
+                        # Если текущее время в пределах разрешенного диапазона - публикуем сразу
+                        if is_within_publish_hours(now_msk):
+                            scheduled_time_msk = now_msk
+                        else:
+                            scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                        
                         scheduled_time_utc = msk_to_utc(scheduled_time_msk)
                         
                         queue = PublicationQueue(
@@ -483,10 +489,16 @@ def create_or_update_autopublish_config(current_user):
                                     ).first()
                                     if not existing:
                                         # Получаем время для публикации (8:00-22:00 МСК)
-                                        from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc
+                                        from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc, is_within_publish_hours
                                         from bot.utils import get_moscow_time
                                         now_msk = get_moscow_time()
-                                        scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                                        
+                                        # Если текущее время в пределах разрешенного диапазона - публикуем сразу
+                                        if is_within_publish_hours(now_msk):
+                                            scheduled_time_msk = now_msk
+                                        else:
+                                            scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                                        
                                         scheduled_time_utc = msk_to_utc(scheduled_time_msk)
                                         
                                         queue = AccountPublicationQueue(
@@ -501,6 +513,12 @@ def create_or_update_autopublish_config(current_user):
                                         db.session.add(queue)
             
             db.session.commit()
+            
+            # Запускаем обработку очередей, если есть задачи, готовые к публикации
+            from workers.tasks import process_account_autopublish, process_autopublish
+            process_account_autopublish.delay()
+            process_autopublish.delay()  # Для бота тоже
+            
         return jsonify({'success': True, 'config': cfg.to_dict()})
     except Exception as e:
         db.session.rollback()
@@ -627,9 +645,15 @@ def update_autopublish_config(object_id, current_user):
                     ).first()
                     if not existing:
                         # Получаем время для публикации (8:00-22:00 МСК)
-                        from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc, get_moscow_time
+                        from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc, get_moscow_time, is_within_publish_hours
                         now_msk = get_moscow_time()
-                        scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                        
+                        # Если текущее время в пределах разрешенного диапазона - публикуем сразу
+                        if is_within_publish_hours(now_msk):
+                            scheduled_time_msk = now_msk
+                        else:
+                            scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                        
                         scheduled_time_utc = msk_to_utc(scheduled_time_msk)
                         
                         queue = PublicationQueue(
@@ -667,10 +691,16 @@ def update_autopublish_config(object_id, current_user):
                                     ).first()
                                     if not existing:
                                         # Получаем время для публикации (8:00-22:00 МСК)
-                                        from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc
+                                        from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc, is_within_publish_hours
                                         from bot.utils import get_moscow_time
                                         now_msk = get_moscow_time()
-                                        scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                                        
+                                        # Если текущее время в пределах разрешенного диапазона - публикуем сразу
+                                        if is_within_publish_hours(now_msk):
+                                            scheduled_time_msk = now_msk
+                                        else:
+                                            scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                                        
                                         scheduled_time_utc = msk_to_utc(scheduled_time_msk)
                                         
                                         queue = AccountPublicationQueue(
@@ -685,6 +715,11 @@ def update_autopublish_config(object_id, current_user):
                                         db.session.add(queue)
             
             db.session.commit()
+            
+            # Запускаем обработку очередей, если есть задачи, готовые к публикации
+            from workers.tasks import process_account_autopublish, process_autopublish
+            process_account_autopublish.delay()
+            process_autopublish.delay()  # Для бота тоже
         
         return jsonify({'success': True, 'config': cfg.to_dict()})
     except Exception as e:
