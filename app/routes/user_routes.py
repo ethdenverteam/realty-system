@@ -176,7 +176,7 @@ def get_autopublish_chats_for_object(object_id, current_user):
     from app.models.telegram_account import TelegramAccount
     from bot.utils import get_districts_config
     from bot.models import Chat as BotChat
-    from bot.database import get_db as get_bot_db
+    from app.database import db
     
     obj = Object.query.filter_by(object_id=object_id, user_id=current_user.user_id).first()
     if not obj:
@@ -206,9 +206,7 @@ def get_autopublish_chats_for_object(object_id, current_user):
                 if isinstance(parent_districts, list):
                     all_districts.update(parent_districts)
         
-        bot_db = get_bot_db()
-        try:
-            bot_chats = bot_db.query(BotChat).filter_by(owner_type='bot', is_active=True).all()
+        bot_chats = db.session.query(BotChat).filter_by(owner_type='bot', is_active=True).all()
             
             for bot_chat in bot_chats:
                 matches = False
@@ -268,7 +266,6 @@ def get_autopublish_chats_for_object(object_id, current_user):
                             'type': 'bot'
                         })
         finally:
-            bot_db.close()
     
     # Get user account chats from config
     if cfg and cfg.accounts_config_json:
@@ -397,42 +394,40 @@ def create_or_update_autopublish_config(current_user):
         if cfg.enabled:
             from workers.tasks import _get_matching_bot_chats_for_object
             from app.models.chat import Chat as WebChat
-            from bot.database import get_db as get_bot_db
+            from app.database import db
             from bot.models import Object as BotObject, Chat as BotChat
             
             # Создаем очередь для бота (всегда включен)
-            worker_db = get_bot_db()
-            try:
-                # Получаем или создаем объект в базе бота
-                bot_obj = worker_db.query(BotObject).filter_by(object_id=object_id).first()
-                if not bot_obj:
-                    bot_obj = BotObject(
-                        object_id=obj.object_id,
-                        user_id=None,
-                        rooms_type=obj.rooms_type,
-                        price=obj.price,
-                        districts_json=obj.districts_json,
-                        region=obj.region,
-                        city=obj.city,
-                        photos_json=obj.photos_json,
-                        area=obj.area,
-                        floor=obj.floor,
-                        address=obj.address,
-                        residential_complex=obj.residential_complex,
-                        renovation=obj.renovation,
-                        comment=obj.comment,
-                        contact_name=obj.contact_name,
-                        show_username=obj.show_username,
-                        phone_number=obj.phone_number,
-                        contact_name_2=obj.contact_name_2,
-                        phone_number_2=obj.phone_number_2,
-                        status=obj.status,
-                        source='web'
-                    )
-                    worker_db.add(bot_obj)
-                    worker_db.commit()
-                
-                bot_chats = _get_matching_bot_chats_for_object(worker_db, bot_obj)
+            # Получаем или создаем объект в базе бота
+            bot_obj = db.session.query(BotObject).filter_by(object_id=object_id).first()
+            if not bot_obj:
+                bot_obj = BotObject(
+                    object_id=obj.object_id,
+                    user_id=None,
+                    rooms_type=obj.rooms_type,
+                    price=obj.price,
+                    districts_json=obj.districts_json,
+                    region=obj.region,
+                    city=obj.city,
+                    photos_json=obj.photos_json,
+                    area=obj.area,
+                    floor=obj.floor,
+                    address=obj.address,
+                    residential_complex=obj.residential_complex,
+                    renovation=obj.renovation,
+                    comment=obj.comment,
+                    contact_name=obj.contact_name,
+                    show_username=obj.show_username,
+                    phone_number=obj.phone_number,
+                    contact_name_2=obj.contact_name_2,
+                    phone_number_2=obj.phone_number_2,
+                    status=obj.status,
+                    source='web'
+                )
+                db.session.add(bot_obj)
+                db.session.commit()
+            
+            bot_chats = _get_matching_bot_chats_for_object(db.session, bot_obj)
                 for bot_chat in bot_chats:
                     # Находим соответствующий чат в веб-базе
                     web_chat = WebChat.query.filter_by(
@@ -467,8 +462,6 @@ def create_or_update_autopublish_config(current_user):
                                 created_at=datetime.utcnow(),
                             )
                             db.session.add(queue)
-            finally:
-                worker_db.close()
             
             # Создаем очередь для аккаунтов пользователей
             accounts_cfg = cfg.accounts_config_json or {}
@@ -589,42 +582,40 @@ def update_autopublish_config(object_id, current_user):
         if obj and cfg.enabled:
             from workers.tasks import _get_matching_bot_chats_for_object
             from app.models.chat import Chat as WebChat
-            from bot.database import get_db as get_bot_db
+            from app.database import db
             from bot.models import Object as BotObject, Chat as BotChat
             
             # Создаем очередь для бота (всегда включен)
-            worker_db = get_bot_db()
-            try:
-                # Получаем или создаем объект в базе бота
-                bot_obj = worker_db.query(BotObject).filter_by(object_id=object_id).first()
-                if not bot_obj:
-                    bot_obj = BotObject(
-                        object_id=obj.object_id,
-                        user_id=None,
-                        rooms_type=obj.rooms_type,
-                        price=obj.price,
-                        districts_json=obj.districts_json,
-                        region=obj.region,
-                        city=obj.city,
-                        photos_json=obj.photos_json,
-                        area=obj.area,
-                        floor=obj.floor,
-                        address=obj.address,
-                        residential_complex=obj.residential_complex,
-                        renovation=obj.renovation,
-                        comment=obj.comment,
-                        contact_name=obj.contact_name,
-                        show_username=obj.show_username,
-                        phone_number=obj.phone_number,
-                        contact_name_2=obj.contact_name_2,
-                        phone_number_2=obj.phone_number_2,
-                        status=obj.status,
-                        source='web'
-                    )
-                    worker_db.add(bot_obj)
-                    worker_db.commit()
-                
-                bot_chats = _get_matching_bot_chats_for_object(worker_db, bot_obj)
+            # Получаем или создаем объект в базе бота
+            bot_obj = db.session.query(BotObject).filter_by(object_id=object_id).first()
+            if not bot_obj:
+                bot_obj = BotObject(
+                    object_id=obj.object_id,
+                    user_id=None,
+                    rooms_type=obj.rooms_type,
+                    price=obj.price,
+                    districts_json=obj.districts_json,
+                    region=obj.region,
+                    city=obj.city,
+                    photos_json=obj.photos_json,
+                    area=obj.area,
+                    floor=obj.floor,
+                    address=obj.address,
+                    residential_complex=obj.residential_complex,
+                    renovation=obj.renovation,
+                    comment=obj.comment,
+                    contact_name=obj.contact_name,
+                    show_username=obj.show_username,
+                    phone_number=obj.phone_number,
+                    contact_name_2=obj.contact_name_2,
+                    phone_number_2=obj.phone_number_2,
+                    status=obj.status,
+                    source='web'
+                )
+                db.session.add(bot_obj)
+                db.session.commit()
+            
+            bot_chats = _get_matching_bot_chats_for_object(db.session, bot_obj)
                 for bot_chat in bot_chats:
                     # Находим соответствующий чат в веб-базе
                     web_chat = WebChat.query.filter_by(
@@ -659,8 +650,6 @@ def update_autopublish_config(object_id, current_user):
                                 created_at=datetime.utcnow(),
                             )
                             db.session.add(queue)
-            finally:
-                worker_db.close()
             
             # Создаем очередь для аккаунтов пользователей
             accounts_cfg = cfg.accounts_config_json or {}
@@ -881,7 +870,7 @@ def user_publish_object_via_bot(current_user):
         format_publication_text, get_districts_config, get_price_ranges
     )
     from bot.models import User as BotUser, Object as BotObject
-    from bot.database import get_db as get_bot_db
+    from app.database import db
     from datetime import timedelta
     
     data = request.get_json()
@@ -912,18 +901,11 @@ def user_publish_object_via_bot(current_user):
     try:
         # Get bot user (try to find by web user's telegram_id if linked)
         bot_user = None
-        bot_db = get_bot_db()
-        try:
-            # Try to find bot user by telegram_id if web user has it
-            if hasattr(current_user, 'telegram_id') and current_user.telegram_id:
-                bot_user = bot_db.query(BotUser).filter_by(telegram_id=int(current_user.telegram_id)).first()
-        finally:
-            bot_db.close()
+        if hasattr(current_user, 'telegram_id') and current_user.telegram_id:
+            bot_user = db.session.query(BotUser).filter_by(telegram_id=int(current_user.telegram_id)).first()
         
         # Get bot object
-        bot_db = get_bot_db()
-        try:
-            bot_obj = bot_db.query(BotObject).filter_by(object_id=object_id).first()
+        bot_obj = db.session.query(BotObject).filter_by(object_id=object_id).first()
             if not bot_obj:
                 # Create bot object from web object
                 bot_obj = BotObject(
@@ -949,10 +931,8 @@ def user_publish_object_via_bot(current_user):
                     status=obj.status,
                     source='web'
                 )
-                bot_db.add(bot_obj)
-                bot_db.commit()
-        finally:
-            bot_db.close()
+                db.session.add(bot_obj)
+                db.session.commit()
         
         # Получаем формат публикации из конфигурации автопубликации
         publication_format = 'default'
@@ -971,10 +951,8 @@ def user_publish_object_via_bot(current_user):
         
         # Get target chats (reuse logic from bot)
         target_chats = []
-        bot_db = get_bot_db()
-        try:
-            from bot.models import Chat as BotChat
-            chats = bot_db.query(BotChat).filter_by(owner_type='bot', is_active=True).all()
+        from bot.models import Chat as BotChat
+        chats = db.session.query(BotChat).filter_by(owner_type='bot', is_active=True).all()
             
             rooms_type = obj.rooms_type or ""
             districts = obj.districts_json or []
@@ -1057,7 +1035,6 @@ def user_publish_object_via_bot(current_user):
                     if web_chat and web_chat.chat_id not in target_chats:
                         target_chats.append(web_chat.chat_id)
         finally:
-            bot_db.close()
         
         if not target_chats:
             return jsonify({
@@ -1195,7 +1172,7 @@ def user_preview_object_in_bot(object_id, current_user):
     from bot.config import BOT_TOKEN
     from bot.utils import format_publication_text
     from bot.models import User as BotUser, Object as BotObject
-    from bot.database import get_db as get_bot_db
+    from app.database import db
     
     # Get object
     obj = Object.query.filter_by(object_id=object_id, user_id=current_user.user_id).first()
@@ -1215,16 +1192,11 @@ def user_preview_object_in_bot(object_id, current_user):
     try:
         # Get bot user
         bot_user = None
-        bot_db = get_bot_db()
-        try:
-            bot_user = bot_db.query(BotUser).filter_by(telegram_id=int(current_user.telegram_id)).first()
-        finally:
-            bot_db.close()
+        if hasattr(current_user, 'telegram_id') and current_user.telegram_id:
+            bot_user = db.session.query(BotUser).filter_by(telegram_id=int(current_user.telegram_id)).first()
         
         # Get or create bot object
-        bot_db = get_bot_db()
-        try:
-            bot_obj = bot_db.query(BotObject).filter_by(object_id=object_id).first()
+        bot_obj = db.session.query(BotObject).filter_by(object_id=object_id).first()
             if not bot_obj:
                 # Create bot object from web object
                 bot_obj = BotObject(
@@ -1250,10 +1222,8 @@ def user_preview_object_in_bot(object_id, current_user):
                     status=obj.status,
                     source='web'
                 )
-                bot_db.add(bot_obj)
-                bot_db.commit()
-        finally:
-            bot_db.close()
+                db.session.add(bot_obj)
+                db.session.commit()
         
         # Получаем формат публикации из конфигурации автопубликации
         publication_format = 'default'

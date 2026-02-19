@@ -4,7 +4,7 @@ Chat utilities - сохранение чатов в базу данных
 import logging
 from datetime import datetime
 from telegram import Update
-from bot.database import get_db
+from app.database import db
 from bot.models import Chat
 
 logger = logging.getLogger(__name__)
@@ -50,9 +50,8 @@ def save_chat_from_update(update: Update):
     username = chat.username or ''
     
     # Save to database
-    db = get_db()
     try:
-        existing_chat = db.query(Chat).filter_by(
+        existing_chat = db.session.query(Chat).filter_by(
             telegram_chat_id=chat_id,
             owner_type='bot'
         ).first()
@@ -80,12 +79,10 @@ def save_chat_from_update(update: Update):
                 filters_json=filters_data if filters_data else None,
                 added_date=datetime.utcnow()
             )
-            db.add(new_chat)
+            db.session.add(new_chat)
         
-        db.commit()
+        db.session.commit()
     except Exception as e:
         logger.error(f"Error saving chat to database: {e}", exc_info=True)
-        db.rollback()
-    finally:
-        db.close()
+        db.session.rollback()
 

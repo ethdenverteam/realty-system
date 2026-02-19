@@ -6,7 +6,7 @@ from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CallbackQueryHandler, filters
 from bot.utils import get_user, save_user
-from bot.database import get_db
+from app.database import db
 from bot.models import ActionLog
 
 logger = logging.getLogger(__name__)
@@ -91,36 +91,32 @@ async def settings_phone_input(update: Update, context: ContextTypes.DEFAULT_TYP
         return SETTINGS_WAITING_PHONE
     
     # Сохранение номера - используем одну сессию для получения и обновления
-    db = get_db()
-    try:
-        from bot.models import User
-        user_obj = db.query(User).filter_by(telegram_id=int(user.id)).first()
+    from bot.models import User
+    user_obj = db.session.query(User).filter_by(telegram_id=int(user.id)).first()
+    
+    if not user_obj:
+        # Create user if doesn't exist
+        from bot.utils import update_user_activity
+        update_user_activity(str(user.id), user.username)
+        user_obj = db.session.query(User).filter_by(telegram_id=int(user.id)).first()
+    
+    if user_obj:
+        user_obj.phone = phone
+        db.session.commit()
         
-        if not user_obj:
-            # Create user if doesn't exist
-            from bot.utils import update_user_activity
-            update_user_activity(str(user.id), user.username)
-            user_obj = db.query(User).filter_by(telegram_id=int(user.id)).first()
-        
-        if user_obj:
-            user_obj.phone = phone
-            db.commit()
-            
-            # Log action
-            try:
-                action_log = ActionLog(
-                    user_id=user_obj.user_id,
-                    action='bot_settings_phone_updated',
-                    details_json={'phone': phone},
-                    created_at=datetime.utcnow()
-                )
-                db.add(action_log)
-                db.commit()
-            except Exception as e:
-                logger.error(f"Failed to log action: {e}")
-                db.rollback()
-    finally:
-        db.close()
+        # Log action
+        try:
+            action_log = ActionLog(
+                user_id=user_obj.user_id,
+                action='bot_settings_phone_updated',
+                details_json={'phone': phone},
+                created_at=datetime.utcnow()
+            )
+            db.session.add(action_log)
+            db.session.commit()
+        except Exception as e:
+            logger.error(f"Failed to log action: {e}")
+            db.session.rollback()
     
     await update.message.reply_text("✅ Номер телефона сохранен!")
     
@@ -153,42 +149,38 @@ async def settings_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE
     user = update.effective_user
     name = update.message.text.strip()
     
-    db = get_db()
-    try:
-        from bot.models import User
-        user_obj = db.query(User).filter_by(telegram_id=int(user.id)).first()
+    from bot.models import User
+    user_obj = db.session.query(User).filter_by(telegram_id=int(user.id)).first()
+    
+    if not user_obj:
+        from bot.utils import update_user_activity
+        update_user_activity(str(user.id), user.username)
+        user_obj = db.session.query(User).filter_by(telegram_id=int(user.id)).first()
+    
+    if user_obj:
+        if not user_obj.settings_json:
+            user_obj.settings_json = {}
+        # Создаем новый словарь для отслеживания изменений SQLAlchemy
+        settings = dict(user_obj.settings_json) if user_obj.settings_json else {}
+        settings['contact_name'] = name
+        user_obj.settings_json = settings
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(user_obj, 'settings_json')
+        db.session.commit()
         
-        if not user_obj:
-            from bot.utils import update_user_activity
-            update_user_activity(str(user.id), user.username)
-            user_obj = db.query(User).filter_by(telegram_id=int(user.id)).first()
-        
-        if user_obj:
-            if not user_obj.settings_json:
-                user_obj.settings_json = {}
-            # Создаем новый словарь для отслеживания изменений SQLAlchemy
-            settings = dict(user_obj.settings_json) if user_obj.settings_json else {}
-            settings['contact_name'] = name
-            user_obj.settings_json = settings
-            from sqlalchemy.orm.attributes import flag_modified
-            flag_modified(user_obj, 'settings_json')
-            db.commit()
-            
-            # Log action
-            try:
-                action_log = ActionLog(
-                    user_id=user_obj.user_id,
-                    action='bot_settings_name_updated',
-                    details_json={'name': name},
-                    created_at=datetime.utcnow()
-                )
-                db.add(action_log)
-                db.commit()
-            except Exception as e:
-                logger.error(f"Failed to log action: {e}")
-                db.rollback()
-    finally:
-        db.close()
+        # Log action
+        try:
+            action_log = ActionLog(
+                user_id=user_obj.user_id,
+                action='bot_settings_name_updated',
+                details_json={'name': name},
+                created_at=datetime.utcnow()
+            )
+            db.session.add(action_log)
+            db.session.commit()
+        except Exception as e:
+            logger.error(f"Failed to log action: {e}")
+            db.session.rollback()
     
     await update.message.reply_text("✅ Имя сохранено!")
     
@@ -202,10 +194,8 @@ async def settings_toggle_username(update: Update, context: ContextTypes.DEFAULT
     query = update.callback_query
     await query.answer()
     
-    db = get_db()
-    try:
-        from bot.models import User
-        user_obj = db.query(User).filter_by(telegram_id=int(update.effective_user.id)).first()
+    from bot.models import User
+    user_obj = db.session.query(User).filter_by(telegram_id=int(update.effective_user.id)).first()
         
         if user_obj:
             if not user_obj.settings_json:
@@ -217,7 +207,7 @@ async def settings_toggle_username(update: Update, context: ContextTypes.DEFAULT
             user_obj.settings_json = settings
             from sqlalchemy.orm.attributes import flag_modified
             flag_modified(user_obj, 'settings_json')
-            db.commit()
+            db.session.commit()
             
             # Log action
             try:
@@ -227,13 +217,11 @@ async def settings_toggle_username(update: Update, context: ContextTypes.DEFAULT
                     details_json={'default_show_username': not current_value},
                     created_at=datetime.utcnow()
                 )
-                db.add(action_log)
-                db.commit()
+                db.session.add(action_log)
+                db.session.commit()
             except Exception as e:
                 logger.error(f"Failed to log action: {e}")
-                db.rollback()
-    finally:
-        db.close()
+                db.session.rollback()
     
     await settings_handler(update, context)
     return SETTINGS_MENU

@@ -459,7 +459,7 @@ def publish_object_via_account(current_user):
     from app.utils.rate_limiter import get_rate_limit_status
     from bot.utils import format_publication_text
     from bot.models import User as BotUser, Object as BotObject
-    from bot.database import get_db as get_bot_db
+    from app.database import db
     
     data = request.get_json()
     object_id = data.get('object_id')
@@ -537,16 +537,10 @@ def publish_object_via_account(current_user):
     try:
         # Get bot user and object for formatting
         bot_user = None
-        bot_db = get_bot_db()
-        try:
-            if hasattr(current_user, 'telegram_id') and current_user.telegram_id:
-                bot_user = bot_db.query(BotUser).filter_by(telegram_id=int(current_user.telegram_id)).first()
-        finally:
-            bot_db.close()
+        if hasattr(current_user, 'telegram_id') and current_user.telegram_id:
+            bot_user = db.session.query(BotUser).filter_by(telegram_id=int(current_user.telegram_id)).first()
         
-        bot_db = get_bot_db()
-        try:
-            bot_obj = bot_db.query(BotObject).filter_by(object_id=object_id).first()
+        bot_obj = db.session.query(BotObject).filter_by(object_id=object_id).first()
             if not bot_obj:
                 # Create bot object from web object
                 bot_obj = BotObject(
@@ -572,10 +566,8 @@ def publish_object_via_account(current_user):
                     status=obj.status,
                     source='web'
                 )
-                bot_db.add(bot_obj)
-                bot_db.commit()
-        finally:
-            bot_db.close()
+                db.session.add(bot_obj)
+                db.session.commit()
         
         # Получаем формат публикации из конфигурации автопубликации
         publication_format = 'default'
@@ -684,7 +676,7 @@ def publish_object_via_bot(current_user):
         get_moscow_time, format_moscow_datetime
     )
     from bot.models import User as BotUser, Object as BotObject
-    from bot.database import get_db as get_bot_db
+    from app.database import db
     
     data = request.get_json()
     object_id = data.get('object_id')
@@ -714,19 +706,13 @@ def publish_object_via_bot(current_user):
     try:
         # Get bot user (try to find by web user's telegram_id if linked)
         bot_user = None
-        bot_db = get_bot_db()
-        try:
-            # Try to find bot user by telegram_id if web user has it
-            if hasattr(current_user, 'telegram_id') and current_user.telegram_id:
-                bot_user = bot_db.query(BotUser).filter_by(telegram_id=int(current_user.telegram_id)).first()
-        finally:
-            bot_db.close()
+        # Try to find bot user by telegram_id if web user has it
+        if hasattr(current_user, 'telegram_id') and current_user.telegram_id:
+            bot_user = db.session.query(BotUser).filter_by(telegram_id=int(current_user.telegram_id)).first()
         
         # Get bot object
-        bot_db = get_bot_db()
-        try:
-            bot_obj = bot_db.query(BotObject).filter_by(object_id=object_id).first()
-            if not bot_obj:
+        bot_obj = db.session.query(BotObject).filter_by(object_id=object_id).first()
+        if not bot_obj:
                 # Create bot object from web object
                 bot_obj = BotObject(
                     object_id=obj.object_id,
@@ -751,10 +737,8 @@ def publish_object_via_bot(current_user):
                     status=obj.status,
                     source='web'
                 )
-                bot_db.add(bot_obj)
-                bot_db.commit()
-        finally:
-            bot_db.close()
+                db.session.add(bot_obj)
+                db.session.commit()
         
         # Получаем формат публикации из конфигурации автопубликации
         publication_format = 'default'
@@ -772,9 +756,7 @@ def publish_object_via_bot(current_user):
         
         # Get target chats (reuse logic from bot)
         target_chats = []
-        bot_db = get_bot_db()
-        try:
-            chats = bot_db.query(Chat).filter_by(owner_type='bot', is_active=True).all()
+        chats = db.session.query(Chat).filter_by(owner_type='bot', is_active=True).all()
             
             rooms_type = obj.rooms_type or ""
             districts = obj.districts_json or []
@@ -854,7 +836,6 @@ def publish_object_via_bot(current_user):
                 if matches and chat.chat_id not in target_chats:
                     target_chats.append(chat.chat_id)
         finally:
-            bot_db.close()
         
         if not target_chats:
             return jsonify({

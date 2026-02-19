@@ -7,7 +7,7 @@ import logging.handlers
 import os
 import sys
 from datetime import datetime
-from bot.database import get_db
+from app.database import db
 from bot.models import ActionLog
 
 # Используем ту же структуру папок, что и в app
@@ -145,14 +145,11 @@ def log_bot_action(action: str, user_id: int = None, telegram_id: str = None,
     """
     logger = logging.getLogger('bot.actions')
     
-    db = None
     try:
-        db = get_db()
-        
         # Если user_id не передан, пытаемся найти пользователя по telegram_id
         if user_id is None and telegram_id:
             from bot.models import User
-            user = db.query(User).filter_by(telegram_id=telegram_id).first()
+            user = db.session.query(User).filter_by(telegram_id=telegram_id).first()
             if user:
                 user_id = user.user_id
         
@@ -163,9 +160,8 @@ def log_bot_action(action: str, user_id: int = None, telegram_id: str = None,
             details_json=details or {},
             created_at=datetime.utcnow()
         )
-        # get_db() возвращает SQLAlchemy Session, поэтому используем методы сессии напрямую
-        db.add(log_entry)
-        db.commit()
+        db.session.add(log_entry)
+        db.session.commit()
         
         # Логируем в файл
         user_info = f"UserID: {user_id}" if user_id else f"TelegramID: {telegram_id}"
@@ -177,17 +173,9 @@ def log_bot_action(action: str, user_id: int = None, telegram_id: str = None,
         # Не падаем, если логирование не удалось
         logger.error(f"Failed to log bot action {action}: {e}", exc_info=True)
         try:
-            if db is None:
-                db = get_db()
-            db.rollback()
+            db.session.rollback()
         except Exception:
             pass
-    finally:
-        if db is not None:
-            try:
-                db.close()
-            except Exception:
-                pass
 
 
 def log_bot_error(error: Exception, action: str = None, user_id: int = None, 

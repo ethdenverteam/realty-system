@@ -10,7 +10,7 @@ from bot.utils import (
     get_user_id_prefix, set_user_id_prefix, generate_next_id_prefix,
     format_publication_text, get_rooms_config, get_districts_config
 )
-from bot.database import get_db
+from app.database import db
 from bot.models import Object, SystemSetting, ActionLog
 from bot.config import ROLE_START, ROLE_BROKE, ROLE_BEGINNER
 from datetime import datetime
@@ -50,12 +50,8 @@ async def add_object_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 obj = get_object(old_object_id)
                 if obj:
-                    db_session = get_db()
-                    try:
-                        db_session.delete(obj)
-                        db_session.commit()
-                    finally:
-                        db_session.close()
+                    db.session.delete(obj)
+                    db.session.commit()
             except Exception as e:
                 logger.error(f"Error deleting old object: {e}")
         user_data.pop(user.id, None)
@@ -75,27 +71,19 @@ async def add_object_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_obj:
             if user_obj.bot_role in [ROLE_START, ROLE_BROKE]:
                 user_obj.bot_role = ROLE_BEGINNER
-                db_session = get_db()
-                try:
-                    db_session.commit()
-                finally:
-                    db_session.close()
+                db.session.commit()
         
         # Log action
         try:
-            db_session = get_db()
-            try:
-                if user_obj:
-                    action_log = ActionLog(
-                        user_id=user_obj.user_id,
-                        action='bot_object_creation_started',
-                        details_json={'object_id': object_id},
-                        created_at=datetime.utcnow()
-                    )
-                    db_session.add(action_log)
-                    db_session.commit()
-            finally:
-                db_session.close()
+            if user_obj:
+                action_log = ActionLog(
+                    user_id=user_obj.user_id,
+                    action='bot_object_creation_started',
+                    details_json={'object_id': object_id},
+                    created_at=datetime.utcnow()
+                )
+                db.session.add(action_log)
+                db.session.commit()
         except Exception as e:
             logger.error(f"Failed to log action: {e}")
         
@@ -233,7 +221,7 @@ async def object_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             obj = db_session.query(Object).filter_by(object_id=object_id).first()
             if obj:
                 obj.price = price
-                db_session.commit()
+                db.session.commit()
         finally:
             db_session.close()
         
@@ -275,7 +263,7 @@ async def object_area_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 rooms_type = obj.rooms_type
                 comment = obj.comment
                 obj.area = area
-                db_session.commit()
+                db.session.commit()
         finally:
             db_session.close()
         
@@ -704,12 +692,10 @@ async def cancel_object_creation(update: Update, context: ContextTypes.DEFAULT_T
             try:
                 obj = get_object(object_id)
                 if obj:
-                    db_session = get_db()
                     try:
-                        db_session.delete(obj)
-                        db_session.commit()
+                        db.session.delete(obj)
+                        db.session.commit()
                     finally:
-                        db_session.close()
             except Exception as e:
                 logger.error(f"Error deleting object: {e}")
         user_data.pop(user.id, None)

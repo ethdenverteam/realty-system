@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, Call
 from bot.utils import (
     get_user, get_object, update_object, get_districts_config, get_rooms_config
 )
-from bot.database import get_db
+from app.database import db
 from bot.models import Object, ActionLog
 from app.models.publication_history import PublicationHistory
 from bot.handlers_object import (
@@ -108,7 +108,6 @@ async def edit_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Log action
     try:
-        db = get_db()
         try:
             user_obj = get_user(str(user.id))
             if user_obj:
@@ -118,10 +117,8 @@ async def edit_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     details_json={'object_id': object_id, 'price': price},
                     created_at=datetime.utcnow()
                 )
-                db.add(action_log)
-                db.commit()
-        finally:
-            db.close()
+                db.session.add(action_log)
+                db.session.commit()
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
     
@@ -171,7 +168,6 @@ async def edit_area_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Log action
     try:
-        db = get_db()
         try:
             user_obj = get_user(str(user.id))
             if user_obj:
@@ -181,10 +177,8 @@ async def edit_area_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     details_json={'object_id': object_id, 'area': area},
                     created_at=datetime.utcnow()
                 )
-                db.add(action_log)
-                db.commit()
-        finally:
-            db.close()
+                db.session.add(action_log)
+                db.session.commit()
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
     
@@ -226,7 +220,6 @@ async def edit_floor_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Log action
     try:
-        db = get_db()
         try:
             user_obj = get_user(str(user.id))
             if user_obj:
@@ -236,10 +229,8 @@ async def edit_floor_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     details_json={'object_id': object_id, 'floor': floor},
                     created_at=datetime.utcnow()
                 )
-                db.add(action_log)
-                db.commit()
-        finally:
-            db.close()
+                db.session.add(action_log)
+                db.session.commit()
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
     
@@ -281,7 +272,6 @@ async def edit_comment_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # Log action
     try:
-        db = get_db()
         try:
             user_obj = get_user(str(user.id))
             if user_obj:
@@ -291,10 +281,8 @@ async def edit_comment_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     details_json={'object_id': object_id, 'comment': comment[:100]},
                     created_at=datetime.utcnow()
                 )
-                db.add(action_log)
-                db.commit()
-        finally:
-            db.close()
+                db.session.add(action_log)
+                db.session.commit()
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
     
@@ -336,7 +324,6 @@ async def residential_complex_input(update: Update, context: ContextTypes.DEFAUL
     
     # Log action
     try:
-        db = get_db()
         try:
             user_obj = get_user(str(user.id))
             if user_obj:
@@ -346,10 +333,8 @@ async def residential_complex_input(update: Update, context: ContextTypes.DEFAUL
                     details_json={'object_id': object_id, 'residential_complex': residential_complex},
                     created_at=datetime.utcnow()
                 )
-                db.add(action_log)
-                db.commit()
-        finally:
-            db.close()
+                db.session.add(action_log)
+                db.session.commit()
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
     
@@ -398,7 +383,6 @@ async def renovation_selected(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # Log action
     try:
-        db = get_db()
         try:
             user_obj = get_user(str(user.id))
             if user_obj:
@@ -408,10 +392,8 @@ async def renovation_selected(update: Update, context: ContextTypes.DEFAULT_TYPE
                     details_json={'object_id': object_id, 'renovation': renovation},
                     created_at=datetime.utcnow()
                 )
-                db.add(action_log)
-                db.commit()
-        finally:
-            db.close()
+                db.session.add(action_log)
+                db.session.commit()
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
     
@@ -453,7 +435,6 @@ async def address_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Log action
     try:
-        db = get_db()
         try:
             user_obj = get_user(str(user.id))
             if user_obj:
@@ -463,10 +444,8 @@ async def address_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     details_json={'object_id': object_id, 'address': address},
                     created_at=datetime.utcnow()
                 )
-                db.add(action_log)
-                db.commit()
-        finally:
-            db.close()
+                db.session.add(action_log)
+                db.session.commit()
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
     
@@ -636,7 +615,6 @@ async def edit_rooms_selected(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # Log action
     try:
-        db = get_db()
         try:
             user_obj = get_user(str(user.id))
             if user_obj:
@@ -646,10 +624,8 @@ async def edit_rooms_selected(update: Update, context: ContextTypes.DEFAULT_TYPE
                     details_json={'object_id': object_id, 'rooms_type': rooms_type},
                     created_at=datetime.utcnow()
                 )
-                db.add(action_log)
-                db.commit()
-        finally:
-            db.close()
+                db.session.add(action_log)
+                db.session.commit()
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
     
@@ -717,7 +693,6 @@ async def edit_district_selected(update: Update, context: ContextTypes.DEFAULT_T
     
     # Log action
     try:
-        db = get_db()
         try:
             user_obj = get_user(str(user.id))
             if user_obj:
@@ -727,10 +702,8 @@ async def edit_district_selected(update: Update, context: ContextTypes.DEFAULT_T
                     details_json={'object_id': object_id, 'districts': current_districts},
                     created_at=datetime.utcnow()
                 )
-                db.add(action_log)
-                db.commit()
-        finally:
-            db.close()
+                db.session.add(action_log)
+                db.session.commit()
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
     
@@ -790,7 +763,6 @@ async def add_district_selected(update: Update, context: ContextTypes.DEFAULT_TY
         
         # Log action
         try:
-            db = get_db()
             try:
                 user_obj = get_user(str(user.id))
                 if user_obj:
@@ -800,10 +772,8 @@ async def add_district_selected(update: Update, context: ContextTypes.DEFAULT_TY
                         details_json={'object_id': object_id, 'district': district},
                         created_at=datetime.utcnow()
                     )
-                    db.add(action_log)
-                    db.commit()
-            finally:
-                db.close()
+                db.session.add(action_log)
+                db.session.commit()
         except Exception as e:
             logger.error(f"Failed to log action: {e}")
     
@@ -889,7 +859,6 @@ async def contacts_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Log action
         try:
-            db = get_db()
             try:
                 user_obj = get_user(str(user.id))
                 if user_obj:
@@ -899,10 +868,8 @@ async def contacts_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         details_json={'object_id': object_id, 'name': text},
                         created_at=datetime.utcnow()
                     )
-                    db.add(action_log)
-                    db.commit()
-            finally:
-                db.close()
+                db.session.add(action_log)
+                db.session.commit()
         except Exception as e:
             logger.error(f"Failed to log action: {e}")
     else:
@@ -918,7 +885,6 @@ async def contacts_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Log action
         try:
-            db = get_db()
             try:
                 user_obj = get_user(str(user.id))
                 if user_obj:
@@ -928,10 +894,8 @@ async def contacts_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         details_json={'object_id': object_id, 'phone': phone},
                         created_at=datetime.utcnow()
                     )
-                    db.add(action_log)
-                    db.commit()
-            finally:
-                db.close()
+                db.session.add(action_log)
+                db.session.commit()
         except Exception as e:
             logger.error(f"Failed to log action: {e}")
     
@@ -955,7 +919,6 @@ async def contact_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # Log action
     try:
-        db = get_db()
         try:
             user_obj = get_user(str(user.id))
             if user_obj:
@@ -965,10 +928,8 @@ async def contact_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     details_json={'object_id': object_id, 'name': name},
                     created_at=datetime.utcnow()
                 )
-                db.add(action_log)
-                db.commit()
-        finally:
-            db.close()
+                db.session.add(action_log)
+                db.session.commit()
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
     
@@ -1012,7 +973,6 @@ async def phone_from_settings_handler(update: Update, context: ContextTypes.DEFA
     
     # Log action
     try:
-        db = get_db()
         try:
             action_log = ActionLog(
                 user_id=user_obj.user_id,
@@ -1020,10 +980,8 @@ async def phone_from_settings_handler(update: Update, context: ContextTypes.DEFA
                 details_json={'object_id': object_id},
                 created_at=datetime.utcnow()
             )
-            db.add(action_log)
-            db.commit()
-        finally:
-            db.close()
+                db.session.add(action_log)
+                db.session.commit()
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
     
@@ -1093,7 +1051,6 @@ async def toggle_username_handler(update: Update, context: ContextTypes.DEFAULT_
         
         # Log action
         try:
-            db = get_db()
             try:
                 user_obj = get_user(str(user.id))
                 if user_obj:
@@ -1103,10 +1060,8 @@ async def toggle_username_handler(update: Update, context: ContextTypes.DEFAULT_
                         details_json={'object_id': object_id, 'show_username': not current_value},
                         created_at=datetime.utcnow()
                     )
-                    db.add(action_log)
-                    db.commit()
-            finally:
-                db.close()
+                db.session.add(action_log)
+                db.session.commit()
         except Exception as e:
             logger.error(f"Failed to log action: {e}")
     
@@ -1197,13 +1152,12 @@ async def confirm_delete_object_handler(update: Update, context: ContextTypes.DE
         return ConversationHandler.END
     
     # Delete object
-    db = get_db()
     try:
         # First, delete all related publication_history records
         # This prevents NOT NULL constraint violation
-        # Use db.query() instead of Model.query for proper session handling
-        db.query(PublicationHistory).filter_by(object_id=object_id).delete(synchronize_session=False)
-        db.commit()
+        # Use db.session.query() instead of Model.query for proper session handling
+        db.session.query(PublicationHistory).filter_by(object_id=object_id).delete(synchronize_session=False)
+        db.session.commit()
         
         # Log action before deletion
         try:
@@ -1213,14 +1167,14 @@ async def confirm_delete_object_handler(update: Update, context: ContextTypes.DE
                 details_json={'object_id': object_id},
                 created_at=datetime.utcnow()
             )
-            db.add(action_log)
-            db.commit()
+            db.session.add(action_log)
+            db.session.commit()
         except Exception as e:
             logger.error(f"Failed to log delete action: {e}")
         
         # Delete the object
-        db.delete(obj)
-        db.commit()
+        db.session.delete(obj)
+        db.session.commit()
         
         # Clean up user_data
         if user.id in user_data:
@@ -1245,8 +1199,7 @@ async def confirm_delete_object_handler(update: Update, context: ContextTypes.DE
         return ConversationHandler.END
     except Exception as e:
         logger.error(f"Error deleting object: {e}", exc_info=True)
-        db.rollback()
+        db.session.rollback()
         await query.answer("Ошибка при удалении объекта.", show_alert=True)
         return OBJECT_PREVIEW_MENU
     finally:
-        db.close()

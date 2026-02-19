@@ -195,33 +195,38 @@ export default function ObjectForm({
                 className="form-input form-input-multiple"
                 value={selectedDistricts}
                 onChange={handleDistrictsChange}
-                size={Math.min(
-                  districts.filter(d => 
-                    !districtSearch || 
-                    d.toLowerCase().includes(districtSearch.toLowerCase())
-                  ).length + 1, 
-                  8
-                )}
+                size={Math.min(districts.length + 1, 8)}
                 style={{ 
                   overflowY: 'auto', 
                   overflowX: 'hidden',
                   maxHeight: '250px'
                 }}
               >
-                {districts
-                  .filter(d => 
-                    !districtSearch || 
-                    d.toLowerCase().includes(districtSearch.toLowerCase())
-                  )
-                  .map((district) => (
-                    <option key={district} value={district}>
+                {districts.map((district) => {
+                  const matchesSearch = !districtSearch || 
+                    district.toLowerCase().includes(districtSearch.toLowerCase())
+                  const isSelected = selectedDistricts.includes(district)
+                  // Показываем все опции, но скрываем не подходящие поиску (кроме выбранных)
+                  const shouldShow = matchesSearch || isSelected
+                  return (
+                    <option 
+                      key={district} 
+                      value={district}
+                      style={{ display: shouldShow ? 'block' : 'none' }}
+                    >
                       {district}
                     </option>
-                  ))}
+                  )
+                })}
               </select>
             </div>
             <small className="form-hint">
               Удерживайте Ctrl (или Cmd на Mac) для выбора нескольких районов. Выбрано: {selectedDistricts.length}
+              {selectedDistricts.length > 0 && (
+                <span style={{ display: 'block', marginTop: '4px', fontSize: '12px', color: '#666' }}>
+                  Выбрано: {selectedDistricts.join(', ')}
+                </span>
+              )}
             </small>
           </div>
         </div>

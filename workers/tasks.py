@@ -4,7 +4,7 @@
 Логика: все задачи логируются для отслеживания выполнения и диагностики ошибок
 """
 from workers.celery_app import celery_app
-from bot.database import get_db
+from app.database import db
 from bot.models import PublicationQueue, Object, Chat, PublicationHistory, AutopublishConfig, TelegramAccount
 from datetime import datetime, timedelta
 from sqlalchemy import or_
@@ -39,26 +39,24 @@ def publish_to_telegram(queue_id: int):
     Логика: проверка дубликатов (24 часа), форматирование текста, отправка через API, создание истории
     Все этапы логируются для отслеживания процесса публикации
     """
-    db = get_db()
-    try:
-        queue = db.query(PublicationQueue).get(queue_id)
-        if not queue:
-            logger.error(f"Queue {queue_id} not found")
-            return False
-        
-        # Update status
-        queue.status = 'processing'
-        queue.started_at = datetime.utcnow()
-        db.commit()
-        
-        # Get object and chat
-        obj = db.query(Object).get(queue.object_id)
-        chat = db.query(Chat).get(queue.chat_id)
+    queue = db.session.query(PublicationQueue).get(queue_id)
+    if not queue:
+        logger.error(f"Queue {queue_id} not found")
+        return False
+    
+    # Update status
+    queue.status = 'processing'
+    queue.started_at = datetime.utcnow()
+    db.session.commit()
+    
+    # Get object and chat
+    obj = db.session.query(Object).get(queue.object_id)
+    chat = db.session.query(Chat).get(queue.chat_id)
         
         if not obj or not chat:
             queue.status = 'failed'
             queue.error_message = 'Object or chat not found'
-            db.commit()
+            db.session.commit()
             return False
         
         # Проверка времени для автопубликации: публикация разрешена только с 8:00 до 22:00 МСК
@@ -92,7 +90,7 @@ def publish_to_telegram(queue_id: int):
                     next_time_utc = msk_to_utc(next_time_msk)
                     queue.scheduled_time = next_time_utc
                     queue.status = 'pending'
-                    db.commit()
+                    db.session.commit()
                     return False
         
         # Проверка дубликатов через унифицированную утилиту
@@ -114,7 +112,7 @@ def publish_to_telegram(queue_id: int):
             logger.info(f"Object {queue.object_id} cannot be published to chat {queue.chat_id} via bot: {reason}")
             queue.status = 'failed'
             queue.error_message = reason
-            db.commit()
+            db.session.commit()
             return False
         
         # Реализация публикации через Telegram API
@@ -128,7 +126,7 @@ def publish_to_telegram(queue_id: int):
             logger.error("BOT_TOKEN is not configured")
             queue.status = 'failed'
             queue.error_message = 'BOT_TOKEN is not configured'
-            db.commit()
+            db.session.commit()
             return False
         
         # Получаем пользователя бота для форматирования текста
@@ -236,7 +234,7 @@ def publish_to_telegram(queue_id: int):
                 logger.error(f"Failed to publish: {error_description}")
                 queue.status = 'failed'
                 queue.error_message = error_description
-                db.commit()
+                db.session.commit()
                 return False
             
             message_id = result.get('result', {}).get('message_id')
@@ -255,13 +253,13 @@ def publish_to_telegram(queue_id: int):
                 published_at=datetime.utcnow(),
                 message_id=queue.message_id
             )
-            db.add(history)
+            db.session.add(history)
             
             # Обновляем статистику чата
             chat.total_publications = (chat.total_publications or 0) + 1
             chat.last_publication = datetime.utcnow()
             
-            db.commit()
+            db.session.commit()
             
             logger.info(f"Successfully published object {obj.object_id} to chat {chat.telegram_chat_id}")
             return True
@@ -270,7 +268,7 @@ def publish_to_telegram(queue_id: int):
             logger.error(f"Error sending message to Telegram: {e}")
             queue.status = 'failed'
             queue.error_message = str(e)
-            db.commit()
+            db.session.commit()
             return False
         
     except Exception as e:
@@ -279,17 +277,14 @@ def publish_to_telegram(queue_id: int):
             queue.status = 'failed'
             queue.error_message = str(e)
             queue.attempts += 1
-            db.commit()
+            db.session.commit()
         return False
     finally:
-        db.close()
 
 
 @celery_app.task(name='workers.tasks.process_autopublish')
 def process_autopublish():
     """Process autopublish queue - обрабатывает задачи в порядке scheduled_time"""
-    db = get_db()
-    try:
         now = datetime.utcnow()
         
         # Get pending autopublish tasks that are ready to publish
@@ -318,7 +313,6 @@ def process_autopublish():
         logger.error(f"Error processing autopublish queue: {e}", exc_info=True)
         return 0
     finally:
-        db.close()
 
 
 def _get_matching_bot_chats_for_object(db, obj: Object):
@@ -328,7 +322,7 @@ def _get_matching_bot_chats_for_object(db, obj: Object):
     """
     target_chats = []
 
-    chats = db.query(Chat).filter_by(owner_type='bot', is_active=True).all()
+    chats = db.session.query(Chat).filter_by(owner_type='bot', is_active=True).all()
 
     rooms_type = obj.rooms_type or ""
     districts = obj.districts_json or []
@@ -430,14 +424,12 @@ def schedule_daily_autopublish():
     from app.models.telegram_account import TelegramAccount as AppTelegramAccount
     from app.utils.account_publication_utils import calculate_scheduled_times_for_account
     
-    db = get_db()
-    try:
         # Через бота: создаем задачи в publication_queues
-        configs = db.query(AutopublishConfig).filter_by(enabled=True).all()
+        configs = db.session.query(AutopublishConfig).filter_by(enabled=True).all()
         created_bot_queues = 0
 
         for cfg in configs:
-            obj = db.query(Object).filter_by(object_id=cfg.object_id).first()
+            obj = db.session.query(Object).filter_by(object_id=cfg.object_id).first()
             if not obj:
                 continue
 
@@ -467,10 +459,10 @@ def schedule_daily_autopublish():
                         scheduled_time=scheduled_time_utc,
                         created_at=datetime.utcnow(),
                     )
-                    db.add(queue)
+                    db.session.add(queue)
                     created_bot_queues += 1
 
-        db.commit()
+        db.session.commit()
         logger.info(f"schedule_daily_autopublish: created {created_bot_queues} bot queue items")
         
         # Через аккаунты: создаем задачи в account_publication_queues
@@ -572,7 +564,7 @@ def schedule_daily_autopublish():
         return created_bot_queues + created_account_queues
     except Exception as e:
         logger.error(f"Error in schedule_daily_autopublish: {e}", exc_info=True)
-        db.rollback()
+            db.session.rollback()
         try:
             with app.app_context():
                 app_db.session.rollback()
@@ -580,14 +572,11 @@ def schedule_daily_autopublish():
             pass
         return 0
     finally:
-        db.close()
 
 
 @celery_app.task(name='workers.tasks.process_scheduled_publications')
 def process_scheduled_publications():
     """Process scheduled publications"""
-    db = get_db()
-    try:
         now = datetime.utcnow()
         
         # Get scheduled tasks ready to publish
@@ -602,7 +591,6 @@ def process_scheduled_publications():
         
         return len(queues)
     finally:
-        db.close()
 
 
 @celery_app.task(name='workers.tasks.process_chat_subscriptions')
@@ -957,7 +945,6 @@ def process_account_autopublish():
     from app.utils.rate_limiter import get_rate_limit_status
     from bot.utils import format_publication_text
     from bot.models import User as BotUser, Object as BotObject
-    from bot.database import get_db as get_bot_db
     
     with app.app_context():
         try:
@@ -1049,12 +1036,10 @@ def process_account_autopublish():
                         
                         # Получаем bot объект для форматирования
                         bot_user = None
-                        bot_db = get_bot_db()
-                        try:
-                            if obj.user_id:
-                                bot_user = bot_db.query(BotUser).filter_by(user_id=obj.user_id).first()
-                            
-                            bot_obj = bot_db.query(BotObject).filter_by(object_id=obj.object_id).first()
+                        if obj.user_id:
+                            bot_user = db.session.query(BotUser).filter_by(user_id=obj.user_id).first()
+                        
+                        bot_obj = db.session.query(BotObject).filter_by(object_id=obj.object_id).first()
                             if not bot_obj:
                                 # Создаем bot object из web object
                                 bot_obj = BotObject(
@@ -1080,10 +1065,8 @@ def process_account_autopublish():
                                     status=obj.status,
                                     source='web'
                                 )
-                                bot_db.add(bot_obj)
-                                bot_db.commit()
-                        finally:
-                            bot_db.close()
+                                    db.session.add(bot_obj)
+                                    db.session.commit()
                         
                         # Получаем формат публикации
                         publication_format = 'default'

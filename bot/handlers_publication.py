@@ -10,7 +10,7 @@ from bot.utils import (
     get_user, get_object, update_object, get_districts_config, get_price_ranges,
     format_publication_text, get_moscow_time, format_moscow_datetime
 )
-from bot.database import get_db
+from app.database import db
 from bot.models import Object, ActionLog, Chat, PublicationHistory
 from datetime import timedelta
 from bot.handlers_object import user_data, show_object_preview_with_menu
@@ -30,26 +30,24 @@ async def get_target_chats_for_object(obj: Object) -> list:
     """Определить целевые чаты для объекта"""
     target_chats = []
     
-    db = get_db()
-    try:
-        # Get all active bot chats
-        chats = db.query(Chat).filter_by(owner_type='bot', is_active=True).all()
-        
-        rooms_type = obj.rooms_type or ""
-        districts = obj.districts_json or []
-        price = obj.price or 0
-        
-        districts_config = get_districts_config()
-        
-        # Add parent districts
-        all_districts = set(districts)
-        for district in districts:
-            if isinstance(district, str) and district in districts_config:
-                parent_districts = districts_config[district]
-                if isinstance(parent_districts, list):
-                    all_districts.update(parent_districts)
-        
-        for chat in chats:
+    # Get all active bot chats
+    chats = db.session.query(Chat).filter_by(owner_type='bot', is_active=True).all()
+    
+    rooms_type = obj.rooms_type or ""
+    districts = obj.districts_json or []
+    price = obj.price or 0
+    
+    districts_config = get_districts_config()
+    
+    # Add parent districts
+    all_districts = set(districts)
+    for district in districts:
+        if isinstance(district, str) and district in districts_config:
+            parent_districts = districts_config[district]
+            if isinstance(parent_districts, list):
+                all_districts.update(parent_districts)
+    
+    for chat in chats:
             matches = False
             filters = chat.filters_json or {}
             
@@ -119,10 +117,8 @@ async def get_target_chats_for_object(obj: Object) -> list:
             
             if matches and chat.chat_id not in target_chats:
                 target_chats.append(chat.chat_id)
-        
-        return target_chats
-    finally:
-        db.close()
+    
+    return target_chats
 
 
 async def publish_immediate_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -176,54 +172,46 @@ async def publish_immediate_handler(update: Update, context: ContextTypes.DEFAUL
     is_admin = user_obj and user_obj.web_role == 'admin'
     
     if not is_admin:
-        db = get_db()
-        try:
-            from datetime import timedelta
-            yesterday = datetime.utcnow() - timedelta(days=1)
-            recent_publications = db.query(PublicationHistory).filter(
-                PublicationHistory.object_id == object_id,
-                PublicationHistory.published_at >= yesterday,
-                PublicationHistory.deleted == False
-            ).all()
+        from datetime import timedelta
+        yesterday = datetime.utcnow() - timedelta(days=1)
+        recent_publications = db.session.query(PublicationHistory).filter(
+            PublicationHistory.object_id == object_id,
+            PublicationHistory.published_at >= yesterday,
+            PublicationHistory.deleted == False
+        ).all()
+        
+        if recent_publications:
+            blocked_chats = []
+            for pub in recent_publications:
+                chat = db.session.query(Chat).filter_by(chat_id=pub.chat_id).first()
+                if chat:
+                    blocked_chats.append(chat.title or f'Чат {chat.chat_id}')
             
-            if recent_publications:
-                blocked_chats = []
-                for pub in recent_publications:
-                    chat = db.query(Chat).filter_by(chat_id=pub.chat_id).first()
-                    if chat:
-                        blocked_chats.append(chat.title or f'Чат {chat.chat_id}')
+            if blocked_chats:
+                error_text = "⚠️ <b>Ошибка!</b>\n\n"
+                error_text += "Этот объект уже был опубликован в следующие чаты в течение последних 24 часов:\n\n"
+                for i, name in enumerate(blocked_chats, 1):
+                    error_text += f"{i}. {name}\n"
+                error_text += "\nОдин объект не может быть опубликован в один и тот же чат чаще чем раз в сутки."
                 
-                if blocked_chats:
-                    error_text = "⚠️ <b>Ошибка!</b>\n\n"
-                    error_text += "Этот объект уже был опубликован в следующие чаты в течение последних 24 часов:\n\n"
-                    for i, name in enumerate(blocked_chats, 1):
-                        error_text += f"{i}. {name}\n"
-                    error_text += "\nОдин объект не может быть опубликован в один и тот же чат чаще чем раз в сутки."
-                    
-                    keyboard = [[InlineKeyboardButton("⬅️ Назад к редактированию", callback_data="back_to_preview")]]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-                    
-                    try:
-                        await query.message.reply_text(error_text, reply_markup=reply_markup, parse_mode='HTML')
-                    except:
-                        await query.edit_message_text(error_text, reply_markup=reply_markup, parse_mode='HTML')
-                    
-                    return OBJECT_PREVIEW_MENU
-        finally:
-            db.close()
+                keyboard = [[InlineKeyboardButton("⬅️ Назад к редактированию", callback_data="back_to_preview")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                try:
+                    await query.message.reply_text(error_text, reply_markup=reply_markup, parse_mode='HTML')
+                except:
+                    await query.edit_message_text(error_text, reply_markup=reply_markup, parse_mode='HTML')
+                
+                return OBJECT_PREVIEW_MENU
     
     # Get target chats
     target_chats = await get_target_chats_for_object(obj)
     
     # Get chat names
-    db = get_db()
     chat_names = []
-    try:
-        chats = db.query(Chat).filter(Chat.chat_id.in_(target_chats)).all()
-        for chat in chats:
-            chat_names.append(chat.title or f'Чат {chat.chat_id}')
-    finally:
-        db.close()
+    chats = db.session.query(Chat).filter(Chat.chat_id.in_(target_chats)).all()
+    for chat in chats:
+        chat_names.append(chat.title or f'Чат {chat.chat_id}')
     
     # Format text with chat list
     if chat_names:
@@ -327,38 +315,30 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
             is_admin = user_obj and user_obj.web_role == 'admin'
             
             if not is_admin:
-                db = get_db()
-                try:
-                    chat = db.query(Chat).filter_by(chat_id=chat_id).first()
-                    if not chat:
-                        continue
-                    
-                    # Check publication history for this object and chat
-                    yesterday = datetime.utcnow() - timedelta(days=1)
-                    recent_publication = db.query(PublicationHistory).filter(
-                        PublicationHistory.object_id == object_id,
-                        PublicationHistory.chat_id == chat_id,
-                        PublicationHistory.published_at >= yesterday,
-                        PublicationHistory.deleted == False
-                    ).first()
-                    
-                    if recent_publication:
-                        logger.info(f"Object {object_id} was already published to chat {chat_id} within 24 hours, skipping")
-                        continue
-                    
-                    telegram_chat_id = chat.telegram_chat_id
-                finally:
-                    db.close()
+                chat = db.session.query(Chat).filter_by(chat_id=chat_id).first()
+                if not chat:
+                    continue
+                
+                # Check publication history for this object and chat
+                yesterday = datetime.utcnow() - timedelta(days=1)
+                recent_publication = db.session.query(PublicationHistory).filter(
+                    PublicationHistory.object_id == object_id,
+                    PublicationHistory.chat_id == chat_id,
+                    PublicationHistory.published_at >= yesterday,
+                    PublicationHistory.deleted == False
+                ).first()
+                
+                if recent_publication:
+                    logger.info(f"Object {object_id} was already published to chat {chat_id} within 24 hours, skipping")
+                    continue
+                
+                telegram_chat_id = chat.telegram_chat_id
             else:
                 # Для админов просто получаем telegram_chat_id без проверки
-                db = get_db()
-                try:
-                    chat = db.query(Chat).filter_by(chat_id=chat_id).first()
-                    if not chat:
-                        continue
-                    telegram_chat_id = chat.telegram_chat_id
-                finally:
-                    db.close()
+                chat = db.session.query(Chat).filter_by(chat_id=chat_id).first()
+                if not chat:
+                    continue
+                telegram_chat_id = chat.telegram_chat_id
             
             # Send message - всегда отправляем фото если оно есть
             # Всегда используем путь к файлу на сервере
@@ -434,26 +414,22 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
                 )
             
             # Update chat statistics and create publication history
-            db = get_db()
-            try:
-                chat = db.query(Chat).filter_by(chat_id=chat_id).first()
-                if chat:
-                    chat.total_publications = (chat.total_publications or 0) + 1
-                    chat.last_publication = datetime.utcnow()
-                    
-                    # Create publication history entry
-                    history = PublicationHistory(
-                        object_id=object_id,
-                        chat_id=chat_id,
-                        account_id=None,  # Bot publication
-                        published_at=datetime.utcnow(),
-                        message_id=None,  # Will be updated if needed
-                        deleted=False
-                    )
-                    db.add(history)
-                    db.commit()
-            finally:
-                db.close()
+            chat = db.session.query(Chat).filter_by(chat_id=chat_id).first()
+            if chat:
+                chat.total_publications = (chat.total_publications or 0) + 1
+                chat.last_publication = datetime.utcnow()
+                
+                # Create publication history entry
+                history = PublicationHistory(
+                    object_id=object_id,
+                    chat_id=chat_id,
+                    account_id=None,  # Bot publication
+                    published_at=datetime.utcnow(),
+                    message_id=None,  # Will be updated if needed
+                    deleted=False
+                )
+                db.session.add(history)
+                db.session.commit()
             
             published_count += 1
             
@@ -478,24 +454,20 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
     
     # Log action
     try:
-        db = get_db()
-        try:
-            if user_obj:
-                action_log = ActionLog(
-                    user_id=user_obj.user_id,
-                    action='bot_object_published',
-                    details_json={
-                        'object_id': object_id,
-                        'chats_count': len(target_chats),
-                        'published_count': published_count,
-                        'errors': errors
-                    },
-                    created_at=datetime.utcnow()
-                )
-                db.add(action_log)
-                db.commit()
-        finally:
-            db.close()
+        if user_obj:
+            action_log = ActionLog(
+                user_id=user_obj.user_id,
+                action='bot_object_published',
+                details_json={
+                    'object_id': object_id,
+                    'chats_count': len(target_chats),
+                    'published_count': published_count,
+                    'errors': errors
+                },
+                created_at=datetime.utcnow()
+            )
+            db.session.add(action_log)
+            db.session.commit()
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
     

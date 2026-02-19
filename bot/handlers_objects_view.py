@@ -93,18 +93,14 @@ async def my_objects_command(update: Update, context: ContextTypes.DEFAULT_TYPE,
     
     # Log action
     try:
-        db = get_db()
-        try:
-            action_log = ActionLog(
-                user_id=user_obj.user_id,
-                action='bot_my_objects_viewed',
-                details_json={'objects_count': len(objects), 'page': page},
-                created_at=datetime.utcnow()
-            )
-            db.add(action_log)
-            db.commit()
-        finally:
-            db.close()
+        action_log = ActionLog(
+            user_id=user_obj.user_id,
+            action='bot_my_objects_viewed',
+            details_json={'objects_count': len(objects), 'page': page},
+            created_at=datetime.utcnow()
+        )
+        db.session.add(action_log)
+        db.session.commit()
     except Exception as e:
         logger.error(f"Failed to log action: {e}")
 
