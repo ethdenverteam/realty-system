@@ -6,6 +6,7 @@ import './Settings.css'
 
 interface AdminSettings {
   allow_duplicates: boolean
+  admin_bypass_time_limit: boolean
 }
 
 export default function AdminSettings(): JSX.Element {
@@ -45,6 +46,25 @@ export default function AdminSettings(): JSX.Element {
       await api.put('/admin/dashboard/settings/allow-duplicates', { enabled })
 
       setSettings((prev) => (prev ? { ...prev, allow_duplicates: enabled } : null))
+      setSuccess('Настройка успешно обновлена')
+    } catch (err: unknown) {
+      console.error('Error updating setting:', err)
+      const message = err instanceof Error ? err.message : 'Ошибка обновления настройки'
+      setError(message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleToggleTimeLimit = async (enabled: boolean): Promise<void> => {
+    try {
+      setSaving(true)
+      setError('')
+      setSuccess('')
+
+      await api.put('/admin/dashboard/settings/admin-bypass-time-limit', { enabled })
+
+      setSettings((prev) => (prev ? { ...prev, admin_bypass_time_limit: enabled } : null))
       setSuccess('Настройка успешно обновлена')
     } catch (err: unknown) {
       console.error('Error updating setting:', err)
@@ -102,6 +122,32 @@ export default function AdminSettings(): JSX.Element {
                   </label>
                   <span className="setting-status">
                     {settings.allow_duplicates ? 'Включено' : 'Выключено'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="setting-item">
+                <div className="setting-info">
+                  <h3>Админ: отключить ограничение времени (8:00-22:00)</h3>
+                  <p className="setting-description">
+                    Если включено, админ может публиковать объекты через бота и аккаунты в любое время суток,
+                    без ограничения рабочими часами (8:00-22:00 МСК). Для обычных пользователей ограничение остается.
+                  </p>
+                </div>
+                <div className="setting-control">
+                  <label className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      checked={settings.admin_bypass_time_limit}
+                      onChange={(e) => {
+                        void handleToggleTimeLimit(e.target.checked)
+                      }}
+                      disabled={saving}
+                    />
+                    <span className="toggle-slider"></span>
+                  </label>
+                  <span className="setting-status">
+                    {settings.admin_bypass_time_limit ? 'Включено' : 'Выключено'}
                   </span>
                 </div>
               </div>

@@ -62,17 +62,38 @@ def publish_to_telegram(queue_id: int):
             return False
         
         # Проверка времени для автопубликации: публикация разрешена только с 8:00 до 22:00 МСК
+        # Исключение: если админ включил обход ограничения времени
         if queue.mode == 'autopublish':
-            now_msk = get_moscow_time()
-            if not is_within_publish_hours(now_msk):
-                logger.info(f"Outside publish hours (8:00-22:00 МСК), rescheduling queue {queue_id}")
-                # Переносим на ближайшее разрешенное время
-                next_time_msk = get_next_allowed_time_msk(now_msk)
-                next_time_utc = msk_to_utc(next_time_msk)
-                queue.scheduled_time = next_time_utc
-                queue.status = 'pending'
-                db.commit()
-                return False
+            # Проверяем настройку обхода ограничения времени для админа (через app контекст)
+            from app import app
+            admin_bypass_enabled = False
+            is_admin = False
+            
+            with app.app_context():
+                from app.models.system_setting import SystemSetting
+                time_limit_setting = SystemSetting.query.filter_by(key='admin_bypass_time_limit').first()
+                if time_limit_setting and isinstance(time_limit_setting.value_json, dict):
+                    admin_bypass_enabled = time_limit_setting.value_json.get('enabled', False)
+                
+                # Проверяем, является ли пользователь админом
+                if queue.user_id:
+                    from app.models.user import User
+                    user = User.query.get(queue.user_id)
+                    if user and user.web_role == 'admin':
+                        is_admin = True
+            
+            # Если админ и включен обход - пропускаем проверку времени
+            if not (is_admin and admin_bypass_enabled):
+                now_msk = get_moscow_time()
+                if not is_within_publish_hours(now_msk):
+                    logger.info(f"Outside publish hours (8:00-22:00 МСК), rescheduling queue {queue_id}")
+                    # Переносим на ближайшее разрешенное время
+                    next_time_msk = get_next_allowed_time_msk(now_msk)
+                    next_time_utc = msk_to_utc(next_time_msk)
+                    queue.scheduled_time = next_time_utc
+                    queue.status = 'pending'
+                    db.commit()
+                    return False
         
         # Проверка дубликатов через унифицированную утилиту
         from app.utils.duplicate_checker import check_duplicate_publication

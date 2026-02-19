@@ -2507,7 +2507,17 @@ def admin_settings_data(current_user):
         
         # Получаем настройку дубликатов
         duplicates_setting = SystemSetting.query.filter_by(key='allow_duplicates').first()
-        settings['allow_duplicates'] = duplicates_setting.value_json.get('enabled', False) if duplicates_setting else False
+        if duplicates_setting and isinstance(duplicates_setting.value_json, dict):
+            settings['allow_duplicates'] = duplicates_setting.value_json.get('enabled', False)
+        else:
+            settings['allow_duplicates'] = False
+        
+        # Получаем настройку обхода ограничения времени для админа
+        time_limit_setting = SystemSetting.query.filter_by(key='admin_bypass_time_limit').first()
+        if time_limit_setting and isinstance(time_limit_setting.value_json, dict):
+            settings['admin_bypass_time_limit'] = time_limit_setting.value_json.get('enabled', False)
+        else:
+            settings['admin_bypass_time_limit'] = False
         
         return jsonify({
             'success': True,
@@ -2558,4 +2568,49 @@ def admin_settings_allow_duplicates(current_user):
         db.session.rollback()
         logger.error(f"Error updating allow duplicates setting: {e}", exc_info=True)
         log_error(e, 'admin_settings_update_failed', current_user.user_id, {'setting': 'allow_duplicates'})
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_routes_bp.route('/dashboard/settings/admin-bypass-time-limit', methods=['PUT'])
+@jwt_required
+@role_required('admin')
+def admin_settings_bypass_time_limit(current_user):
+    """Update admin bypass time limit setting"""
+    from app.models.system_setting import SystemSetting
+    
+    try:
+        data = request.get_json()
+        enabled = data.get('enabled', False)
+        
+        setting = SystemSetting.query.filter_by(key='admin_bypass_time_limit').first()
+        if not setting:
+            setting = SystemSetting(
+                key='admin_bypass_time_limit',
+                value_json={'enabled': enabled},
+                description='Админ может публиковать в любое время (обход ограничения 8:00-22:00)',
+                updated_by=current_user.user_id
+            )
+            db.session.add(setting)
+        else:
+            if not isinstance(setting.value_json, dict):
+                setting.value_json = {}
+            setting.value_json['enabled'] = enabled
+            setting.updated_by = current_user.user_id
+        
+        db.session.commit()
+        
+        log_action(
+            action='admin_settings_updated',
+            user_id=current_user.user_id,
+            details={'setting': 'admin_bypass_time_limit', 'enabled': enabled}
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Setting updated successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating admin bypass time limit setting: {e}", exc_info=True)
+        log_error(e, 'admin_settings_update_failed', current_user.user_id, {'setting': 'admin_bypass_time_limit'})
         return jsonify({'error': str(e)}), 500
