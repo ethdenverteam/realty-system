@@ -5,6 +5,7 @@ from flask import Blueprint, request, jsonify, render_template
 from app.database import db
 from app.models.object import Object
 from app.models.publication_queue import PublicationQueue
+from app.models.account_publication_queue import AccountPublicationQueue
 from app.models.publication_history import PublicationHistory
 from app.models.telegram_account import TelegramAccount
 from app.models.quick_access import QuickAccess
@@ -473,12 +474,11 @@ def create_or_update_autopublish_config(current_user):
                             for chat_id in chat_ids:
                                 chat = WebChat.query.get(chat_id)
                                 if chat and chat.owner_type == 'user' and chat.owner_account_id == account_id:
-                                    # Проверяем, нет ли уже такой очереди
-                                    existing = PublicationQueue.query.filter_by(
+                                    # Проверяем, нет ли уже такой очереди в AccountPublicationQueue
+                                    existing = AccountPublicationQueue.query.filter_by(
                                         object_id=object_id,
                                         chat_id=chat_id,
-                                        type='user',
-                                        mode='autopublish',
+                                        account_id=account_id,
                                         status='pending'
                                     ).first()
                                     if not existing:
@@ -489,13 +489,11 @@ def create_or_update_autopublish_config(current_user):
                                         scheduled_time_msk = get_next_allowed_time_msk(now_msk)
                                         scheduled_time_utc = msk_to_utc(scheduled_time_msk)
                                         
-                                        queue = PublicationQueue(
+                                        queue = AccountPublicationQueue(
                                             object_id=object_id,
                                             chat_id=chat_id,
                                             account_id=account_id,
                                             user_id=current_user.user_id,
-                                            type='user',
-                                            mode='autopublish',
                                             status='pending',
                                             scheduled_time=scheduled_time_utc,
                                             created_at=datetime.utcnow(),
@@ -660,12 +658,11 @@ def update_autopublish_config(object_id, current_user):
                             for chat_id in chat_ids:
                                 chat = WebChat.query.get(chat_id)
                                 if chat and chat.owner_type == 'user' and chat.owner_account_id == account_id:
-                                    # Проверяем, нет ли уже такой очереди
-                                    existing = PublicationQueue.query.filter_by(
+                                    # Проверяем, нет ли уже такой очереди в AccountPublicationQueue
+                                    existing = AccountPublicationQueue.query.filter_by(
                                         object_id=object_id,
                                         chat_id=chat_id,
-                                        type='user',
-                                        mode='autopublish',
+                                        account_id=account_id,
                                         status='pending'
                                     ).first()
                                     if not existing:
@@ -676,13 +673,11 @@ def update_autopublish_config(object_id, current_user):
                                         scheduled_time_msk = get_next_allowed_time_msk(now_msk)
                                         scheduled_time_utc = msk_to_utc(scheduled_time_msk)
                                         
-                                        queue = PublicationQueue(
+                                        queue = AccountPublicationQueue(
                                             object_id=object_id,
                                             chat_id=chat_id,
                                             account_id=account_id,
                                             user_id=current_user.user_id,
-                                            type='user',
-                                            mode='autopublish',
                                             status='pending',
                                             scheduled_time=scheduled_time_utc,
                                             created_at=datetime.utcnow(),
@@ -1444,4 +1439,57 @@ def update_user_settings(current_user):
     except Exception as e:
         db.session.rollback()
         log_error(e, 'user_settings_update_failed', current_user.user_id, {})
+        return jsonify({'error': str(e)}), 500
+
+
+@user_routes_bp.route('/dashboard/settings/clear-autopublish', methods=['POST'])
+@jwt_required
+def clear_autopublish_and_queues(current_user):
+    """Clear all autopublish configs and queues for user"""
+    try:
+        # Удаляем все конфигурации автопубликации пользователя
+        autopublish_configs = AutopublishConfig.query.filter_by(user_id=current_user.user_id).all()
+        configs_count = len(autopublish_configs)
+        for config in autopublish_configs:
+            db.session.delete(config)
+        
+        # Удаляем все очереди публикаций с автопубликацией для пользователя
+        publication_queues = PublicationQueue.query.filter_by(
+            user_id=current_user.user_id,
+            mode='autopublish'
+        ).all()
+        queues_count = len(publication_queues)
+        for queue in publication_queues:
+            db.session.delete(queue)
+        
+        # Удаляем все очереди публикаций для аккаунтов пользователя
+        account_queues = AccountPublicationQueue.query.filter_by(user_id=current_user.user_id).all()
+        account_queues_count = len(account_queues)
+        for queue in account_queues:
+            db.session.delete(queue)
+        
+        db.session.commit()
+        
+        log_action(
+            action='autopublish_cleared',
+            user_id=current_user.user_id,
+            details={
+                'configs_deleted': configs_count,
+                'publication_queues_deleted': queues_count,
+                'account_queues_deleted': account_queues_count
+            }
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Автопубликация и очереди успешно очищены',
+            'deleted': {
+                'configs': configs_count,
+                'publication_queues': queues_count,
+                'account_queues': account_queues_count
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        log_error(e, 'clear_autopublish_failed', current_user.user_id, {})
         return jsonify({'error': str(e)}), 500
