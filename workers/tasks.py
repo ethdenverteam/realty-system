@@ -132,7 +132,7 @@ def publish_to_telegram(queue_id: int):
         # Получаем пользователя бота для форматирования текста
         bot_user = None
         if obj.user_id:
-            bot_user = db.query(BotUser).filter_by(user_id=obj.user_id).first()
+            bot_user = db.session.query(BotUser).filter_by(user_id=obj.user_id).first()
         
         # Получаем формат публикации из конфигурации автопубликации
         publication_format = 'default'
@@ -315,14 +315,14 @@ def process_autopublish():
     finally:
 
 
-def _get_matching_bot_chats_for_object(db, obj: Object):
+def _get_matching_bot_chats_for_object(db_session, obj: Object):
     """
     Подбор чатов бота для объекта по тем же правилам,
     что и ручная публикация через бота.
     """
     target_chats = []
 
-    chats = db.session.query(Chat).filter_by(owner_type='bot', is_active=True).all()
+    chats = db_session.query(Chat).filter_by(owner_type='bot', is_active=True).all()
 
     rooms_type = obj.rooms_type or ""
     districts = obj.districts_json or []
@@ -424,6 +424,7 @@ def schedule_daily_autopublish():
     from app.models.telegram_account import TelegramAccount as AppTelegramAccount
     from app.utils.account_publication_utils import calculate_scheduled_times_for_account
     
+    try:
         # Через бота: создаем задачи в publication_queues
         configs = db.session.query(AutopublishConfig).filter_by(enabled=True).all()
         created_bot_queues = 0
@@ -439,7 +440,7 @@ def schedule_daily_autopublish():
 
             # Через бота: чаты подбираются автоматически
             if cfg.bot_enabled:
-                chats = _get_matching_bot_chats_for_object(db, obj)
+                chats = _get_matching_bot_chats_for_object(db.session, obj)
                 # Получаем время для публикации (8:00-22:00 МСК)
                 now_msk = get_moscow_time()
                 scheduled_time_msk = get_next_allowed_time_msk(now_msk)
@@ -564,14 +565,13 @@ def schedule_daily_autopublish():
         return created_bot_queues + created_account_queues
     except Exception as e:
         logger.error(f"Error in schedule_daily_autopublish: {e}", exc_info=True)
-            db.session.rollback()
+        db.session.rollback()
         try:
             with app.app_context():
                 app_db.session.rollback()
         except:
             pass
         return 0
-    finally:
 
 
 @celery_app.task(name='workers.tasks.process_scheduled_publications')
@@ -1037,36 +1037,36 @@ def process_account_autopublish():
                         # Получаем bot объект для форматирования
                         bot_user = None
                         if obj.user_id:
-                            bot_user = db.session.query(BotUser).filter_by(user_id=obj.user_id).first()
+                            bot_user = app_db.session.query(BotUser).filter_by(user_id=obj.user_id).first()
                         
-                        bot_obj = db.session.query(BotObject).filter_by(object_id=obj.object_id).first()
-                            if not bot_obj:
-                                # Создаем bot object из web object
-                                bot_obj = BotObject(
-                                    object_id=obj.object_id,
-                                    user_id=obj.user_id,
-                                    rooms_type=obj.rooms_type,
-                                    price=obj.price,
-                                    districts_json=obj.districts_json,
-                                    region=obj.region,
-                                    city=obj.city,
-                                    photos_json=obj.photos_json,
-                                    area=obj.area,
-                                    floor=obj.floor,
-                                    address=obj.address,
-                                    residential_complex=obj.residential_complex,
-                                    renovation=obj.renovation,
-                                    comment=obj.comment,
-                                    contact_name=obj.contact_name,
-                                    show_username=obj.show_username,
-                                    phone_number=obj.phone_number,
-                                    contact_name_2=obj.contact_name_2,
-                                    phone_number_2=obj.phone_number_2,
-                                    status=obj.status,
-                                    source='web'
-                                )
-                                    db.session.add(bot_obj)
-                                    db.session.commit()
+                        bot_obj = app_db.session.query(BotObject).filter_by(object_id=obj.object_id).first()
+                        if not bot_obj:
+                            # Создаем bot object из web object
+                            bot_obj = BotObject(
+                                object_id=obj.object_id,
+                                user_id=obj.user_id,
+                                rooms_type=obj.rooms_type,
+                                price=obj.price,
+                                districts_json=obj.districts_json,
+                                region=obj.region,
+                                city=obj.city,
+                                photos_json=obj.photos_json,
+                                area=obj.area,
+                                floor=obj.floor,
+                                address=obj.address,
+                                residential_complex=obj.residential_complex,
+                                renovation=obj.renovation,
+                                comment=obj.comment,
+                                contact_name=obj.contact_name,
+                                show_username=obj.show_username,
+                                phone_number=obj.phone_number,
+                                contact_name_2=obj.contact_name_2,
+                                phone_number_2=obj.phone_number_2,
+                                status=obj.status,
+                                source='web'
+                            )
+                            app_db.session.add(bot_obj)
+                            app_db.session.commit()
                         
                         # Получаем формат публикации
                         publication_format = 'default'

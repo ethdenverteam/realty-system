@@ -541,33 +541,33 @@ def publish_object_via_account(current_user):
             bot_user = db.session.query(BotUser).filter_by(telegram_id=int(current_user.telegram_id)).first()
         
         bot_obj = db.session.query(BotObject).filter_by(object_id=object_id).first()
-            if not bot_obj:
-                # Create bot object from web object
-                bot_obj = BotObject(
-                    object_id=obj.object_id,
-                    user_id=bot_user.user_id if bot_user else None,
-                    rooms_type=obj.rooms_type,
-                    price=obj.price,
-                    districts_json=obj.districts_json,
-                    region=obj.region,
-                    city=obj.city,
-                    photos_json=obj.photos_json,
-                    area=obj.area,
-                    floor=obj.floor,
-                    address=obj.address,
-                    residential_complex=obj.residential_complex,
-                    renovation=obj.renovation,
-                    comment=obj.comment,
-                    contact_name=obj.contact_name,
-                    show_username=obj.show_username,
-                    phone_number=obj.phone_number,
-                    contact_name_2=obj.contact_name_2,
-                    phone_number_2=obj.phone_number_2,
-                    status=obj.status,
-                    source='web'
-                )
-                db.session.add(bot_obj)
-                db.session.commit()
+        if not bot_obj:
+            # Create bot object from web object
+            bot_obj = BotObject(
+                object_id=obj.object_id,
+                user_id=bot_user.user_id if bot_user else None,
+                rooms_type=obj.rooms_type,
+                price=obj.price,
+                districts_json=obj.districts_json,
+                region=obj.region,
+                city=obj.city,
+                photos_json=obj.photos_json,
+                area=obj.area,
+                floor=obj.floor,
+                address=obj.address,
+                residential_complex=obj.residential_complex,
+                renovation=obj.renovation,
+                comment=obj.comment,
+                contact_name=obj.contact_name,
+                show_username=obj.show_username,
+                phone_number=obj.phone_number,
+                contact_name_2=obj.contact_name_2,
+                phone_number_2=obj.phone_number_2,
+                status=obj.status,
+                source='web'
+            )
+            db.session.add(bot_obj)
+            db.session.commit()
         
         # Получаем формат публикации из конфигурации автопубликации
         publication_format = 'default'
