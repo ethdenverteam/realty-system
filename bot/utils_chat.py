@@ -51,38 +51,45 @@ def save_chat_from_update(update: Update):
     
     # Save to database
     try:
-        existing_chat = db.session.query(Chat).filter_by(
-            telegram_chat_id=chat_id,
-            owner_type='bot'
-        ).first()
-        
-        if existing_chat:
-            # Update existing chat
-            existing_chat.title = title
-            existing_chat.type = chat_type
-            if username:
-                if not existing_chat.filters_json:
-                    existing_chat.filters_json = {}
-                existing_chat.filters_json['username'] = username
-        else:
-            # Create new chat
-            filters_data = {}
-            if username:
-                filters_data['username'] = username
-            
-            new_chat = Chat(
+        from app import app
+        with app.app_context():
+            existing_chat = db.session.query(Chat).filter_by(
                 telegram_chat_id=chat_id,
-                title=title,
-                type=chat_type,
-                owner_type='bot',
-                is_active=False,  # Not active by default, needs to be configured
-                filters_json=filters_data if filters_data else None,
-                added_date=datetime.utcnow()
-            )
-            db.session.add(new_chat)
-        
-        db.session.commit()
+                owner_type='bot'
+            ).first()
+            
+            if existing_chat:
+                # Update existing chat
+                existing_chat.title = title
+                existing_chat.type = chat_type
+                if username:
+                    if not existing_chat.filters_json:
+                        existing_chat.filters_json = {}
+                    existing_chat.filters_json['username'] = username
+            else:
+                # Create new chat
+                filters_data = {}
+                if username:
+                    filters_data['username'] = username
+                
+                new_chat = Chat(
+                    telegram_chat_id=chat_id,
+                    title=title,
+                    type=chat_type,
+                    owner_type='bot',
+                    is_active=False,  # Not active by default, needs to be configured
+                    filters_json=filters_data if filters_data else None,
+                    added_date=datetime.utcnow()
+                )
+                db.session.add(new_chat)
+            
+            db.session.commit()
     except Exception as e:
         logger.error(f"Error saving chat to database: {e}", exc_info=True)
-        db.session.rollback()
+        try:
+            from app import app
+            with app.app_context():
+                db.session.rollback()
+        except:
+            pass
 

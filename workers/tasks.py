@@ -39,35 +39,35 @@ def publish_to_telegram(queue_id: int):
     Логика: проверка дубликатов (24 часа), форматирование текста, отправка через API, создание истории
     Все этапы логируются для отслеживания процесса публикации
     """
-    queue = db.session.query(PublicationQueue).get(queue_id)
-    if not queue:
-        logger.error(f"Queue {queue_id} not found")
-        return False
-    
-    # Update status
-    queue.status = 'processing'
-    queue.started_at = datetime.utcnow()
-    db.session.commit()
-    
-    # Get object and chat
-    obj = db.session.query(Object).get(queue.object_id)
-    chat = db.session.query(Chat).get(queue.chat_id)
-    
-    if not obj or not chat:
-        queue.status = 'failed'
-        queue.error_message = 'Object or chat not found'
-        db.session.commit()
-        return False
-    
-    # Проверка времени для автопубликации: публикация разрешена только с 8:00 до 22:00 МСК
-    # Исключение: если админ включил обход ограничения времени
-    if queue.mode == 'autopublish':
-        # Проверяем настройку обхода ограничения времени для админа (через app контекст)
-        from app import app
-        admin_bypass_enabled = False
-        is_admin = False
+    from app import app
+    with app.app_context():
+        queue = db.session.query(PublicationQueue).get(queue_id)
+        if not queue:
+            logger.error(f"Queue {queue_id} not found")
+            return False
         
-        with app.app_context():
+        # Update status
+        queue.status = 'processing'
+        queue.started_at = datetime.utcnow()
+        db.session.commit()
+        
+        # Get object and chat
+        obj = db.session.query(Object).get(queue.object_id)
+        chat = db.session.query(Chat).get(queue.chat_id)
+        
+        if not obj or not chat:
+            queue.status = 'failed'
+            queue.error_message = 'Object or chat not found'
+            db.session.commit()
+            return False
+        
+        # Проверка времени для автопубликации: публикация разрешена только с 8:00 до 22:00 МСК
+        # Исключение: если админ включил обход ограничения времени
+        if queue.mode == 'autopublish':
+            # Проверяем настройку обхода ограничения времени для админа (через app контекст)
+            admin_bypass_enabled = False
+            is_admin = False
+            
             from app.models.system_setting import SystemSetting
             time_limit_setting = SystemSetting.query.filter_by(key='admin_bypass_time_limit').first()
             if time_limit_setting and isinstance(time_limit_setting.value_json, dict):
@@ -79,43 +79,43 @@ def publish_to_telegram(queue_id: int):
                 user = User.query.get(queue.user_id)
                 if user and user.web_role == 'admin':
                     is_admin = True
+            
+            # Если админ и включен обход - пропускаем проверку времени
+            if not (is_admin and admin_bypass_enabled):
+                now_msk = get_moscow_time()
+                if not is_within_publish_hours(now_msk):
+                    logger.info(f"Outside publish hours (8:00-22:00 МСК), rescheduling queue {queue_id}")
+                    # Переносим на ближайшее разрешенное время
+                    next_time_msk = get_next_allowed_time_msk(now_msk)
+                    next_time_utc = msk_to_utc(next_time_msk)
+                    queue.scheduled_time = next_time_utc
+                    queue.status = 'pending'
+                    db.session.commit()
+                    return False
         
-        # Если админ и включен обход - пропускаем проверку времени
-        if not (is_admin and admin_bypass_enabled):
-            now_msk = get_moscow_time()
-            if not is_within_publish_hours(now_msk):
-                logger.info(f"Outside publish hours (8:00-22:00 МСК), rescheduling queue {queue_id}")
-                # Переносим на ближайшее разрешенное время
-                next_time_msk = get_next_allowed_time_msk(now_msk)
-                next_time_utc = msk_to_utc(next_time_msk)
-                queue.scheduled_time = next_time_utc
-                queue.status = 'pending'
-                db.session.commit()
-                return False
-    
-    # Проверка дубликатов через унифицированную утилиту
-    from app.utils.duplicate_checker import check_duplicate_publication
-    
-    # Определяем тип публикации
-    publication_type = 'autopublish_bot' if queue.mode == 'autopublish' else 'manual_bot'
-    
-    can_publish, reason = check_duplicate_publication(
-        object_id=queue.object_id,
-        chat_id=queue.chat_id,
-        account_id=None,  # Бот
-        publication_type=publication_type,
-        user_id=queue.user_id,
-        allow_duplicates_setting=None  # Получит из SystemSetting автоматически
-    )
-    
-    if not can_publish:
-        logger.info(f"Object {queue.object_id} cannot be published to chat {queue.chat_id} via bot: {reason}")
-        queue.status = 'failed'
-        queue.error_message = reason
-        db.session.commit()
-        return False
-    
-    # Реализация публикации через Telegram API
+        # Проверка дубликатов через унифицированную утилиту
+        from app.utils.duplicate_checker import check_duplicate_publication
+        
+        # Определяем тип публикации
+        publication_type = 'autopublish_bot' if queue.mode == 'autopublish' else 'manual_bot'
+        
+        can_publish, reason = check_duplicate_publication(
+            object_id=queue.object_id,
+            chat_id=queue.chat_id,
+            account_id=None,  # Бот
+            publication_type=publication_type,
+            user_id=queue.user_id,
+            allow_duplicates_setting=None  # Получит из SystemSetting автоматически
+        )
+        
+        if not can_publish:
+            logger.info(f"Object {queue.object_id} cannot be published to chat {queue.chat_id} via bot: {reason}")
+            queue.status = 'failed'
+            queue.error_message = reason
+            db.session.commit()
+            return False
+        
+        # Реализация публикации через Telegram API
         import requests
         import os
         from bot.config import BOT_TOKEN
@@ -266,13 +266,14 @@ def publish_to_telegram(queue_id: int):
             
         except requests.exceptions.RequestException as e:
             logger.error(f"Error sending message to Telegram: {e}")
-            queue.status = 'failed'
-            queue.error_message = str(e)
-            db.session.commit()
+            if queue:
+                queue.status = 'failed'
+                queue.error_message = str(e)
+                db.session.commit()
             return False
         
         except Exception as e:
-            logger.error(f"Error publishing to Telegram: {e}")
+            logger.error(f"Error publishing to Telegram: {e}", exc_info=True)
             if queue:
                 queue.status = 'failed'
                 queue.error_message = str(e)
@@ -953,7 +954,8 @@ def process_account_autopublish():
             now = datetime.utcnow()
             
             # Получаем настройку проверки дубликатов
-            duplicates_setting = app_db.session.query(SystemSetting).filter_by(key='allow_duplicates').first()
+            # Используем SystemSetting.query напрямую, так как мы уже в app_context
+            duplicates_setting = SystemSetting.query.filter_by(key='allow_duplicates').first()
             allow_duplicates = False
             if duplicates_setting and isinstance(duplicates_setting.value_json, dict):
                 allow_duplicates = duplicates_setting.value_json.get('enabled', False)
