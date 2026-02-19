@@ -695,7 +695,8 @@ async def cancel_object_creation(update: Update, context: ContextTypes.DEFAULT_T
                     try:
                         db.session.delete(obj)
                         db.session.commit()
-                    finally:
+                    except Exception as e:
+                        logger.error(f"Error deleting object from database: {e}")
             except Exception as e:
                 logger.error(f"Error deleting object: {e}")
         user_data.pop(user.id, None)

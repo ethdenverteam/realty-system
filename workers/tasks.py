@@ -289,7 +289,7 @@ def process_autopublish():
         
         # Get pending autopublish tasks that are ready to publish
         # Сортируем по scheduled_time (старейшие первыми), если scheduled_time не установлено - по created_at
-        queues = db.query(PublicationQueue).filter(
+        queues = db.session.query(PublicationQueue).filter(
             PublicationQueue.mode == 'autopublish',
             PublicationQueue.status == 'pending',
             or_(
@@ -579,7 +579,7 @@ def process_scheduled_publications():
     now = datetime.utcnow()
     
     # Get scheduled tasks ready to publish
-    queues = db.query(PublicationQueue).filter(
+    queues = db.session.query(PublicationQueue).filter(
         PublicationQueue.mode == 'scheduled',
         PublicationQueue.status == 'pending',
         PublicationQueue.scheduled_time <= now

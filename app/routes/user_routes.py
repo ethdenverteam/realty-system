@@ -350,7 +350,7 @@ def create_or_update_autopublish_config(current_user):
     # Бот всегда включен для автопубликации
     cfg.bot_enabled = True
     
-        # Сохраняем настройки аккаунтов, если переданы
+    # Сохраняем настройки аккаунтов, если переданы
     if isinstance(accounts_config, dict):
         # Разрешаем сохранение формата публикации даже без выбранных чатов
         # Проверяем, что есть хотя бы один аккаунт с выбранными чатами только если есть аккаунты
@@ -393,7 +393,6 @@ def create_or_update_autopublish_config(current_user):
         if cfg.enabled:
             from workers.tasks import _get_matching_bot_chats_for_object
             from app.models.chat import Chat as WebChat
-            from app.database import db
             from bot.models import Object as BotObject, Chat as BotChat
             
             # Создаем очередь для бота (всегда включен)
