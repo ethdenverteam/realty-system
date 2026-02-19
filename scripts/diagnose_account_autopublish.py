@@ -2,6 +2,9 @@
 """
 Скрипт диагностики автопубликации от имени аккаунтов
 Проверяет состояние account_publication_queues и связанных данных
+
+Использование в Docker:
+docker exec -it realty_web python scripts/diagnose_account_autopublish.py
 """
 import sys
 import os

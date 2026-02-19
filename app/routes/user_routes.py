@@ -479,7 +479,21 @@ def create_or_update_autopublish_config(current_user):
                         if account and account.owner_id == current_user.user_id and account.is_active:
                             for chat_id in chat_ids:
                                 chat = WebChat.query.get(chat_id)
-                                if chat and chat.owner_type == 'user' and chat.owner_account_id == account_id:
+                                if not chat or chat.owner_type != 'user':
+                                    continue
+                                
+                                # Проверяем привязку чата к аккаунту:
+                                # 1. Legacy связь через owner_account_id
+                                # 2. Новая связь через TelegramAccountChat
+                                from app.models.telegram_account_chat import TelegramAccountChat
+                                
+                                legacy_check = chat.owner_account_id == account_id
+                                new_check = db.session.query(TelegramAccountChat).filter_by(
+                                    account_id=account_id,
+                                    chat_id=chat_id
+                                ).first() is not None
+                                
+                                if legacy_check or new_check:
                                     # Проверяем, нет ли уже такой очереди в AccountPublicationQueue
                                     existing = AccountPublicationQueue.query.filter_by(
                                         object_id=object_id,
@@ -681,7 +695,21 @@ def update_autopublish_config(object_id, current_user):
                         if account and account.owner_id == current_user.user_id and account.is_active:
                             for chat_id in chat_ids:
                                 chat = WebChat.query.get(chat_id)
-                                if chat and chat.owner_type == 'user' and chat.owner_account_id == account_id:
+                                if not chat or chat.owner_type != 'user':
+                                    continue
+                                
+                                # Проверяем привязку чата к аккаунту:
+                                # 1. Legacy связь через owner_account_id
+                                # 2. Новая связь через TelegramAccountChat
+                                from app.models.telegram_account_chat import TelegramAccountChat
+                                
+                                legacy_check = chat.owner_account_id == account_id
+                                new_check = db.session.query(TelegramAccountChat).filter_by(
+                                    account_id=account_id,
+                                    chat_id=chat_id
+                                ).first() is not None
+                                
+                                if legacy_check or new_check:
                                     # Проверяем, нет ли уже такой очереди в AccountPublicationQueue
                                     existing = AccountPublicationQueue.query.filter_by(
                                         object_id=object_id,
