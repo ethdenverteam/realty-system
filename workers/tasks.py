@@ -40,6 +40,8 @@ def publish_to_telegram(queue_id: int):
     Все этапы логируются для отслеживания процесса публикации
     """
     from app import app
+    from celery.exceptions import SoftTimeLimitExceeded
+    
     with app.app_context():
         queue = db.session.query(PublicationQueue).get(queue_id)
         if not queue:
@@ -291,6 +293,15 @@ def publish_to_telegram(queue_id: int):
                 db.session.commit()
             return False
         
+        except SoftTimeLimitExceeded:
+            logger.warning(f"SoftTimeLimitExceeded in publish_to_telegram for queue {queue_id}")
+            if queue:
+                queue.status = 'failed'
+                queue.error_message = 'Task timeout - exceeded soft time limit'
+                queue.attempts += 1
+                db.session.commit()
+            return False
+        
         except Exception as e:
             logger.error(f"Error publishing to Telegram: {e}", exc_info=True)
             if queue:
@@ -305,8 +316,32 @@ def publish_to_telegram(queue_id: int):
 def process_autopublish():
     """Process autopublish queue - обрабатывает задачи в порядке scheduled_time"""
     from app import app
+    from celery.exceptions import SoftTimeLimitExceeded
+    
     try:
         with app.app_context():
+            # Сбрасываем зависшие задачи в статусе 'processing'
+            try:
+                stuck_threshold = datetime.utcnow() - timedelta(minutes=5)
+                stuck_queues = db.session.query(PublicationQueue).filter(
+                    PublicationQueue.status == 'processing',
+                    PublicationQueue.started_at < stuck_threshold
+                ).all()
+                
+                for stuck_queue in stuck_queues:
+                    logger.warning(f"Resetting stuck bot queue {stuck_queue.queue_id} (started at {stuck_queue.started_at})")
+                    stuck_queue.status = 'pending'
+                    stuck_queue.attempts += 1
+                    if stuck_queue.attempts >= 3:
+                        stuck_queue.status = 'failed'
+                        stuck_queue.error_message = 'Task timeout - exceeded time limit'
+                    db.session.commit()
+                
+                if stuck_queues:
+                    logger.info(f"Reset {len(stuck_queues)} stuck bot publication tasks")
+            except Exception as reset_error:
+                logger.error(f"Error resetting stuck bot tasks: {reset_error}", exc_info=True)
+            
             now = datetime.utcnow()
             
             # Get pending autopublish tasks that are ready to publish
@@ -331,6 +366,9 @@ def process_autopublish():
                 publish_to_telegram.delay(queue.queue_id)
             
             return len(queues)
+    except SoftTimeLimitExceeded:
+        logger.warning("SoftTimeLimitExceeded in process_autopublish")
+        return 0
     except Exception as e:
         logger.error(f"Error processing autopublish queue: {e}", exc_info=True)
         return 0
@@ -972,6 +1010,7 @@ def process_account_autopublish():
     from app.utils.rate_limiter import get_rate_limit_status
     from bot.utils import format_publication_text
     from bot.models import User as BotUser, Object as BotObject
+    from celery.exceptions import SoftTimeLimitExceeded
     
     with app.app_context():
         try:
@@ -1343,6 +1382,32 @@ def process_account_autopublish():
                         )
             
             logger.info(f"process_account_autopublish: processed {processed_count} tasks")
+            return processed_count
+            
+        except SoftTimeLimitExceeded:
+            # Время выполнения задачи превысило soft time limit (240 секунд)
+            # Помечаем все задачи в статусе 'processing' обратно в 'pending' для повторной обработки
+            logger.warning("SoftTimeLimitExceeded in process_account_autopublish - resetting stuck tasks")
+            try:
+                stuck_threshold = datetime.utcnow() - timedelta(minutes=5)
+                stuck_queues = app_db.session.query(AccountPublicationQueue).filter(
+                    AccountPublicationQueue.status == 'processing',
+                    AccountPublicationQueue.started_at < stuck_threshold
+                ).all()
+                
+                for stuck_queue in stuck_queues:
+                    logger.warning(f"Resetting stuck queue {stuck_queue.queue_id} (started at {stuck_queue.started_at})")
+                    stuck_queue.status = 'pending'
+                    stuck_queue.attempts += 1
+                    if stuck_queue.attempts >= 3:
+                        stuck_queue.status = 'failed'
+                        stuck_queue.error_message = 'Task timeout - exceeded soft time limit'
+                    app_db.session.commit()
+                
+                logger.info(f"Reset {len(stuck_queues)} stuck account publication tasks")
+            except Exception as reset_error:
+                logger.error(f"Error resetting stuck tasks: {reset_error}", exc_info=True)
+            
             return processed_count
             
         except Exception as e:
