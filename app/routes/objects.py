@@ -757,85 +757,84 @@ def publish_object_via_bot(current_user):
         # Get target chats (reuse logic from bot)
         target_chats = []
         chats = db.session.query(Chat).filter_by(owner_type='bot', is_active=True).all()
+        
+        rooms_type = obj.rooms_type or ""
+        districts = obj.districts_json or []
+        price = obj.price or 0
+        
+        districts_config = get_districts_config()
+        
+        # Add parent districts
+        all_districts = set(districts)
+        for district in districts:
+            if isinstance(district, str) and district in districts_config:
+                parent_districts = districts_config[district]
+                if isinstance(parent_districts, list):
+                    all_districts.update(parent_districts)
+        
+        for chat in chats:
+            matches = False
+            filters = chat.filters_json or {}
             
-            rooms_type = obj.rooms_type or ""
-            districts = obj.districts_json or []
-            price = obj.price or 0
+            # Проверка типа привязки "общий" - такой чат получает все посты
+            binding_type = filters.get('binding_type')
+            if binding_type == 'common':
+                # Map bot chat_id to web chat_id
+                web_chat = Chat.query.filter_by(telegram_chat_id=chat.telegram_chat_id, owner_type='bot').first()
+                if web_chat and web_chat.chat_id not in target_chats:
+                    target_chats.append(web_chat.chat_id)
+                continue  # Пропускаем проверку фильтров для "общего" чата
             
-            districts_config = get_districts_config()
+            # Check if filters_json is used
+            has_filters_json = bool(filters.get('rooms_types') or filters.get('districts') or 
+                                   filters.get('price_min') is not None or filters.get('price_max') is not None)
             
-            # Add parent districts
-            all_districts = set(districts)
-            for district in districts:
-                if isinstance(district, str) and district in districts_config:
-                    parent_districts = districts_config[district]
-                    if isinstance(parent_districts, list):
-                        all_districts.update(parent_districts)
-            
-            for chat in chats:
-                matches = False
-                filters = chat.filters_json or {}
+            if has_filters_json:
+                rooms_match = True
+                districts_match = True
+                price_match = True
                 
-                # Проверка типа привязки "общий" - такой чат получает все посты
-                binding_type = filters.get('binding_type')
-                if binding_type == 'common':
-                    # Map bot chat_id to web chat_id
-                    web_chat = Chat.query.filter_by(telegram_chat_id=chat.telegram_chat_id, owner_type='bot').first()
-                    if web_chat and web_chat.chat_id not in target_chats:
-                        target_chats.append(web_chat.chat_id)
-                    continue  # Пропускаем проверку фильтров для "общего" чата
+                if filters.get('rooms_types'):
+                    rooms_match = rooms_type in filters['rooms_types']
                 
-                # Check if filters_json is used
-                has_filters_json = bool(filters.get('rooms_types') or filters.get('districts') or 
-                                       filters.get('price_min') is not None or filters.get('price_max') is not None)
+                if filters.get('districts'):
+                    chat_districts = set(filters['districts'])
+                    districts_match = bool(chat_districts.intersection(all_districts))
                 
-                if has_filters_json:
-                    rooms_match = True
-                    districts_match = True
-                    price_match = True
-                    
-                    if filters.get('rooms_types'):
-                        rooms_match = rooms_type in filters['rooms_types']
-                    
-                    if filters.get('districts'):
-                        chat_districts = set(filters['districts'])
-                        districts_match = bool(chat_districts.intersection(all_districts))
-                    
-                    price_min = filters.get('price_min')
-                    price_max = filters.get('price_max')
-                    if price_min is not None or price_max is not None:
-                        price_min = price_min or 0
-                        price_max = price_max if price_max is not None else float('inf')
-                        price_match = price_min <= price < price_max
-                    
-                    if rooms_match and districts_match and price_match:
+                price_min = filters.get('price_min')
+                price_max = filters.get('price_max')
+                if price_min is not None or price_max is not None:
+                    price_min = price_min or 0
+                    price_max = price_max if price_max is not None else float('inf')
+                    price_match = price_min <= price < price_max
+                
+                if rooms_match and districts_match and price_match:
+                    matches = True
+            else:
+                # Legacy category support
+                category = chat.category or ""
+                
+                if category.startswith("rooms_") and category.replace("rooms_", "") == rooms_type:
+                    matches = True
+                
+                if category.startswith("district_"):
+                    district_name = category.replace("district_", "")
+                    if district_name in all_districts:
                         matches = True
-                else:
-                    # Legacy category support
-                    category = chat.category or ""
-                    
-                    if category.startswith("rooms_") and category.replace("rooms_", "") == rooms_type:
-                        matches = True
-                    
-                    if category.startswith("district_"):
-                        district_name = category.replace("district_", "")
-                        if district_name in all_districts:
-                            matches = True
-                    
-                    if category.startswith("price_"):
-                        try:
-                            parts = category.replace("price_", "").split("_")
-                            if len(parts) == 2:
-                                min_price = float(parts[0])
-                                max_price = float(parts[1])
-                                if min_price <= price < max_price:
-                                    matches = True
-                        except:
-                            pass
                 
-                if matches and chat.chat_id not in target_chats:
-                    target_chats.append(chat.chat_id)
-        finally:
+                if category.startswith("price_"):
+                    try:
+                        parts = category.replace("price_", "").split("_")
+                        if len(parts) == 2:
+                            min_price = float(parts[0])
+                            max_price = float(parts[1])
+                            if min_price <= price < max_price:
+                                matches = True
+                    except:
+                        pass
+            
+            if matches and chat.chat_id not in target_chats:
+                target_chats.append(chat.chat_id)
         
         if not target_chats:
             return jsonify({

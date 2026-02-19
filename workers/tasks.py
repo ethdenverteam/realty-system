@@ -52,14 +52,14 @@ def publish_to_telegram(queue_id: int):
     # Get object and chat
     obj = db.session.query(Object).get(queue.object_id)
     chat = db.session.query(Chat).get(queue.chat_id)
-        
-        if not obj or not chat:
-            queue.status = 'failed'
-            queue.error_message = 'Object or chat not found'
-            db.session.commit()
-            return False
-        
-        # Проверка времени для автопубликации: публикация разрешена только с 8:00 до 22:00 МСК
+    
+    if not obj or not chat:
+        queue.status = 'failed'
+        queue.error_message = 'Object or chat not found'
+        db.session.commit()
+        return False
+    
+    # Проверка времени для автопубликации: публикация разрешена только с 8:00 до 22:00 МСК
         # Исключение: если админ включил обход ограничения времени
         if queue.mode == 'autopublish':
             # Проверяем настройку обхода ограничения времени для админа (через app контекст)

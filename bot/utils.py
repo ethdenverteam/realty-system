@@ -87,36 +87,36 @@ def update_user_activity(user_id: str, username: str = None):
     is_new_user = False
     
     if not user:
-            is_new_user = True
-            user = User(
-                telegram_id=int(user_id),
-                username=username or "",
-                bot_role='start',
-                created_at=datetime.utcnow(),
-                last_activity=datetime.utcnow()
+        is_new_user = True
+        user = User(
+            telegram_id=int(user_id),
+            username=username or "",
+            bot_role='start',
+            created_at=datetime.utcnow(),
+            last_activity=datetime.utcnow()
+        )
+        db.session.add(user)
+    else:
+        user.last_activity = datetime.utcnow()
+        if username:
+            user.username = username
+    
+    db.session.commit()
+    
+    # Log user activity
+    if is_new_user:
+        try:
+            action_log = ActionLog(
+                user_id=user.user_id,
+                action='bot_user_registered',
+                details_json={'telegram_id': int(user_id), 'username': username},
+                created_at=datetime.utcnow()
             )
-            db.session.add(user)
-        else:
-            user.last_activity = datetime.utcnow()
-            if username:
-                user.username = username
-        
-        db.session.commit()
-        
-        # Log user activity
-        if is_new_user:
-            try:
-                action_log = ActionLog(
-                    user_id=user.user_id,
-                    action='bot_user_registered',
-                    details_json={'telegram_id': int(user_id), 'username': username},
-                    created_at=datetime.utcnow()
-                )
-                db.session.add(action_log)
-                db.session.commit()
-            except Exception as e:
-                logger.error(f"Failed to log user registration: {e}")
-                db.session.rollback()
+            db.session.add(action_log)
+            db.session.commit()
+        except Exception as e:
+            logger.error(f"Failed to log user registration: {e}")
+            db.session.rollback()
 
 
 def get_user_id_prefix(user_id: str) -> str:
