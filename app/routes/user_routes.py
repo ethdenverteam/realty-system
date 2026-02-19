@@ -1453,20 +1453,55 @@ def clear_autopublish_and_queues(current_user):
         for config in autopublish_configs:
             db.session.delete(config)
         
-        # Удаляем все очереди публикаций с автопубликацией для пользователя
-        publication_queues = PublicationQueue.query.filter_by(
-            user_id=current_user.user_id,
-            mode='autopublish'
-        ).all()
-        queues_count = len(publication_queues)
-        for queue in publication_queues:
-            db.session.delete(queue)
+        # Получаем ID всех очередей публикаций с автопубликацией для пользователя
+        # Используем no_autoflush, чтобы избежать преждевременного flush
+        with db.session.no_autoflush:
+            publication_queues = PublicationQueue.query.filter_by(
+                user_id=current_user.user_id,
+                mode='autopublish'
+            ).all()
+            queues_count = len(publication_queues)
+            queue_ids = [q.queue_id for q in publication_queues]
         
-        # Удаляем все очереди публикаций для аккаунтов пользователя
-        account_queues = AccountPublicationQueue.query.filter_by(user_id=current_user.user_id).all()
-        account_queues_count = len(account_queues)
-        for queue in account_queues:
-            db.session.delete(queue)
+        # Сначала обнуляем ссылки в PublicationHistory, чтобы избежать нарушения внешнего ключа
+        if queue_ids:
+            PublicationHistory.query.filter(
+                PublicationHistory.queue_id.in_(queue_ids)
+            ).update({PublicationHistory.queue_id: None}, synchronize_session=False)
+            db.session.commit()  # Фиксируем обнуление ссылок
+        
+        # Теперь удаляем очереди
+        if queue_ids:
+            PublicationQueue.query.filter(
+                PublicationQueue.queue_id.in_(queue_ids)
+            ).delete(synchronize_session=False)
+        
+        # Получаем ID всех очередей публикаций для аккаунтов пользователя
+        with db.session.no_autoflush:
+            account_queues = AccountPublicationQueue.query.filter_by(user_id=current_user.user_id).all()
+            account_queues_count = len(account_queues)
+            account_queue_ids = [q.queue_id for q in account_queues]
+        
+        # Проверяем, есть ли модель AppPublicationHistory, которая может ссылаться на AccountPublicationQueue
+        # Если есть, обнуляем ссылки
+        try:
+            from app.models.app_publication_history import AppPublicationHistory
+            if account_queue_ids:
+                # Проверяем, есть ли поле queue_id в AppPublicationHistory
+                if hasattr(AppPublicationHistory, 'queue_id'):
+                    AppPublicationHistory.query.filter(
+                        AppPublicationHistory.queue_id.in_(account_queue_ids)
+                    ).update({AppPublicationHistory.queue_id: None}, synchronize_session=False)
+                    db.session.commit()  # Фиксируем обнуление ссылок
+        except ImportError:
+            # Модель не существует или не импортируется - пропускаем
+            pass
+        
+        # Удаляем очереди для аккаунтов
+        if account_queue_ids:
+            AccountPublicationQueue.query.filter(
+                AccountPublicationQueue.queue_id.in_(account_queue_ids)
+            ).delete(synchronize_session=False)
         
         db.session.commit()
         
