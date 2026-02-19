@@ -1012,21 +1012,35 @@ def process_account_autopublish():
     from bot.models import User as BotUser, Object as BotObject
     from celery.exceptions import SoftTimeLimitExceeded
     
-    with app.app_context():
-        try:
-            now = datetime.utcnow()
-            
-            # Получаем настройку проверки дубликатов
-            # Используем SystemSetting.query напрямую, так как мы уже в app_context
-            duplicates_setting = SystemSetting.query.filter_by(key='allow_duplicates').first()
-            allow_duplicates = False
-            if duplicates_setting and isinstance(duplicates_setting.value_json, dict):
-                allow_duplicates = duplicates_setting.value_json.get('enabled', False)
-            
-            # Получаем все активные аккаунты
-            accounts = app_db.session.query(AppTelegramAccount).filter_by(is_active=True).all()
-            
-            processed_count = 0
+    processed_count = 0
+    
+    logger.info("🚀 process_account_autopublish: Starting task")
+    
+    try:
+        with app.app_context():
+            try:
+                now = datetime.utcnow()
+                logger.info(f"process_account_autopublish: Current time UTC: {now}")
+                
+                # Получаем настройку проверки дубликатов
+                # Используем SystemSetting.query напрямую, так как мы уже в app_context
+                duplicates_setting = SystemSetting.query.filter_by(key='allow_duplicates').first()
+                allow_duplicates = False
+                if duplicates_setting and isinstance(duplicates_setting.value_json, dict):
+                    allow_duplicates = duplicates_setting.value_json.get('enabled', False)
+                
+                logger.info(f"process_account_autopublish: Duplicates allowed: {allow_duplicates}")
+                
+                # Получаем все активные аккаунты
+                accounts = app_db.session.query(AppTelegramAccount).filter_by(is_active=True).all()
+                logger.info(f"process_account_autopublish: Found {len(accounts)} active accounts")
+                
+                # Проверяем количество pending задач
+                total_pending = app_db.session.query(AccountPublicationQueue).filter(
+                    AccountPublicationQueue.status == 'pending',
+                    AccountPublicationQueue.scheduled_time <= now
+                ).count()
+                logger.info(f"process_account_autopublish: Found {total_pending} pending tasks ready for processing")
             
             for account in accounts:
                 # Проверяем лимит аккаунта (по успешным публикациям за сегодня)
@@ -1381,14 +1395,49 @@ def process_account_autopublish():
                             }
                         )
             
-            logger.info(f"process_account_autopublish: processed {processed_count} tasks")
-            return processed_count
-            
-        except SoftTimeLimitExceeded:
-            # Время выполнения задачи превысило soft time limit (240 секунд)
-            # Помечаем все задачи в статусе 'processing' обратно в 'pending' для повторной обработки
-            logger.warning("SoftTimeLimitExceeded in process_account_autopublish - resetting stuck tasks")
-            try:
+                logger.info(f"process_account_autopublish: processed {processed_count} tasks")
+                return processed_count
+                
+            except SoftTimeLimitExceeded as e:
+                # Время выполнения задачи превысило soft time limit (240 секунд)
+                # Помечаем все задачи в статусе 'processing' обратно в 'pending' для повторной обработки
+                logger.warning(f"⚠️ SoftTimeLimitExceeded in process_account_autopublish (processed {processed_count} tasks so far) - resetting stuck tasks")
+                try:
+                    stuck_threshold = datetime.utcnow() - timedelta(minutes=5)
+                    stuck_queues = app_db.session.query(AccountPublicationQueue).filter(
+                        AccountPublicationQueue.status == 'processing',
+                        AccountPublicationQueue.started_at < stuck_threshold
+                    ).all()
+                    
+                    logger.warning(f"Found {len(stuck_queues)} stuck queues (processing for more than 5 minutes)")
+                    
+                    for stuck_queue in stuck_queues:
+                        logger.warning(f"Resetting stuck queue {stuck_queue.queue_id} (started at {stuck_queue.started_at}, attempts: {stuck_queue.attempts})")
+                        stuck_queue.status = 'pending'
+                        stuck_queue.attempts += 1
+                        if stuck_queue.attempts >= 3:
+                            stuck_queue.status = 'failed'
+                            stuck_queue.error_message = 'Task timeout - exceeded soft time limit'
+                        app_db.session.commit()
+                    
+                    logger.info(f"Reset {len(stuck_queues)} stuck account publication tasks")
+                except Exception as reset_error:
+                    logger.error(f"Error resetting stuck tasks: {reset_error}", exc_info=True)
+                    app_db.session.rollback()
+                
+                return processed_count
+                
+            except Exception as e:
+                logger.error(f"❌ Error in process_account_autopublish: {e}", exc_info=True)
+                app_db.session.rollback()
+                return processed_count
+                
+    except SoftTimeLimitExceeded as e:
+        # Обработка SoftTimeLimitExceeded на верхнем уровне (если произошло до входа в app_context)
+        logger.error(f"⚠️ SoftTimeLimitExceeded in process_account_autopublish BEFORE app_context: {e}")
+        # Пытаемся войти в контекст для сброса stuck задач
+        try:
+            with app.app_context():
                 stuck_threshold = datetime.utcnow() - timedelta(minutes=5)
                 stuck_queues = app_db.session.query(AccountPublicationQueue).filter(
                     AccountPublicationQueue.status == 'processing',
@@ -1405,12 +1454,12 @@ def process_account_autopublish():
                     app_db.session.commit()
                 
                 logger.info(f"Reset {len(stuck_queues)} stuck account publication tasks")
-            except Exception as reset_error:
-                logger.error(f"Error resetting stuck tasks: {reset_error}", exc_info=True)
-            
-            return processed_count
-            
-        except Exception as e:
-            logger.error(f"Error in process_account_autopublish: {e}", exc_info=True)
-            return 0
+        except Exception as reset_error:
+            logger.error(f"Error resetting stuck tasks in outer handler: {reset_error}", exc_info=True)
+        
+        return processed_count
+        
+    except Exception as e:
+        logger.error(f"❌ Critical error in process_account_autopublish (outside app_context): {e}", exc_info=True)
+        return processed_count
 
