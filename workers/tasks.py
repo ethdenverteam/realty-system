@@ -64,6 +64,25 @@ def publish_to_telegram(queue_id: int):
         # Проверка времени для автопубликации: публикация разрешена только с 8:00 до 22:00 МСК
         # Исключение: если админ включил обход ограничения времени
         if queue.mode == 'autopublish':
+            # ВАЖНО: Проверяем, что автопубликация все еще включена для объекта
+            from app.models.autopublish_config import AutopublishConfig as AppAutopublishConfig
+            autopublish_cfg = AppAutopublishConfig.query.filter_by(object_id=queue.object_id).first()
+            
+            if not autopublish_cfg or not autopublish_cfg.enabled:
+                logger.warning(f"Autopublish disabled for object {queue.object_id}, cancelling queue {queue_id}")
+                queue.status = 'failed'
+                queue.error_message = 'Autopublish disabled for this object'
+                db.session.commit()
+                return False
+            
+            # Для бота проверяем bot_enabled
+            if queue.type == 'bot' and not autopublish_cfg.bot_enabled:
+                logger.warning(f"Bot autopublish disabled for object {queue.object_id}, cancelling queue {queue_id}")
+                queue.status = 'failed'
+                queue.error_message = 'Bot autopublish disabled for this object'
+                db.session.commit()
+                return False
+            
             # Проверяем настройку обхода ограничения времени для админа (через app контекст)
             admin_bypass_enabled = False
             is_admin = False
@@ -286,8 +305,8 @@ def publish_to_telegram(queue_id: int):
 def process_autopublish():
     """Process autopublish queue - обрабатывает задачи в порядке scheduled_time"""
     from app import app
-    with app.app_context():
-        try:
+    try:
+        with app.app_context():
             now = datetime.utcnow()
             
             # Get pending autopublish tasks that are ready to publish
@@ -312,9 +331,9 @@ def process_autopublish():
                 publish_to_telegram.delay(queue.queue_id)
             
             return len(queues)
-        except Exception as e:
-            logger.error(f"Error processing autopublish queue: {e}", exc_info=True)
-            return 0
+    except Exception as e:
+        logger.error(f"Error processing autopublish queue: {e}", exc_info=True)
+        return 0
 
 
 def _get_matching_bot_chats_for_object(db_session, obj: Object):
@@ -580,20 +599,25 @@ def schedule_daily_autopublish():
 def process_scheduled_publications():
     """Process scheduled publications"""
     from app import app
-    with app.app_context():
-        now = datetime.utcnow()
-        
-        # Get scheduled tasks ready to publish
-        queues = db.session.query(PublicationQueue).filter(
-            PublicationQueue.mode == 'scheduled',
-            PublicationQueue.status == 'pending',
-            PublicationQueue.scheduled_time <= now
-        ).all()
-        
-        for queue in queues:
-            publish_to_telegram.delay(queue.queue_id)
-        
-        return len(queues)
+    try:
+        with app.app_context():
+            now = datetime.utcnow()
+            
+            # Get scheduled tasks ready to publish
+            # Используем явный список полей для избежания NotImplementedError
+            queues = db.session.query(PublicationQueue).filter(
+                PublicationQueue.mode == 'scheduled',
+                PublicationQueue.status == 'pending',
+                PublicationQueue.scheduled_time <= now
+            ).all()
+            
+            for queue in queues:
+                publish_to_telegram.delay(queue.queue_id)
+            
+            return len(queues)
+    except Exception as e:
+        logger.error(f"Error processing scheduled publications: {e}", exc_info=True)
+        return 0
 
 
 @celery_app.task(name='workers.tasks.process_chat_subscriptions')
@@ -1018,6 +1042,39 @@ def process_account_autopublish():
                             queue.error_message = 'Object or chat not found'
                             app_db.session.commit()
                             continue
+                        
+                        # ВАЖНО: Проверяем, что автопубликация все еще включена для объекта
+                        from app.models.autopublish_config import AutopublishConfig
+                        autopublish_cfg = app_db.session.query(AutopublishConfig).filter_by(
+                            object_id=queue.object_id
+                        ).first()
+                        
+                        if not autopublish_cfg or not autopublish_cfg.enabled:
+                            logger.warning(f"Autopublish disabled for object {queue.object_id}, cancelling account queue {queue.queue_id}")
+                            queue.status = 'failed'
+                            queue.error_message = 'Autopublish disabled for this object'
+                            app_db.session.commit()
+                            continue
+                        
+                        # Проверяем, что для этого аккаунта и чата автопубликация включена
+                        if autopublish_cfg.accounts_config_json:
+                            accounts_cfg = autopublish_cfg.accounts_config_json
+                            if isinstance(accounts_cfg, dict):
+                                accounts = accounts_cfg.get('accounts', [])
+                                account_found = False
+                                for acc_cfg in accounts:
+                                    if acc_cfg.get('account_id') == queue.account_id:
+                                        chat_ids = acc_cfg.get('chat_ids', [])
+                                        if queue.chat_id in chat_ids:
+                                            account_found = True
+                                            break
+                                
+                                if not account_found:
+                                    logger.warning(f"Account {queue.account_id} or chat {queue.chat_id} not in autopublish config for object {queue.object_id}, cancelling queue {queue.queue_id}")
+                                    queue.status = 'failed'
+                                    queue.error_message = 'Account or chat not in autopublish config'
+                                    app_db.session.commit()
+                                    continue
                         
                         # Проверка дубликатов через унифицированную утилиту
                         from app.utils.duplicate_checker import check_duplicate_publication

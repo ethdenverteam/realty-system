@@ -1528,3 +1528,71 @@ def clear_autopublish_and_queues(current_user):
         db.session.rollback()
         log_error(e, 'clear_autopublish_failed', current_user.user_id, {})
         return jsonify({'error': str(e)}), 500
+
+
+@user_routes_bp.route('/dashboard/settings/check-account-queues', methods=['GET'])
+@jwt_required
+def check_account_autopublish_queues(current_user):
+    """Проверить очереди автопубликации для аккаунтов пользователя"""
+    try:
+        from app.models.account_publication_queue import AccountPublicationQueue
+        from app.models.autopublish_config import AutopublishConfig
+        
+        # Получаем все очереди пользователя
+        queues = AccountPublicationQueue.query.filter_by(
+            user_id=current_user.user_id
+        ).order_by(AccountPublicationQueue.created_at.desc()).limit(100).all()
+        
+        # Группируем по статусам
+        queues_by_status = {}
+        for queue in queues:
+            status = queue.status
+            if status not in queues_by_status:
+                queues_by_status[status] = []
+            queues_by_status[status].append({
+                'queue_id': queue.queue_id,
+                'object_id': queue.object_id,
+                'chat_id': queue.chat_id,
+                'account_id': queue.account_id,
+                'status': queue.status,
+                'scheduled_time': queue.scheduled_time.isoformat() if queue.scheduled_time else None,
+                'created_at': queue.created_at.isoformat() if queue.created_at else None,
+                'attempts': queue.attempts,
+                'error_message': queue.error_message
+            })
+        
+        # Проверяем конфигурации автопубликации
+        configs = AutopublishConfig.query.filter_by(user_id=current_user.user_id).all()
+        configs_info = []
+        for cfg in configs:
+            accounts_enabled = False
+            if cfg.accounts_config_json and isinstance(cfg.accounts_config_json, dict):
+                accounts = cfg.accounts_config_json.get('accounts', [])
+                accounts_enabled = len(accounts) > 0
+            
+            configs_info.append({
+                'object_id': cfg.object_id,
+                'enabled': cfg.enabled,
+                'bot_enabled': cfg.bot_enabled,
+                'accounts_enabled': accounts_enabled,
+                'accounts_count': len(cfg.accounts_config_json.get('accounts', [])) if cfg.accounts_config_json else 0
+            })
+        
+        return jsonify({
+            'success': True,
+            'queues': {
+                'total': len(queues),
+                'by_status': queues_by_status
+            },
+            'configs': configs_info,
+            'summary': {
+                'pending': len([q for q in queues if q.status == 'pending']),
+                'processing': len([q for q in queues if q.status == 'processing']),
+                'completed': len([q for q in queues if q.status == 'completed']),
+                'failed': len([q for q in queues if q.status == 'failed']),
+                'flood_wait': len([q for q in queues if q.status == 'flood_wait'])
+            }
+        }), 200
+    except Exception as e:
+        log_error(e, 'check_account_queues_failed', current_user.user_id, {})
+        return jsonify({'error': str(e)}), 500
