@@ -7,7 +7,7 @@ from workers.celery_app import celery_app
 from app.database import db
 from bot.models import PublicationQueue, Object, Chat, PublicationHistory, AutopublishConfig, TelegramAccount
 from datetime import datetime, timedelta
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 import logging
 import asyncio
 import random
@@ -965,12 +965,19 @@ def process_account_autopublish():
             
             for account in accounts:
                 # Проверяем лимит аккаунта (по успешным публикациям за сегодня)
-                today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-                today_publications = app_db.session.query(AppPublicationHistory).filter(
-                    AppPublicationHistory.account_id == account.account_id,
-                    AppPublicationHistory.published_at >= today_start,
-                    AppPublicationHistory.deleted == False
-                ).count()
+                try:
+                    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                    # Используем scalar() для получения одного значения вместо count()
+                    today_publications = app_db.session.query(
+                        func.count(AppPublicationHistory.history_id)
+                    ).filter(
+                        AppPublicationHistory.account_id == account.account_id,
+                        AppPublicationHistory.published_at >= today_start,
+                        AppPublicationHistory.deleted == False
+                    ).scalar() or 0
+                except Exception as e:
+                    logger.error(f"Error checking daily limit for account {account.account_id}: {e}", exc_info=True)
+                    continue
                 
                 if today_publications >= account.daily_limit:
                     # Лимит достигнут - пропускаем этот аккаунт
