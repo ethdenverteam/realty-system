@@ -1002,6 +1002,7 @@ def process_account_autopublish():
                 
                 for queue in queues:
                     try:
+                        logger.info(f"Starting publication for queue {queue.queue_id}: object {queue.object_id} to chat {queue.chat_id} via account {account.account_id}")
                         # Обновляем статус
                         queue.status = 'processing'
                         queue.started_at = datetime.utcnow()
@@ -1260,14 +1261,18 @@ def process_account_autopublish():
                         
                         app_db.session.commit()
                         processed_count += 1
-                        logger.info(f"Successfully published object {obj.object_id} via account {account.account_id} to chat {chat.telegram_chat_id}")
+                        logger.info(f"✅ Successfully published object {obj.object_id} via account {account.account_id} ({account.phone}) to chat {chat.telegram_chat_id} (message_id: {message_id})")
                         
                     except Exception as e:
-                        logger.error(f"Error processing queue {queue.queue_id} for account {account.account_id}: {e}", exc_info=True)
-                        queue.status = 'failed'
-                        queue.error_message = str(e)
-                        queue.attempts += 1
-                        app_db.session.commit()
+                        logger.error(f"❌ Error processing queue {queue.queue_id} for account {account.account_id} ({account.phone}): {e}", exc_info=True)
+                        try:
+                            queue.status = 'failed'
+                            queue.error_message = str(e)
+                            queue.attempts += 1
+                            app_db.session.commit()
+                        except Exception as commit_error:
+                            logger.error(f"Failed to commit error status for queue {queue.queue_id}: {commit_error}", exc_info=True)
+                            app_db.session.rollback()
                         # Записываем ошибку
                         from app.utils.logger import log_error
                         log_error(
