@@ -265,7 +265,6 @@ def get_autopublish_chats_for_object(object_id, current_user):
                         'telegram_chat_id': web_chat.telegram_chat_id,
                         'type': 'bot'
                     })
-        finally:
     
     # Get user account chats from config
     if cfg and cfg.accounts_config_json:
@@ -428,40 +427,40 @@ def create_or_update_autopublish_config(current_user):
                 db.session.commit()
             
             bot_chats = _get_matching_bot_chats_for_object(db.session, bot_obj)
-                for bot_chat in bot_chats:
-                    # Находим соответствующий чат в веб-базе
-                    web_chat = WebChat.query.filter_by(
-                        telegram_chat_id=bot_chat.telegram_chat_id,
-                        owner_type='bot'
+            for bot_chat in bot_chats:
+                # Находим соответствующий чат в веб-базе
+                web_chat = WebChat.query.filter_by(
+                    telegram_chat_id=bot_chat.telegram_chat_id,
+                    owner_type='bot'
+                ).first()
+                if web_chat:
+                    # Проверяем, нет ли уже такой очереди
+                    existing = PublicationQueue.query.filter_by(
+                        object_id=object_id,
+                        chat_id=web_chat.chat_id,
+                        type='bot',
+                        mode='autopublish',
+                        status='pending'
                     ).first()
-                    if web_chat:
-                        # Проверяем, нет ли уже такой очереди
-                        existing = PublicationQueue.query.filter_by(
+                    if not existing:
+                        # Получаем время для публикации (8:00-22:00 МСК)
+                        from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc, get_moscow_time
+                        now_msk = get_moscow_time()
+                        scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                        scheduled_time_utc = msk_to_utc(scheduled_time_msk)
+                        
+                        queue = PublicationQueue(
                             object_id=object_id,
                             chat_id=web_chat.chat_id,
+                            account_id=None,
+                            user_id=current_user.user_id,
                             type='bot',
                             mode='autopublish',
-                            status='pending'
-                        ).first()
-                        if not existing:
-                            # Получаем время для публикации (8:00-22:00 МСК)
-                            from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc, get_moscow_time
-                            now_msk = get_moscow_time()
-                            scheduled_time_msk = get_next_allowed_time_msk(now_msk)
-                            scheduled_time_utc = msk_to_utc(scheduled_time_msk)
-                            
-                            queue = PublicationQueue(
-                                object_id=object_id,
-                                chat_id=web_chat.chat_id,
-                                account_id=None,
-                                user_id=current_user.user_id,
-                                type='bot',
-                                mode='autopublish',
-                                status='pending',
-                                scheduled_time=scheduled_time_utc,
-                                created_at=datetime.utcnow(),
-                            )
-                            db.session.add(queue)
+                            status='pending',
+                            scheduled_time=scheduled_time_utc,
+                            created_at=datetime.utcnow(),
+                        )
+                        db.session.add(queue)
             
             # Создаем очередь для аккаунтов пользователей
             accounts_cfg = cfg.accounts_config_json or {}
@@ -616,40 +615,40 @@ def update_autopublish_config(object_id, current_user):
                 db.session.commit()
             
             bot_chats = _get_matching_bot_chats_for_object(db.session, bot_obj)
-                for bot_chat in bot_chats:
-                    # Находим соответствующий чат в веб-базе
-                    web_chat = WebChat.query.filter_by(
-                        telegram_chat_id=bot_chat.telegram_chat_id,
-                        owner_type='bot'
+            for bot_chat in bot_chats:
+                # Находим соответствующий чат в веб-базе
+                web_chat = WebChat.query.filter_by(
+                    telegram_chat_id=bot_chat.telegram_chat_id,
+                    owner_type='bot'
+                ).first()
+                if web_chat:
+                    # Проверяем, нет ли уже такой очереди
+                    existing = PublicationQueue.query.filter_by(
+                        object_id=object_id,
+                        chat_id=web_chat.chat_id,
+                        type='bot',
+                        mode='autopublish',
+                        status='pending'
                     ).first()
-                    if web_chat:
-                        # Проверяем, нет ли уже такой очереди
-                        existing = PublicationQueue.query.filter_by(
+                    if not existing:
+                        # Получаем время для публикации (8:00-22:00 МСК)
+                        from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc, get_moscow_time
+                        now_msk = get_moscow_time()
+                        scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                        scheduled_time_utc = msk_to_utc(scheduled_time_msk)
+                        
+                        queue = PublicationQueue(
                             object_id=object_id,
                             chat_id=web_chat.chat_id,
+                            account_id=None,
+                            user_id=current_user.user_id,
                             type='bot',
                             mode='autopublish',
-                            status='pending'
-                        ).first()
-                        if not existing:
-                            # Получаем время для публикации (8:00-22:00 МСК)
-                            from app.utils.time_utils import get_next_allowed_time_msk, msk_to_utc, get_moscow_time
-                            now_msk = get_moscow_time()
-                            scheduled_time_msk = get_next_allowed_time_msk(now_msk)
-                            scheduled_time_utc = msk_to_utc(scheduled_time_msk)
-                            
-                            queue = PublicationQueue(
-                                object_id=object_id,
-                                chat_id=web_chat.chat_id,
-                                account_id=None,
-                                user_id=current_user.user_id,
-                                type='bot',
-                                mode='autopublish',
-                                status='pending',
-                                scheduled_time=scheduled_time_utc,
-                                created_at=datetime.utcnow(),
-                            )
-                            db.session.add(queue)
+                            status='pending',
+                            scheduled_time=scheduled_time_utc,
+                            created_at=datetime.utcnow(),
+                        )
+                        db.session.add(queue)
             
             # Создаем очередь для аккаунтов пользователей
             accounts_cfg = cfg.accounts_config_json or {}
@@ -906,7 +905,7 @@ def user_publish_object_via_bot(current_user):
         
         # Get bot object
         bot_obj = db.session.query(BotObject).filter_by(object_id=object_id).first()
-            if not bot_obj:
+        if not bot_obj:
                 # Create bot object from web object
                 bot_obj = BotObject(
                     object_id=obj.object_id,
@@ -953,88 +952,87 @@ def user_publish_object_via_bot(current_user):
         target_chats = []
         from bot.models import Chat as BotChat
         chats = db.session.query(BotChat).filter_by(owner_type='bot', is_active=True).all()
+        
+        rooms_type = obj.rooms_type or ""
+        districts = obj.districts_json or []
+        price = obj.price or 0
+        
+        districts_config = get_districts_config()
+        
+        # Add parent districts
+        all_districts = set(districts)
+        for district in districts:
+            if isinstance(district, str) and district in districts_config:
+                parent_districts = districts_config[district]
+                if isinstance(parent_districts, list):
+                    all_districts.update(parent_districts)
+        
+        for chat in chats:
+            matches = False
+            filters = chat.filters_json or {}
             
-            rooms_type = obj.rooms_type or ""
-            districts = obj.districts_json or []
-            price = obj.price or 0
+            # Проверка типа привязки "общий" - такой чат получает все посты
+            binding_type = filters.get('binding_type')
+            if binding_type == 'common':
+                # Map bot chat_id to web chat_id
+                web_chat = Chat.query.filter_by(telegram_chat_id=chat.telegram_chat_id, owner_type='bot').first()
+                if web_chat and web_chat.chat_id not in target_chats:
+                    target_chats.append(web_chat.chat_id)
+                continue  # Пропускаем проверку фильтров для "общего" чата
             
-            districts_config = get_districts_config()
+            # Check if filters_json is used
+            has_filters_json = bool(filters.get('rooms_types') or filters.get('districts') or 
+                                   filters.get('price_min') is not None or filters.get('price_max') is not None)
             
-            # Add parent districts
-            all_districts = set(districts)
-            for district in districts:
-                if isinstance(district, str) and district in districts_config:
-                    parent_districts = districts_config[district]
-                    if isinstance(parent_districts, list):
-                        all_districts.update(parent_districts)
-            
-            for chat in chats:
-                matches = False
-                filters = chat.filters_json or {}
+            if has_filters_json:
+                rooms_match = True
+                districts_match = True
+                price_match = True
                 
-                # Проверка типа привязки "общий" - такой чат получает все посты
-                binding_type = filters.get('binding_type')
-                if binding_type == 'common':
-                    # Map bot chat_id to web chat_id
-                    web_chat = Chat.query.filter_by(telegram_chat_id=chat.telegram_chat_id, owner_type='bot').first()
-                    if web_chat and web_chat.chat_id not in target_chats:
-                        target_chats.append(web_chat.chat_id)
-                    continue  # Пропускаем проверку фильтров для "общего" чата
+                if filters.get('rooms_types'):
+                    rooms_match = rooms_type in filters['rooms_types']
                 
-                # Check if filters_json is used
-                has_filters_json = bool(filters.get('rooms_types') or filters.get('districts') or 
-                                       filters.get('price_min') is not None or filters.get('price_max') is not None)
+                if filters.get('districts'):
+                    chat_districts = set(filters['districts'])
+                    districts_match = bool(chat_districts.intersection(all_districts))
                 
-                if has_filters_json:
-                    rooms_match = True
-                    districts_match = True
-                    price_match = True
-                    
-                    if filters.get('rooms_types'):
-                        rooms_match = rooms_type in filters['rooms_types']
-                    
-                    if filters.get('districts'):
-                        chat_districts = set(filters['districts'])
-                        districts_match = bool(chat_districts.intersection(all_districts))
-                    
-                    price_min = filters.get('price_min')
-                    price_max = filters.get('price_max')
-                    if price_min is not None or price_max is not None:
-                        price_min = price_min or 0
-                        price_max = price_max if price_max is not None else float('inf')
-                        price_match = price_min <= price < price_max
-                    
-                    if rooms_match and districts_match and price_match:
+                price_min = filters.get('price_min')
+                price_max = filters.get('price_max')
+                if price_min is not None or price_max is not None:
+                    price_min = price_min or 0
+                    price_max = price_max if price_max is not None else float('inf')
+                    price_match = price_min <= price < price_max
+                
+                if rooms_match and districts_match and price_match:
+                    matches = True
+            else:
+                # Legacy category support
+                category = chat.category or ""
+                
+                if category.startswith("rooms_") and category.replace("rooms_", "") == rooms_type:
+                    matches = True
+                
+                if category.startswith("district_"):
+                    district_name = category.replace("district_", "")
+                    if district_name in all_districts:
                         matches = True
-                else:
-                    # Legacy category support
-                    category = chat.category or ""
-                    
-                    if category.startswith("rooms_") and category.replace("rooms_", "") == rooms_type:
-                        matches = True
-                    
-                    if category.startswith("district_"):
-                        district_name = category.replace("district_", "")
-                        if district_name in all_districts:
-                            matches = True
-                    
-                    if category.startswith("price_"):
-                        try:
-                            parts = category.replace("price_", "").split("_")
-                            if len(parts) == 2:
-                                min_price = float(parts[0])
-                                max_price = float(parts[1])
-                                if min_price <= price < max_price:
-                                    matches = True
-                        except:
-                            pass
                 
-                if matches:
-                    # Map bot chat_id to web chat_id
-                    web_chat = Chat.query.filter_by(telegram_chat_id=chat.telegram_chat_id, owner_type='bot').first()
-                    if web_chat and web_chat.chat_id not in target_chats:
-                        target_chats.append(web_chat.chat_id)
-        finally:
+                if category.startswith("price_"):
+                    try:
+                        parts = category.replace("price_", "").split("_")
+                        if len(parts) == 2:
+                            min_price = float(parts[0])
+                            max_price = float(parts[1])
+                            if min_price <= price < max_price:
+                                matches = True
+                    except:
+                        pass
+            
+            if matches:
+                # Map bot chat_id to web chat_id
+                web_chat = Chat.query.filter_by(telegram_chat_id=chat.telegram_chat_id, owner_type='bot').first()
+                if web_chat and web_chat.chat_id not in target_chats:
+                    target_chats.append(web_chat.chat_id)
         
         if not target_chats:
             return jsonify({
@@ -1197,7 +1195,7 @@ def user_preview_object_in_bot(object_id, current_user):
         
         # Get or create bot object
         bot_obj = db.session.query(BotObject).filter_by(object_id=object_id).first()
-            if not bot_obj:
+        if not bot_obj:
                 # Create bot object from web object
                 bot_obj = BotObject(
                     object_id=obj.object_id,

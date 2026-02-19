@@ -60,62 +60,62 @@ def publish_to_telegram(queue_id: int):
         return False
     
     # Проверка времени для автопубликации: публикация разрешена только с 8:00 до 22:00 МСК
-        # Исключение: если админ включил обход ограничения времени
-        if queue.mode == 'autopublish':
-            # Проверяем настройку обхода ограничения времени для админа (через app контекст)
-            from app import app
-            admin_bypass_enabled = False
-            is_admin = False
+    # Исключение: если админ включил обход ограничения времени
+    if queue.mode == 'autopublish':
+        # Проверяем настройку обхода ограничения времени для админа (через app контекст)
+        from app import app
+        admin_bypass_enabled = False
+        is_admin = False
+        
+        with app.app_context():
+            from app.models.system_setting import SystemSetting
+            time_limit_setting = SystemSetting.query.filter_by(key='admin_bypass_time_limit').first()
+            if time_limit_setting and isinstance(time_limit_setting.value_json, dict):
+                admin_bypass_enabled = time_limit_setting.value_json.get('enabled', False)
             
-            with app.app_context():
-                from app.models.system_setting import SystemSetting
-                time_limit_setting = SystemSetting.query.filter_by(key='admin_bypass_time_limit').first()
-                if time_limit_setting and isinstance(time_limit_setting.value_json, dict):
-                    admin_bypass_enabled = time_limit_setting.value_json.get('enabled', False)
-                
-                # Проверяем, является ли пользователь админом
-                if queue.user_id:
-                    from app.models.user import User
-                    user = User.query.get(queue.user_id)
-                    if user and user.web_role == 'admin':
-                        is_admin = True
-            
-            # Если админ и включен обход - пропускаем проверку времени
-            if not (is_admin and admin_bypass_enabled):
-                now_msk = get_moscow_time()
-                if not is_within_publish_hours(now_msk):
-                    logger.info(f"Outside publish hours (8:00-22:00 МСК), rescheduling queue {queue_id}")
-                    # Переносим на ближайшее разрешенное время
-                    next_time_msk = get_next_allowed_time_msk(now_msk)
-                    next_time_utc = msk_to_utc(next_time_msk)
-                    queue.scheduled_time = next_time_utc
-                    queue.status = 'pending'
-                    db.session.commit()
-                    return False
+            # Проверяем, является ли пользователь админом
+            if queue.user_id:
+                from app.models.user import User
+                user = User.query.get(queue.user_id)
+                if user and user.web_role == 'admin':
+                    is_admin = True
         
-        # Проверка дубликатов через унифицированную утилиту
-        from app.utils.duplicate_checker import check_duplicate_publication
-        
-        # Определяем тип публикации
-        publication_type = 'autopublish_bot' if queue.mode == 'autopublish' else 'manual_bot'
-        
-        can_publish, reason = check_duplicate_publication(
-            object_id=queue.object_id,
-            chat_id=queue.chat_id,
-            account_id=None,  # Бот
-            publication_type=publication_type,
-            user_id=queue.user_id,
-            allow_duplicates_setting=None  # Получит из SystemSetting автоматически
-        )
-        
-        if not can_publish:
-            logger.info(f"Object {queue.object_id} cannot be published to chat {queue.chat_id} via bot: {reason}")
-            queue.status = 'failed'
-            queue.error_message = reason
-            db.session.commit()
-            return False
-        
-        # Реализация публикации через Telegram API
+        # Если админ и включен обход - пропускаем проверку времени
+        if not (is_admin and admin_bypass_enabled):
+            now_msk = get_moscow_time()
+            if not is_within_publish_hours(now_msk):
+                logger.info(f"Outside publish hours (8:00-22:00 МСК), rescheduling queue {queue_id}")
+                # Переносим на ближайшее разрешенное время
+                next_time_msk = get_next_allowed_time_msk(now_msk)
+                next_time_utc = msk_to_utc(next_time_msk)
+                queue.scheduled_time = next_time_utc
+                queue.status = 'pending'
+                db.session.commit()
+                return False
+    
+    # Проверка дубликатов через унифицированную утилиту
+    from app.utils.duplicate_checker import check_duplicate_publication
+    
+    # Определяем тип публикации
+    publication_type = 'autopublish_bot' if queue.mode == 'autopublish' else 'manual_bot'
+    
+    can_publish, reason = check_duplicate_publication(
+        object_id=queue.object_id,
+        chat_id=queue.chat_id,
+        account_id=None,  # Бот
+        publication_type=publication_type,
+        user_id=queue.user_id,
+        allow_duplicates_setting=None  # Получит из SystemSetting автоматически
+    )
+    
+    if not can_publish:
+        logger.info(f"Object {queue.object_id} cannot be published to chat {queue.chat_id} via bot: {reason}")
+        queue.status = 'failed'
+        queue.error_message = reason
+        db.session.commit()
+        return False
+    
+    # Реализация публикации через Telegram API
         import requests
         import os
         from bot.config import BOT_TOKEN
@@ -279,12 +279,12 @@ def publish_to_telegram(queue_id: int):
                 queue.attempts += 1
                 db.session.commit()
             return False
-        finally:
 
 
 @celery_app.task(name='workers.tasks.process_autopublish')
 def process_autopublish():
     """Process autopublish queue - обрабатывает задачи в порядке scheduled_time"""
+    try:
         now = datetime.utcnow()
         
         # Get pending autopublish tasks that are ready to publish
@@ -312,7 +312,6 @@ def process_autopublish():
     except Exception as e:
         logger.error(f"Error processing autopublish queue: {e}", exc_info=True)
         return 0
-    finally:
 
 
 def _get_matching_bot_chats_for_object(db_session, obj: Object):
@@ -577,20 +576,19 @@ def schedule_daily_autopublish():
 @celery_app.task(name='workers.tasks.process_scheduled_publications')
 def process_scheduled_publications():
     """Process scheduled publications"""
-        now = datetime.utcnow()
-        
-        # Get scheduled tasks ready to publish
-        queues = db.query(PublicationQueue).filter(
-            PublicationQueue.mode == 'scheduled',
-            PublicationQueue.status == 'pending',
-            PublicationQueue.scheduled_time <= now
-        ).all()
-        
-        for queue in queues:
-            publish_to_telegram.delay(queue.queue_id)
-        
-        return len(queues)
-    finally:
+    now = datetime.utcnow()
+    
+    # Get scheduled tasks ready to publish
+    queues = db.query(PublicationQueue).filter(
+        PublicationQueue.mode == 'scheduled',
+        PublicationQueue.status == 'pending',
+        PublicationQueue.scheduled_time <= now
+    ).all()
+    
+    for queue in queues:
+        publish_to_telegram.delay(queue.queue_id)
+    
+    return len(queues)
 
 
 @celery_app.task(name='workers.tasks.process_chat_subscriptions')
