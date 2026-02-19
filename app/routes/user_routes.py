@@ -176,7 +176,6 @@ def get_autopublish_chats_for_object(object_id, current_user):
     from app.models.telegram_account import TelegramAccount
     from bot.utils import get_districts_config
     from bot.models import Chat as BotChat
-    from app.database import db
     
     obj = Object.query.filter_by(object_id=object_id, user_id=current_user.user_id).first()
     if not obj:
@@ -580,7 +579,6 @@ def update_autopublish_config(object_id, current_user):
         if obj and cfg.enabled:
             from workers.tasks import _get_matching_bot_chats_for_object
             from app.models.chat import Chat as WebChat
-            from app.database import db
             from bot.models import Object as BotObject, Chat as BotChat
             
             # Создаем очередь для бота (всегда включен)
@@ -868,7 +866,6 @@ def user_publish_object_via_bot(current_user):
         format_publication_text, get_districts_config, get_price_ranges
     )
     from bot.models import User as BotUser, Object as BotObject
-    from app.database import db
     from datetime import timedelta
     
     data = request.get_json()
@@ -1169,7 +1166,6 @@ def user_preview_object_in_bot(object_id, current_user):
     from bot.config import BOT_TOKEN
     from bot.utils import format_publication_text
     from bot.models import User as BotUser, Object as BotObject
-    from app.database import db
     
     # Get object
     obj = Object.query.filter_by(object_id=object_id, user_id=current_user.user_id).first()

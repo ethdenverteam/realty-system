@@ -284,34 +284,36 @@ def publish_to_telegram(queue_id: int):
 @celery_app.task(name='workers.tasks.process_autopublish')
 def process_autopublish():
     """Process autopublish queue - обрабатывает задачи в порядке scheduled_time"""
-    try:
-        now = datetime.utcnow()
-        
-        # Get pending autopublish tasks that are ready to publish
-        # Сортируем по scheduled_time (старейшие первыми), если scheduled_time не установлено - по created_at
-        queues = db.session.query(PublicationQueue).filter(
-            PublicationQueue.mode == 'autopublish',
-            PublicationQueue.status == 'pending',
-            or_(
-                PublicationQueue.scheduled_time <= now,
-                PublicationQueue.scheduled_time.is_(None)
-            )
-        ).order_by(
-            PublicationQueue.scheduled_time.asc().nullslast(),
-            PublicationQueue.created_at.asc()
-        ).limit(10).all()  # Обрабатываем по 10 задач за раз
-        
-        logger.info(f"Processing {len(queues)} autopublish tasks")
-        
-        for queue in queues:
-            scheduled_str = queue.scheduled_time.strftime('%Y-%m-%d %H:%M:%S') if queue.scheduled_time else 'not scheduled'
-            logger.info(f"Publishing queue {queue.queue_id} for object {queue.object_id} to chat {queue.chat_id} (scheduled: {scheduled_str}, created: {queue.created_at})")
-            publish_to_telegram.delay(queue.queue_id)
-        
-        return len(queues)
-    except Exception as e:
-        logger.error(f"Error processing autopublish queue: {e}", exc_info=True)
-        return 0
+    from app import app
+    with app.app_context():
+        try:
+            now = datetime.utcnow()
+            
+            # Get pending autopublish tasks that are ready to publish
+            # Сортируем по scheduled_time (старейшие первыми), если scheduled_time не установлено - по created_at
+            queues = db.session.query(PublicationQueue).filter(
+                PublicationQueue.mode == 'autopublish',
+                PublicationQueue.status == 'pending',
+                or_(
+                    PublicationQueue.scheduled_time <= now,
+                    PublicationQueue.scheduled_time.is_(None)
+                )
+            ).order_by(
+                PublicationQueue.scheduled_time.asc().nullslast(),
+                PublicationQueue.created_at.asc()
+            ).limit(10).all()  # Обрабатываем по 10 задач за раз
+            
+            logger.info(f"Processing {len(queues)} autopublish tasks")
+            
+            for queue in queues:
+                scheduled_str = queue.scheduled_time.strftime('%Y-%m-%d %H:%M:%S') if queue.scheduled_time else 'not scheduled'
+                logger.info(f"Publishing queue {queue.queue_id} for object {queue.object_id} to chat {queue.chat_id} (scheduled: {scheduled_str}, created: {queue.created_at})")
+                publish_to_telegram.delay(queue.queue_id)
+            
+            return len(queues)
+        except Exception as e:
+            logger.error(f"Error processing autopublish queue: {e}", exc_info=True)
+            return 0
 
 
 def _get_matching_bot_chats_for_object(db_session, obj: Object):
@@ -576,19 +578,21 @@ def schedule_daily_autopublish():
 @celery_app.task(name='workers.tasks.process_scheduled_publications')
 def process_scheduled_publications():
     """Process scheduled publications"""
-    now = datetime.utcnow()
-    
-    # Get scheduled tasks ready to publish
-    queues = db.session.query(PublicationQueue).filter(
-        PublicationQueue.mode == 'scheduled',
-        PublicationQueue.status == 'pending',
-        PublicationQueue.scheduled_time <= now
-    ).all()
-    
-    for queue in queues:
-        publish_to_telegram.delay(queue.queue_id)
-    
-    return len(queues)
+    from app import app
+    with app.app_context():
+        now = datetime.utcnow()
+        
+        # Get scheduled tasks ready to publish
+        queues = db.session.query(PublicationQueue).filter(
+            PublicationQueue.mode == 'scheduled',
+            PublicationQueue.status == 'pending',
+            PublicationQueue.scheduled_time <= now
+        ).all()
+        
+        for queue in queues:
+            publish_to_telegram.delay(queue.queue_id)
+        
+        return len(queues)
 
 
 @celery_app.task(name='workers.tasks.process_chat_subscriptions')

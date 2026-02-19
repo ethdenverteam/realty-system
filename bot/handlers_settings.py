@@ -196,8 +196,8 @@ async def settings_toggle_username(update: Update, context: ContextTypes.DEFAULT
     
     from bot.models import User
     user_obj = db.session.query(User).filter_by(telegram_id=int(update.effective_user.id)).first()
-        
-        if user_obj:
+    
+    if user_obj:
             if not user_obj.settings_json:
                 user_obj.settings_json = {}
             # Создаем новый словарь для отслеживания изменений SQLAlchemy
