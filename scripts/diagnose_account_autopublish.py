@@ -13,7 +13,8 @@ from datetime import datetime, timedelta
 # Добавляем корневую директорию проекта в путь
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app import app, database as app_db
+from app import app
+from app.database import db
 from app.models.account_publication_queue import AccountPublicationQueue
 from app.models.telegram_account import TelegramAccount
 from app.models.autopublish_config import AutopublishConfig
@@ -38,12 +39,12 @@ def diagnose_account_autopublish():
         # 1. Проверка активных аккаунтов
         print("1. АКТИВНЫЕ АККАУНТЫ")
         print("-" * 80)
-        active_accounts = app_db.session.query(TelegramAccount).filter_by(is_active=True).all()
+        active_accounts = db.session.query(TelegramAccount).filter_by(is_active=True).all()
         print(f"Всего активных аккаунтов: {len(active_accounts)}")
         
         for acc in active_accounts:
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            today_pubs = app_db.session.query(
+            today_pubs = db.session.query(
                 func.count(PublicationHistory.history_id)
             ).filter(
                 PublicationHistory.account_id == acc.account_id,
@@ -63,11 +64,11 @@ def diagnose_account_autopublish():
         print("2. ОЧЕРЕДИ ПУБЛИКАЦИЙ (account_publication_queues)")
         print("-" * 80)
         
-        total_queues = app_db.session.query(AccountPublicationQueue).count()
-        pending_queues = app_db.session.query(AccountPublicationQueue).filter_by(status='pending').count()
-        processing_queues = app_db.session.query(AccountPublicationQueue).filter_by(status='processing').count()
-        completed_queues = app_db.session.query(AccountPublicationQueue).filter_by(status='completed').count()
-        failed_queues = app_db.session.query(AccountPublicationQueue).filter_by(status='failed').count()
+        total_queues = db.session.query(AccountPublicationQueue).count()
+        pending_queues = db.session.query(AccountPublicationQueue).filter_by(status='pending').count()
+        processing_queues = db.session.query(AccountPublicationQueue).filter_by(status='processing').count()
+        completed_queues = db.session.query(AccountPublicationQueue).filter_by(status='completed').count()
+        failed_queues = db.session.query(AccountPublicationQueue).filter_by(status='failed').count()
         
         print(f"Всего задач в очереди: {total_queues}")
         print(f"  - pending: {pending_queues}")
@@ -79,7 +80,7 @@ def diagnose_account_autopublish():
         # 3. Готовые к публикации задачи
         print("3. ЗАДАЧИ, ГОТОВЫЕ К ПУБЛИКАЦИИ (scheduled_time <= now)")
         print("-" * 80)
-        ready_queues = app_db.session.query(AccountPublicationQueue).filter(
+        ready_queues = db.session.query(AccountPublicationQueue).filter(
             AccountPublicationQueue.status == 'pending',
             AccountPublicationQueue.scheduled_time <= now
         ).order_by(AccountPublicationQueue.scheduled_time.asc()).limit(20).all()
@@ -88,9 +89,9 @@ def diagnose_account_autopublish():
         if ready_queues:
             print("\nПервые 20 задач:")
             for q in ready_queues:
-                account = app_db.session.query(TelegramAccount).get(q.account_id)
-                obj = app_db.session.query(Object).get(q.object_id)
-                chat = app_db.session.query(Chat).get(q.chat_id)
+                account = db.session.query(TelegramAccount).get(q.account_id)
+                obj = db.session.query(Object).get(q.object_id)
+                chat = db.session.query(Chat).get(q.chat_id)
                 
                 print(f"  - Queue {q.queue_id}:")
                 print(f"    Объект: {q.object_id} ({obj.address if obj else 'NOT FOUND'})")
@@ -105,7 +106,7 @@ def diagnose_account_autopublish():
         print("4. ЗАСТРЯВШИЕ ЗАДАЧИ (processing более 5 минут)")
         print("-" * 80)
         stuck_threshold = now - timedelta(minutes=5)
-        stuck_queues = app_db.session.query(AccountPublicationQueue).filter(
+        stuck_queues = db.session.query(AccountPublicationQueue).filter(
             AccountPublicationQueue.status == 'processing',
             AccountPublicationQueue.started_at < stuck_threshold
         ).all()
@@ -114,7 +115,7 @@ def diagnose_account_autopublish():
         if stuck_queues:
             print("\nЗастрявшие задачи:")
             for q in stuck_queues:
-                account = app_db.session.query(TelegramAccount).get(q.account_id)
+                account = db.session.query(TelegramAccount).get(q.account_id)
                 print(f"  - Queue {q.queue_id}:")
                 print(f"    Аккаунт: {q.account_id} ({account.phone if account else 'NOT FOUND'})")
                 print(f"    Начато: {q.started_at}")
@@ -125,14 +126,14 @@ def diagnose_account_autopublish():
         # 5. Конфигурации автопубликации
         print("5. КОНФИГУРАЦИИ АВТОПУБЛИКАЦИИ")
         print("-" * 80)
-        enabled_configs = app_db.session.query(AutopublishConfig).filter_by(enabled=True).count()
-        total_configs = app_db.session.query(AutopublishConfig).count()
+        enabled_configs = db.session.query(AutopublishConfig).filter_by(enabled=True).count()
+        total_configs = db.session.query(AutopublishConfig).count()
         
         print(f"Всего конфигураций: {total_configs}")
         print(f"Включено: {enabled_configs}")
         
         # Проверяем конфигурации с accounts_enabled
-        configs_with_accounts = app_db.session.query(AutopublishConfig).filter(
+        configs_with_accounts = db.session.query(AutopublishConfig).filter(
             AutopublishConfig.enabled == True,
             AutopublishConfig.accounts_config_json.isnot(None)
         ).all()
@@ -149,7 +150,7 @@ def diagnose_account_autopublish():
         print("6. ИСТОРИЯ ПУБЛИКАЦИЙ ЗА СЕГОДНЯ")
         print("-" * 80)
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        today_history = app_db.session.query(PublicationHistory).filter(
+        today_history = db.session.query(PublicationHistory).filter(
             PublicationHistory.account_id.isnot(None),
             PublicationHistory.published_at >= today_start,
             PublicationHistory.deleted == False
@@ -166,7 +167,7 @@ def diagnose_account_autopublish():
         
         print(f"\nПо аккаунтам:")
         for account_id, pubs in by_account.items():
-            account = app_db.session.query(TelegramAccount).get(account_id)
+            account = db.session.query(TelegramAccount).get(account_id)
             print(f"  - Account {account_id} ({account.phone if account else 'NOT FOUND'}): {len(pubs)} публикаций")
         print()
         

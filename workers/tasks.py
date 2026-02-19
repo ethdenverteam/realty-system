@@ -1043,8 +1043,8 @@ def process_account_autopublish():
                 logger.info(f"process_account_autopublish: Found {total_pending} pending tasks ready for processing")
                 
                 for account in accounts:
-                # Проверяем лимит аккаунта (по успешным публикациям за сегодня)
-                try:
+                    # Проверяем лимит аккаунта (по успешным публикациям за сегодня)
+                    try:
                     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
                     # Используем scalar() для получения одного значения вместо count()
                     today_publications = app_db.session.query(
