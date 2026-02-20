@@ -1046,36 +1046,36 @@ def process_account_autopublish():
                     # Проверяем лимит аккаунта (по успешным публикациям за сегодня)
                     try:
                         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-                    # Используем scalar() для получения одного значения вместо count()
-                    today_publications = app_db.session.query(
-                        func.count(AppPublicationHistory.history_id)
-                    ).filter(
-                        AppPublicationHistory.account_id == account.account_id,
-                        AppPublicationHistory.published_at >= today_start,
-                        AppPublicationHistory.deleted == False
-                    ).scalar() or 0
-                except Exception as e:
-                    logger.error(f"Error checking daily limit for account {account.account_id}: {e}", exc_info=True)
-                    continue
-                
-                if today_publications >= account.daily_limit:
-                    # Лимит достигнут - пропускаем этот аккаунт
-                    logger.info(f"Account {account.account_id} ({account.phone}) reached daily limit ({today_publications}/{account.daily_limit})")
-                    continue
-                
-                # Получаем задачи аккаунта, готовые к публикации
-                queues = app_db.session.query(AccountPublicationQueue).filter(
-                    AccountPublicationQueue.account_id == account.account_id,
-                    AccountPublicationQueue.status == 'pending',
-                    AccountPublicationQueue.scheduled_time <= now
-                ).order_by(
-                    AccountPublicationQueue.scheduled_time.asc()
-                ).limit(10).all()  # Обрабатываем по 10 задач за раз
-                
-                if not queues:
-                    continue
-                
-                logger.info(f"Processing {len(queues)} tasks for account {account.account_id} ({account.phone})")
+                        # Используем scalar() для получения одного значения вместо count()
+                        today_publications = app_db.session.query(
+                            func.count(AppPublicationHistory.history_id)
+                        ).filter(
+                            AppPublicationHistory.account_id == account.account_id,
+                            AppPublicationHistory.published_at >= today_start,
+                            AppPublicationHistory.deleted == False
+                        ).scalar() or 0
+                    except Exception as e:
+                        logger.error(f"Error checking daily limit for account {account.account_id}: {e}", exc_info=True)
+                        continue
+                    
+                    if today_publications >= account.daily_limit:
+                        # Лимит достигнут - пропускаем этот аккаунт
+                        logger.info(f"Account {account.account_id} ({account.phone}) reached daily limit ({today_publications}/{account.daily_limit})")
+                        continue
+                    
+                    # Получаем задачи аккаунта, готовые к публикации
+                    queues = app_db.session.query(AccountPublicationQueue).filter(
+                        AccountPublicationQueue.account_id == account.account_id,
+                        AccountPublicationQueue.status == 'pending',
+                        AccountPublicationQueue.scheduled_time <= now
+                    ).order_by(
+                        AccountPublicationQueue.scheduled_time.asc()
+                    ).limit(10).all()  # Обрабатываем по 10 задач за раз
+                    
+                    if not queues:
+                        continue
+                    
+                    logger.info(f"Processing {len(queues)} tasks for account {account.account_id} ({account.phone})")
                 
                 for queue in queues:
                     try:
