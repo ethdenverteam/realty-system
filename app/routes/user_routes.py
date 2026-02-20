@@ -363,8 +363,25 @@ def create_or_update_autopublish_config(current_user):
                     has_valid_accounts = True
                     break
         
+        # Если передана пустая конфигурация с accounts: [], но есть старая конфигурация,
+        # сохраняем формат публикации и список аккаунтов (без чатов) из старой конфигурации
+        if accounts_list == [] and not accounts_config.get('publication_format'):
+            old_config = cfg.accounts_config_json
+            if isinstance(old_config, dict):
+                # Восстанавливаем формат публикации и список аккаунтов из старой конфигурации
+                restored_config = {
+                    'publication_format': old_config.get('publication_format', 'default'),
+                    'accounts': old_config.get('accounts', [])
+                }
+                # Очищаем chat_ids у всех аккаунтов, но сохраняем структуру
+                for acc in restored_config['accounts']:
+                    if isinstance(acc, dict):
+                        acc['chat_ids'] = []
+                cfg.accounts_config_json = restored_config
+            else:
+                cfg.accounts_config_json = None
         # Сохраняем конфигурацию если есть валидные аккаунты или если есть только формат публикации
-        if has_valid_accounts or accounts_config.get('publication_format'):
+        elif has_valid_accounts or accounts_config.get('publication_format'):
             cfg.accounts_config_json = accounts_config
         elif accounts_list and len(accounts_list) > 0:
             # Если есть аккаунты, но нет выбранных чатов, очищаем конфигурацию аккаунтов
@@ -372,7 +389,15 @@ def create_or_update_autopublish_config(current_user):
             if accounts_config.get('publication_format'):
                 cfg.accounts_config_json = {'publication_format': accounts_config.get('publication_format'), 'accounts': []}
             else:
-                cfg.accounts_config_json = None
+                # Сохраняем список аккаунтов без чатов, но с форматом из старой конфигурации
+                old_config = cfg.accounts_config_json
+                if isinstance(old_config, dict) and old_config.get('publication_format'):
+                    cfg.accounts_config_json = {
+                        'publication_format': old_config.get('publication_format'),
+                        'accounts': []
+                    }
+                else:
+                    cfg.accounts_config_json = None
         else:
             # Если нет аккаунтов, но есть формат публикации, сохраняем только формат
             if accounts_config.get('publication_format'):
@@ -559,6 +584,14 @@ def update_autopublish_config(object_id, current_user):
     
     if 'accounts_config_json' in data or 'accounts_config' in data:
         accounts_config = data.get('accounts_config_json') or data.get('accounts_config')
+        
+        # Если передана пустая конфигурация с accounts: [], но есть старая конфигурация с форматом,
+        # сохраняем формат публикации из старой конфигурации
+        if isinstance(accounts_config, dict) and accounts_config.get('accounts') == []:
+            old_config = cfg.accounts_config_json
+            if isinstance(old_config, dict) and old_config.get('publication_format'):
+                # Сохраняем формат публикации из старой конфигурации
+                accounts_config['publication_format'] = old_config.get('publication_format')
         if isinstance(accounts_config, dict):
             # Унифицированная логика с create_or_update_autopublish_config:
             # разрешаем сохранять формат публикации даже без выбранных чатов

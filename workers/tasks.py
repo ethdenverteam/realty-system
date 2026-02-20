@@ -1045,7 +1045,7 @@ def process_account_autopublish():
                 for account in accounts:
                     # Проверяем лимит аккаунта (по успешным публикациям за сегодня)
                     try:
-                    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
                     # Используем scalar() для получения одного значения вместо count()
                     today_publications = app_db.session.query(
                         func.count(AppPublicationHistory.history_id)
