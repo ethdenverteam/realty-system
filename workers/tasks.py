@@ -532,6 +532,7 @@ def schedule_daily_autopublish():
             from app.models.object import Object as AppObject
             
             app_configs = AppAutopublishConfig.query.filter_by(enabled=True).all()
+            logger.info(f"schedule_daily_autopublish: Found {len(app_configs)} enabled autopublish configs")
             created_account_queues = 0
             
             # Группируем задачи по аккаунтам
@@ -542,10 +543,15 @@ def schedule_daily_autopublish():
             for cfg in app_configs:
                 obj = AppObject.query.filter_by(object_id=cfg.object_id).first()
                 if not obj or obj.status == 'архив':
+                    logger.debug(f"schedule_daily_autopublish: Skipping object {cfg.object_id} - not found or archived")
                     continue
                 
                 accounts_cfg = getattr(cfg, 'accounts_config_json', None) or {}
                 accounts_list = accounts_cfg.get('accounts') if isinstance(accounts_cfg, dict) else None
+                
+                if not accounts_list or not isinstance(accounts_list, list):
+                    logger.debug(f"schedule_daily_autopublish: Object {cfg.object_id} has no accounts_config_json.accounts")
+                    continue
                 
                 if accounts_list and isinstance(accounts_list, list):
                     for acc_entry in accounts_list:
@@ -563,12 +569,29 @@ def schedule_daily_autopublish():
                             continue
                         
                         # Ограничиваемся чатами этого аккаунта
+                        # Проверяем обе связи: legacy (owner_account_id) и новая (TelegramAccountChat)
+                        # Получаем chat_id из новой таблицы TelegramAccountChat
+                        linked_chat_ids = [
+                            link.chat_id for link in 
+                            AppTelegramAccountChat.query.filter_by(account_id=account_id).all()
+                        ]
+                        
+                        # Ищем чаты, которые либо:
+                        # 1. Имеют owner_account_id == account_id (legacy)
+                        # 2. Или связаны через TelegramAccountChat (новая связь)
                         user_chats = AppChat.query.filter(
                             AppChat.owner_type == 'user',
-                            AppChat.owner_account_id == account_id,
                             AppChat.chat_id.in_(chat_ids),
                             AppChat.is_active == True,
+                            or_(
+                                AppChat.owner_account_id == account_id,  # Legacy связь
+                                AppChat.chat_id.in_(linked_chat_ids)  # Новая связь через TelegramAccountChat
+                            )
                         ).all()
+                        
+                        if not user_chats:
+                            logger.warning(f"schedule_daily_autopublish: No valid chats found for account {account_id} and object {obj.object_id}. chat_ids in config: {chat_ids}")
+                            continue
                         
                         if account_id not in account_tasks:
                             account_tasks[account_id] = []
@@ -577,6 +600,7 @@ def schedule_daily_autopublish():
                         # Порядок важен: сначала все чаты первого объекта, потом второго
                         for chat in user_chats:
                             account_tasks[account_id].append((obj.object_id, chat.chat_id, obj.user_id))
+                            logger.debug(f"schedule_daily_autopublish: Added task for account {account_id}, object {obj.object_id}, chat {chat.chat_id}")
             
             # Создаем задачи для каждого аккаунта с учетом режима и лимитов
             now_msk = get_moscow_time()
@@ -619,7 +643,10 @@ def schedule_daily_autopublish():
                         created_account_queues += 1
             
             app_db.session.commit()
-            logger.info(f"schedule_daily_autopublish: created {created_account_queues} account queue items")
+            logger.info(f"schedule_daily_autopublish: created {created_account_queues} account queue items for {len(account_tasks)} accounts")
+            
+            if created_account_queues == 0:
+                logger.warning("schedule_daily_autopublish: No account queue items created! Check configs and chat-account links.")
         
         return created_bot_queues + created_account_queues
     except Exception as e:

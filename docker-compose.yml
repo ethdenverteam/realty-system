@@ -56,6 +56,7 @@ services:
       - LOGS_DOWNLOAD_TOKEN=${LOGS_DOWNLOAD_TOKEN}
     volumes:
       - ./app:/app/app
+      - ./scripts:/app/scripts
       - ./uploads:/app/uploads
       - ./logs:/app/logs
       - ./static:/app/static

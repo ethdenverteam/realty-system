@@ -37,7 +37,7 @@ SELECT * FROM autopublish_configs WHERE object_id = 'AAA052';
 # Проверить очереди бота
 SELECT queue_id, object_id, chat_id, status, scheduled_time, error_message 
 FROM publication_queues 
-WHERE object_id = 'AAA052' AND type = 'bot' AND mode = 'autopublish'
+WHERE object_id = 'AAA053' AND type = 'bot' AND mode = 'autopublish'
 ORDER BY scheduled_time;
 
 # Проверить очереди аккаунтов
@@ -45,7 +45,7 @@ SELECT aq.queue_id, aq.object_id, aq.chat_id, aq.account_id, aq.status,
        aq.scheduled_time, aq.error_message, ta.phone, ta.mode, ta.is_active
 FROM account_publication_queues aq
 JOIN telegram_accounts ta ON aq.account_id = ta.account_id
-WHERE aq.object_id = 'AAA052'
+WHERE aq.object_id = 'AAA053'
 ORDER BY aq.account_id, aq.scheduled_time;
 
 # Проверить аккаунт
@@ -53,7 +53,7 @@ SELECT * FROM telegram_accounts WHERE phone = '+79996731791';
 
 # Проверить историю публикаций
 SELECT * FROM publication_history 
-WHERE object_id = 'AAA052' 
+WHERE object_id = 'AAA053' 
 ORDER BY published_at DESC 
 LIMIT 10;
 ```

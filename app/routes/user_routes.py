@@ -363,21 +363,15 @@ def create_or_update_autopublish_config(current_user):
                     has_valid_accounts = True
                     break
         
-        # Если передана пустая конфигурация с accounts: [], но есть старая конфигурация,
-        # сохраняем формат публикации и список аккаунтов (без чатов) из старой конфигурации
+        # Если передана пустая конфигурация с accounts: [], это означает переключение на режим "Бот"
+        # В этом случае сохраняем аккаунты с чатами - так при переключении обратно все будет на месте
         if accounts_list == [] and not accounts_config.get('publication_format'):
             old_config = cfg.accounts_config_json
             if isinstance(old_config, dict):
-                # Восстанавливаем формат публикации и список аккаунтов из старой конфигурации
-                restored_config = {
-                    'publication_format': old_config.get('publication_format', 'default'),
-                    'accounts': old_config.get('accounts', [])
-                }
-                # Очищаем chat_ids у всех аккаунтов, но сохраняем структуру
-                for acc in restored_config['accounts']:
-                    if isinstance(acc, dict):
-                        acc['chat_ids'] = []
-                cfg.accounts_config_json = restored_config
+                # Сохраняем всю старую конфигурацию полностью (формат публикации, аккаунты И чаты)
+                # Чаты не будут использоваться в режиме "Бот" (не создаются очереди), но останутся в конфигурации
+                # При переключении обратно пользователь увидит все как было
+                cfg.accounts_config_json = old_config.copy()
             else:
                 cfg.accounts_config_json = None
         # Сохраняем конфигурацию если есть валидные аккаунты или если есть только формат публикации
@@ -585,13 +579,27 @@ def update_autopublish_config(object_id, current_user):
     if 'accounts_config_json' in data or 'accounts_config' in data:
         accounts_config = data.get('accounts_config_json') or data.get('accounts_config')
         
-        # Если передана пустая конфигурация с accounts: [], но есть старая конфигурация с форматом,
-        # сохраняем формат публикации из старой конфигурации
+        # Если передана пустая конфигурация с accounts: [], это означает переключение на режим "Бот"
+        # В этом случае сохраняем аккаунты с пустыми chat_ids - так фронтенд покажет аккаунты как выбранные
+        # Чаты сохраняются в старой конфигурации, но не используются (не создаются очереди)
+        # При переключении обратно пользователь увидит аккаунты и сможет быстро выбрать чаты
         if isinstance(accounts_config, dict) and accounts_config.get('accounts') == []:
             old_config = cfg.accounts_config_json
-            if isinstance(old_config, dict) and old_config.get('publication_format'):
-                # Сохраняем формат публикации из старой конфигурации
-                accounts_config['publication_format'] = old_config.get('publication_format')
+            if isinstance(old_config, dict):
+                # Восстанавливаем аккаунты с пустыми chat_ids, но сохраняем всю старую конфигурацию
+                restored_config = {
+                    'publication_format': old_config.get('publication_format', 'default'),
+                    'accounts': []
+                }
+                # Восстанавливаем аккаунты с пустыми chat_ids
+                if old_config.get('accounts'):
+                    for old_acc in old_config.get('accounts', []):
+                        if isinstance(old_acc, dict) and old_acc.get('account_id'):
+                            restored_config['accounts'].append({
+                                'account_id': old_acc.get('account_id'),
+                                'chat_ids': old_acc.get('chat_ids', [])  # Сохраняем чаты для быстрого восстановления
+                            })
+                accounts_config = restored_config
         if isinstance(accounts_config, dict):
             # Унифицированная логика с create_or_update_autopublish_config:
             # разрешаем сохранять формат публикации даже без выбранных чатов
