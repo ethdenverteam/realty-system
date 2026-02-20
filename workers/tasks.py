@@ -484,49 +484,49 @@ def schedule_daily_autopublish():
     from app.utils.account_publication_utils import calculate_scheduled_times_for_account
     
     try:
-        # Через бота: создаем задачи в publication_queues
-        configs = db.session.query(AutopublishConfig).filter_by(enabled=True).all()
-        created_bot_queues = 0
-
-        for cfg in configs:
-            obj = db.session.query(Object).filter_by(object_id=cfg.object_id).first()
-            if not obj:
-                continue
-
-            # Не публикуем архивные объекты
-            if obj.status == 'архив':
-                continue
-
-            # Через бота: чаты подбираются автоматически
-            if cfg.bot_enabled:
-                chats = _get_matching_bot_chats_for_object(db.session, obj)
-                # Получаем время для публикации (8:00-22:00 МСК)
-                now_msk = get_moscow_time()
-                scheduled_time_msk = get_next_allowed_time_msk(now_msk)
-                
-                # Конвертируем МСК время в UTC
-                scheduled_time_utc = msk_to_utc(scheduled_time_msk)
-                
-                for chat in chats:
-                    queue = PublicationQueue(
-                        object_id=obj.object_id,
-                        chat_id=chat.chat_id,
-                        account_id=None,
-                        user_id=obj.user_id,
-                        type='bot',
-                        mode='autopublish',
-                        status='pending',
-                        scheduled_time=scheduled_time_utc,
-                        created_at=datetime.utcnow(),
-                    )
-                    db.session.add(queue)
-                    created_bot_queues += 1
-
-        db.session.commit()
-        logger.info(f"schedule_daily_autopublish: created {created_bot_queues} bot queue items")
-        
-        # Через аккаунты: создаем задачи в account_publication_queues
         with app.app_context():
+            # Через бота: создаем задачи в publication_queues
+            configs = db.session.query(AutopublishConfig).filter_by(enabled=True).all()
+            created_bot_queues = 0
+
+            for cfg in configs:
+                obj = db.session.query(Object).filter_by(object_id=cfg.object_id).first()
+                if not obj:
+                    continue
+
+                # Не публикуем архивные объекты
+                if obj.status == 'архив':
+                    continue
+
+                # Через бота: чаты подбираются автоматически
+                if cfg.bot_enabled:
+                    chats = _get_matching_bot_chats_for_object(db.session, obj)
+                    # Получаем время для публикации (8:00-22:00 МСК)
+                    now_msk = get_moscow_time()
+                    scheduled_time_msk = get_next_allowed_time_msk(now_msk)
+                    
+                    # Конвертируем МСК время в UTC
+                    scheduled_time_utc = msk_to_utc(scheduled_time_msk)
+                    
+                    for chat in chats:
+                        queue = PublicationQueue(
+                            object_id=obj.object_id,
+                            chat_id=chat.chat_id,
+                            account_id=None,
+                            user_id=obj.user_id,
+                            type='bot',
+                            mode='autopublish',
+                            status='pending',
+                            scheduled_time=scheduled_time_utc,
+                            created_at=datetime.utcnow(),
+                        )
+                        db.session.add(queue)
+                        created_bot_queues += 1
+
+            db.session.commit()
+            logger.info(f"schedule_daily_autopublish: created {created_bot_queues} bot queue items")
+            
+            # Через аккаунты: создаем задачи в account_publication_queues
             from app.models.account_publication_queue import AccountPublicationQueue
             from app.models.autopublish_config import AutopublishConfig as AppAutopublishConfig
             from app.models.object import Object as AppObject
@@ -651,11 +651,11 @@ def schedule_daily_autopublish():
         return created_bot_queues + created_account_queues
     except Exception as e:
         logger.error(f"Error in schedule_daily_autopublish: {e}", exc_info=True)
-        db.session.rollback()
         try:
             with app.app_context():
+                db.session.rollback()
                 app_db.session.rollback()
-        except:
+        except Exception:
             pass
         return 0
 
@@ -1068,6 +1068,7 @@ def process_account_autopublish():
                     AccountPublicationQueue.scheduled_time <= now
                 ).count()
                 logger.info(f"process_account_autopublish: Found {total_pending} pending tasks ready for processing")
+                work_items = []
                 
                 for account in accounts:
                     # Проверяем лимит аккаунта (по успешным публикациям за сегодня)
@@ -1103,8 +1104,10 @@ def process_account_autopublish():
                         continue
                     
                     logger.info(f"Processing {len(queues)} tasks for account {account.account_id} ({account.phone})")
+                    for queue in queues:
+                        work_items.append((account, queue))
                 
-                for queue in queues:
+                for account, queue in work_items:
                     try:
                         logger.info(f"Starting publication for queue {queue.queue_id}: object {queue.object_id} to chat {queue.chat_id} via account {account.account_id}")
                         # Обновляем статус
