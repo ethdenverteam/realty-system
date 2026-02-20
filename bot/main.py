@@ -6,14 +6,19 @@ import os
 import logging
 from telegram import Update
 from telegram.ext import (
-    Application, CommandHandler, CallbackQueryHandler, MessageHandler,
-    ContextTypes, filters
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
 )
 from telegram import Update
 
 from bot.handlers import (
-    start_command, show_main_menu,
-    getcode_command
+    start_command,
+    show_main_menu,
+    getcode_command,
 )
 from bot.handlers_object import create_object_conversation_handler
 from bot.handlers_settings import create_settings_conversation_handler
@@ -48,12 +53,20 @@ from bot.config import BOT_TOKEN, ADMIN_ID
 # Импортируем единую систему логирования для бота
 from bot.utils_logger import setup_bot_logging, log_bot_action, log_bot_error
 
+# ВАЖНО: импортируем Flask-приложение, чтобы создать application context для работы с db.session
+from app import app as flask_app
+
 # Настраиваем логирование при старте модуля
 logger = setup_bot_logging()
 
 
 def main():
     """Main function to run the bot"""
+    # Глобальный Flask application context для бота:
+    # после унификации БД бот использует app.database.db.session и модели app.models,
+    # поэтому все операции с БД должны выполняться внутри app_context().
+    flask_app.app_context().push()
+
     # Create application
     application = Application.builder().token(BOT_TOKEN).build()
     

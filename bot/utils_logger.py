@@ -178,8 +178,14 @@ def log_bot_action(action: str, user_id: int = None, telegram_id: str = None,
             pass
 
 
-def log_bot_error(error: Exception, action: str = None, user_id: int = None, 
-                  telegram_id: str = None, details: dict = None):
+def log_bot_error(
+    error: Exception,
+    action: str | None = None,
+    user_id: int | None = None,
+    telegram_id: str | None = None,
+    details: dict | None = None,
+    username: str | None = None,
+):
     """
     Логирование ошибки бота в БД и файл
     Цель: полная трассировка всех ошибок для диагностики
@@ -213,7 +219,8 @@ def log_bot_error(error: Exception, action: str = None, user_id: int = None,
             action=action or 'bot_error_occurred',
             user_id=user_id,
             telegram_id=telegram_id,
-            details=error_details
+            details=error_details,
+            username=username,
         )
     except Exception:
         # Не падаем, если логирование ошибки не удалось
