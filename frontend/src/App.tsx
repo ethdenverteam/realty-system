@@ -18,6 +18,7 @@ import AdminMobXStore from './pages/admin/MobXStore'
 import AdminPublicationQueues from './pages/admin/PublicationQueues'
 import AdminTestAccountPublication from './pages/admin/TestAccountPublication'
 import AdminSettings from './pages/admin/Settings'
+import AccountAutopublishMonitor from './pages/admin/AccountAutopublishMonitor'
 import UserCreateObject from './pages/user/CreateObject'
 import UserDashboard from './pages/user/Dashboard'
 import UserEditObject from './pages/user/EditObject'
@@ -158,6 +159,14 @@ export default function App(): JSX.Element {
               element={
                 <ProtectedRoute requireAdmin>
                   <AdminSettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/dashboard/account-autopublish-monitor"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AccountAutopublishMonitor />
                 </ProtectedRoute>
               }
             />

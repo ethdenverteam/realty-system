@@ -2319,6 +2319,226 @@ def admin_publication_queues_data(current_user):
         return jsonify({'error': str(e)}), 500
 
 
+@admin_routes_bp.route('/dashboard/account-autopublish/monitor', methods=['GET'])
+@jwt_required
+@role_required('admin')
+def admin_account_autopublish_monitor(current_user):
+    """Данные мониторинга автопубликации от имени аккаунтов (для веб-страницы админа)."""
+    from app.models.account_publication_queue import AccountPublicationQueue
+    from app.models.telegram_account import TelegramAccount
+    from app.models.autopublish_config import AutopublishConfig
+    from app.models.publication_history import PublicationHistory
+
+    try:
+        now = datetime.utcnow()
+        threshold_minutes = request.args.get('threshold_minutes', 5, type=int) or 5
+        stuck_threshold = now - timedelta(minutes=threshold_minutes)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        active_accounts = TelegramAccount.query.filter_by(is_active=True).order_by(TelegramAccount.account_id.asc()).all()
+
+        account_rows = []
+        for acc in active_accounts:
+            today_pubs = db.session.query(
+                func.count(PublicationHistory.history_id)
+            ).filter(
+                PublicationHistory.account_id == acc.account_id,
+                PublicationHistory.published_at >= today_start,
+                PublicationHistory.deleted == False
+            ).scalar() or 0
+
+            pending_count = db.session.query(func.count(AccountPublicationQueue.queue_id)).filter(
+                AccountPublicationQueue.account_id == acc.account_id,
+                AccountPublicationQueue.status == 'pending',
+            ).scalar() or 0
+            processing_count = db.session.query(func.count(AccountPublicationQueue.queue_id)).filter(
+                AccountPublicationQueue.account_id == acc.account_id,
+                AccountPublicationQueue.status == 'processing',
+            ).scalar() or 0
+            failed_count = db.session.query(func.count(AccountPublicationQueue.queue_id)).filter(
+                AccountPublicationQueue.account_id == acc.account_id,
+                AccountPublicationQueue.status == 'failed',
+            ).scalar() or 0
+            completed_count = db.session.query(func.count(AccountPublicationQueue.queue_id)).filter(
+                AccountPublicationQueue.account_id == acc.account_id,
+                AccountPublicationQueue.status == 'completed',
+            ).scalar() or 0
+            flood_wait_count = db.session.query(func.count(AccountPublicationQueue.queue_id)).filter(
+                AccountPublicationQueue.account_id == acc.account_id,
+                AccountPublicationQueue.status == 'flood_wait',
+            ).scalar() or 0
+
+            next_pending = db.session.query(AccountPublicationQueue).filter(
+                AccountPublicationQueue.account_id == acc.account_id,
+                AccountPublicationQueue.status == 'pending',
+            ).order_by(AccountPublicationQueue.scheduled_time.asc()).first()
+
+            account_rows.append({
+                'account_id': acc.account_id,
+                'phone': acc.phone,
+                'mode': acc.mode,
+                'daily_limit': acc.daily_limit,
+                'today_publications': int(today_pubs),
+                'last_used': acc.last_used.isoformat() if acc.last_used else None,
+                'last_error': acc.last_error,
+                'queue': {
+                    'pending': int(pending_count),
+                    'processing': int(processing_count),
+                    'failed': int(failed_count),
+                    'completed': int(completed_count),
+                    'flood_wait': int(flood_wait_count),
+                },
+                'next_pending': {
+                    'queue_id': next_pending.queue_id,
+                    'scheduled_time': next_pending.scheduled_time.isoformat() if next_pending.scheduled_time else None,
+                } if next_pending else None,
+            })
+
+        total_queues = db.session.query(AccountPublicationQueue).count()
+        pending_queues = db.session.query(AccountPublicationQueue).filter_by(status='pending').count()
+        processing_queues = db.session.query(AccountPublicationQueue).filter_by(status='processing').count()
+        completed_queues = db.session.query(AccountPublicationQueue).filter_by(status='completed').count()
+        failed_queues = db.session.query(AccountPublicationQueue).filter_by(status='failed').count()
+        flood_wait_queues = db.session.query(AccountPublicationQueue).filter_by(status='flood_wait').count()
+
+        ready_queues = db.session.query(AccountPublicationQueue).filter(
+            AccountPublicationQueue.status == 'pending',
+            AccountPublicationQueue.scheduled_time <= now
+        ).order_by(AccountPublicationQueue.scheduled_time.asc()).limit(20).all()
+
+        stuck_queues = db.session.query(AccountPublicationQueue).filter(
+            AccountPublicationQueue.status == 'processing',
+            AccountPublicationQueue.started_at < stuck_threshold
+        ).order_by(AccountPublicationQueue.started_at.asc()).all()
+
+        enabled_configs = db.session.query(AutopublishConfig).filter_by(enabled=True).count()
+        total_configs = db.session.query(AutopublishConfig).count()
+
+        def _queue_payload(q):
+            obj = Object.query.get(q.object_id)
+            chat = Chat.query.get(q.chat_id)
+            account = TelegramAccount.query.get(q.account_id) if q.account_id else None
+            return {
+                'queue_id': q.queue_id,
+                'object_id': q.object_id,
+                'object_title': obj.object_id if obj else None,
+                'chat_id': q.chat_id,
+                'chat_title': chat.title if chat else None,
+                'account_id': q.account_id,
+                'account_phone': account.phone if account else None,
+                'status': q.status,
+                'attempts': q.attempts,
+                'scheduled_time': q.scheduled_time.isoformat() if q.scheduled_time else None,
+                'started_at': q.started_at.isoformat() if q.started_at else None,
+                'created_at': q.created_at.isoformat() if q.created_at else None,
+                'error_message': q.error_message,
+            }
+
+        return jsonify({
+            'success': True,
+            'now_utc': now.isoformat(),
+            'threshold_minutes': threshold_minutes,
+            'summary': {
+                'active_accounts': len(active_accounts),
+                'total_queues': total_queues,
+                'pending': pending_queues,
+                'processing': processing_queues,
+                'completed': completed_queues,
+                'failed': failed_queues,
+                'flood_wait': flood_wait_queues,
+                'ready_count': len(ready_queues),
+                'stuck_count': len(stuck_queues),
+                'enabled_configs': enabled_configs,
+                'total_configs': total_configs,
+            },
+            'accounts': account_rows,
+            'ready_queues': [_queue_payload(q) for q in ready_queues],
+            'stuck_queues': [_queue_payload(q) for q in stuck_queues],
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error in account autopublish monitor: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_routes_bp.route('/dashboard/account-autopublish/reset-stuck', methods=['POST'])
+@jwt_required
+@role_required('admin')
+def admin_account_autopublish_reset_stuck(current_user):
+    """Сброс застрявших account_publication_queues в pending/failed."""
+    from app.models.account_publication_queue import AccountPublicationQueue
+
+    data = request.get_json(silent=True) or {}
+    threshold_minutes = int(data.get('threshold_minutes', 5) or 5)
+    max_attempts = int(data.get('max_attempts', 3) or 3)
+
+    try:
+        now = datetime.utcnow()
+        stuck_threshold = now - timedelta(minutes=threshold_minutes)
+        stuck_queues = db.session.query(AccountPublicationQueue).filter(
+            AccountPublicationQueue.status == 'processing',
+            AccountPublicationQueue.started_at < stuck_threshold
+        ).all()
+
+        reset_to_pending = 0
+        marked_failed = 0
+        changed = []
+
+        for q in stuck_queues:
+            q.attempts = (q.attempts or 0) + 1
+            if q.attempts >= max_attempts:
+                q.status = 'failed'
+                q.error_message = q.error_message or 'Task timeout - exceeded processing threshold'
+                marked_failed += 1
+            else:
+                q.status = 'pending'
+                q.started_at = None
+                q.error_message = None
+                reset_to_pending += 1
+
+            changed.append({
+                'queue_id': q.queue_id,
+                'status': q.status,
+                'attempts': q.attempts,
+                'object_id': q.object_id,
+                'account_id': q.account_id,
+                'chat_id': q.chat_id,
+            })
+
+        db.session.commit()
+
+        log_action(
+            action='admin_reset_stuck_account_queues',
+            user_id=current_user.user_id,
+            details={
+                'threshold_minutes': threshold_minutes,
+                'max_attempts': max_attempts,
+                'total_found': len(stuck_queues),
+                'reset_to_pending': reset_to_pending,
+                'marked_failed': marked_failed,
+            },
+        )
+
+        return jsonify({
+            'success': True,
+            'threshold_minutes': threshold_minutes,
+            'max_attempts': max_attempts,
+            'total_found': len(stuck_queues),
+            'reset_to_pending': reset_to_pending,
+            'marked_failed': marked_failed,
+            'queues': changed,
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error resetting stuck account queues: {e}", exc_info=True)
+        log_error(e, 'admin_reset_stuck_account_queues_failed', current_user.user_id, {
+            'threshold_minutes': threshold_minutes,
+            'max_attempts': max_attempts
+        })
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @admin_routes_bp.route('/dashboard/test-account-publication/objects', methods=['GET'])
 @jwt_required
 @role_required('admin')

@@ -194,6 +194,15 @@ export default function Layout({
               <span>Очереди</span>
             </Link>
             <Link
+              to="/admin/dashboard/account-autopublish-monitor"
+              className={`top-nav-item ${location.pathname.includes('/account-autopublish-monitor') ? 'active' : ''}`}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M3 16H17M4 13L8 9L11 12L16 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span>Аккаунт авто</span>
+            </Link>
+            <Link
               to="/admin/dashboard/database-schema"
               className={`top-nav-item ${location.pathname.includes('/database-schema') ? 'active' : ''}`}
             >

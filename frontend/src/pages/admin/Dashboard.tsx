@@ -74,6 +74,7 @@ export default function AdminDashboard(): JSX.Element {
               { path: '/admin/dashboard/chat-lists', label: 'Списки чатов (подписки)', icon: '📂' },
               { path: '/admin/dashboard/logs', label: 'Просмотр логов', icon: '📋' },
               { path: '/admin/dashboard/publication-queues', label: 'Очереди публикаций', icon: '📤' },
+              { path: '/admin/dashboard/account-autopublish-monitor', label: 'Мониторинг аккаунтной автопубликации', icon: '📈' },
               { path: '/admin/dashboard/test-account-publication', label: 'Проверка публикации аккаунт', icon: '🧪' },
               { path: '/admin/dashboard/settings', label: 'Настройки', icon: '⚙️' },
               { path: '/admin/dashboard/users', label: 'Управление пользователями', icon: '👥' },
