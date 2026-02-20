@@ -46,6 +46,7 @@ interface MonitorResponse {
   success: boolean
   now_utc: string
   threshold_minutes: number
+  rate_limit_enabled?: boolean
   summary: {
     active_accounts: number
     total_queues: number
@@ -71,6 +72,7 @@ export default function AccountAutopublishMonitor(): JSX.Element {
   const [actionMessage, setActionMessage] = useState('')
   const [thresholdMinutes, setThresholdMinutes] = useState(5)
   const [resetting, setResetting] = useState(false)
+  const [togglingRateLimit, setTogglingRateLimit] = useState(false)
 
   useEffect(() => {
     void loadData()
@@ -136,6 +138,34 @@ export default function AccountAutopublishMonitor(): JSX.Element {
     }
   }
 
+  const toggleRateLimit = async (): Promise<void> => {
+    const currentEnabled = data?.rate_limit_enabled ?? data?.summary.rate_limit_enabled ?? true
+    const nextEnabled = !currentEnabled
+
+    try {
+      setTogglingRateLimit(true)
+      setActionMessage('')
+      const res = await api.post('/admin/dashboard/account-autopublish/rate-limit', {
+        enabled: nextEnabled,
+      })
+      const payload = res.data as { success?: boolean; enabled?: boolean; error?: string }
+      if (payload.success) {
+        setActionMessage(nextEnabled ? 'Лимит по аккаунтам включен' : 'Лимит по аккаунтам отключен')
+        await loadData()
+      } else {
+        setError(payload.error || 'Не удалось изменить состояние лимита')
+      }
+    } catch (err: unknown) {
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+        setError(err.response?.data?.error || 'Ошибка изменения состояния лимита')
+      } else {
+        setError('Ошибка изменения состояния лимита')
+      }
+    } finally {
+      setTogglingRateLimit(false)
+    }
+  }
+
   return (
     <Layout title="Мониторинг аккаунтной автопубликации" isAdmin>
       <div className="account-monitor-page">
@@ -158,6 +188,26 @@ export default function AccountAutopublishMonitor(): JSX.Element {
                 onChange={(e) => setThresholdMinutes(Number(e.target.value || 5))}
                 className="form-control"
               />
+            </div>
+            <div className="control-group">
+              <label>Лимит отправки для Telegram-аккаунтов:</label>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => void toggleRateLimit()}
+                disabled={loading || togglingRateLimit}
+              >
+                {togglingRateLimit
+                  ? 'Применение...'
+                  : (data?.rate_limit_enabled ?? data?.summary.rate_limit_enabled ?? true)
+                    ? 'Отключить лимит'
+                    : 'Включить лимит'}
+              </button>
+              <div className="hint-text">
+                {(data?.rate_limit_enabled ?? data?.summary.rate_limit_enabled ?? true)
+                  ? 'Сейчас действует внутренний лимит: не чаще 1 сообщения в минуту и не более 60 в час на аккаунт.'
+                  : 'Сейчас внутренний лимит отключён: остаются только реальные ограничения Telegram и дневной лимит аккаунта.'}
+              </div>
             </div>
             <button className="btn btn-secondary" onClick={() => void loadData()} disabled={loading}>
               Обновить

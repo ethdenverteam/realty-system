@@ -2328,6 +2328,7 @@ def admin_account_autopublish_monitor(current_user):
     from app.models.telegram_account import TelegramAccount
     from app.models.autopublish_config import AutopublishConfig
     from app.models.publication_history import PublicationHistory
+    from app.models.system_setting import SystemSetting
 
     try:
         now = datetime.utcnow()
@@ -2336,6 +2337,12 @@ def admin_account_autopublish_monitor(current_user):
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
         active_accounts = TelegramAccount.query.filter_by(is_active=True).order_by(TelegramAccount.account_id.asc()).all()
+
+        # Глобальный переключатель лимита по аккаунтам (используется в app.utils.rate_limiter)
+        rate_limit_setting = SystemSetting.query.filter_by(key='account_rate_limit').first()
+        rate_limit_enabled = True
+        if rate_limit_setting and isinstance(rate_limit_setting.value_json, dict):
+            rate_limit_enabled = bool(rate_limit_setting.value_json.get('enabled', True))
 
         account_rows = []
         for acc in active_accounts:
@@ -2450,7 +2457,9 @@ def admin_account_autopublish_monitor(current_user):
                 'stuck_count': len(stuck_queues),
                 'enabled_configs': enabled_configs,
                 'total_configs': total_configs,
+                'rate_limit_enabled': rate_limit_enabled,
             },
+            'rate_limit_enabled': rate_limit_enabled,
             'accounts': account_rows,
             'ready_queues': [_queue_payload(q) for q in ready_queues],
             'stuck_queues': [_queue_payload(q) for q in stuck_queues],
@@ -2458,6 +2467,51 @@ def admin_account_autopublish_monitor(current_user):
 
     except Exception as e:
         logger.error(f"Error in account autopublish monitor: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_routes_bp.route('/dashboard/account-autopublish/rate-limit', methods=['POST'])
+@jwt_required
+@role_required('admin')
+def admin_account_autopublish_rate_limit_toggle(current_user):
+    """
+    Глобальный переключатель лимита отправки сообщений с Telegram-аккаунтов.
+
+    Источник: SystemSetting.key='account_rate_limit', value_json={'enabled': bool}.
+    Используется во всех местах, где вызывается get_rate_limit_status().
+    """
+    from app.models.system_setting import SystemSetting
+
+    data = request.get_json(silent=True) or {}
+    enabled = bool(data.get('enabled', True))
+
+    try:
+        setting = SystemSetting.query.filter_by(key='account_rate_limit').first()
+        if not setting:
+            setting = SystemSetting(
+                key='account_rate_limit',
+                value_json={'enabled': enabled},
+                description='Глобальный переключатель rate limiter для аккаунтных публикаций (Telethon)',
+                updated_at=datetime.utcnow(),
+            )
+            db.session.add(setting)
+        else:
+            setting.value_json = {'enabled': enabled}
+            setting.updated_at = datetime.utcnow()
+
+        db.session.commit()
+
+        log_action(
+            action='admin_toggle_account_rate_limit',
+            user_id=current_user.user_id,
+            details={'enabled': enabled},
+        )
+
+        return jsonify({'success': True, 'enabled': enabled}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error toggling account rate limit: {e}", exc_info=True)
+        log_error(e, 'admin_toggle_account_rate_limit_failed', current_user.user_id, {'enabled': enabled})
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

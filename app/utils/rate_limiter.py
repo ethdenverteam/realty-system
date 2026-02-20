@@ -11,6 +11,42 @@ import threading
 # Global rate limiter state
 _rate_limiter_lock = threading.Lock()
 _message_times: Dict[str, List[float]] = defaultdict(list)  # phone -> list of message timestamps
+_rate_limit_enabled_cache: Dict[str, bool] = {'enabled': True}
+_rate_limit_last_checked: Dict[str, float] = {'ts': 0.0}
+_RATE_LIMIT_CACHE_TTL_SECONDS = 30.0
+
+
+def _is_rate_limit_enabled() -> bool:
+    """
+    Глобальный переключатель лимита отправки сообщений.
+
+    Источник правды — SystemSetting с key='account_rate_limit', value_json={'enabled': bool}.
+    Если настройка отсутствует или недоступна, по умолчанию лимит ВКЛЮЧЕН (безопасный режим).
+    """
+    import time
+
+    now = time.time()
+    # Быстрый путь: используем кэш, чтобы не бить в БД на каждый вызов
+    if now - _rate_limit_last_checked['ts'] < _RATE_LIMIT_CACHE_TTL_SECONDS:
+        return _rate_limit_enabled_cache['enabled']
+
+    try:
+        from app.database import db
+        from app.models.system_setting import SystemSetting
+
+        setting = db.session.query(SystemSetting).filter_by(key='account_rate_limit').first()
+        enabled = True
+        if setting and isinstance(setting.value_json, dict):
+            enabled = bool(setting.value_json.get('enabled', True))
+
+        _rate_limit_enabled_cache['enabled'] = enabled
+        _rate_limit_last_checked['ts'] = now
+        return enabled
+    except Exception:
+        # При любых проблемах с БД/моделями возвращаем безопасное значение (лимит включен)
+        _rate_limit_enabled_cache['enabled'] = True
+        _rate_limit_last_checked['ts'] = now
+        return True
 
 
 def can_send_message(phone: str) -> tuple[bool, float]:
@@ -69,8 +105,24 @@ def wait_if_needed(phone: str) -> float:
 
 
 def get_rate_limit_status(phone: str) -> dict:
-    """Get current rate limit status for phone"""
+    """
+    Get current rate limit status for phone.
+
+    Если глобальный переключатель лимита выключен (SystemSetting.account_rate_limit.enabled = False),
+    функция всегда возвращает can_send=True и wait_seconds=0, не учитывая локальное состояние.
+    """
     with _rate_limiter_lock:
+        # Глобальное отключение лимита: используем только реальные лимиты Telegram
+        if not _is_rate_limit_enabled():
+            return {
+                'can_send': True,
+                'wait_seconds': 0.0,
+                'messages_in_hour': 0,
+                'messages_remaining': 60,
+                'next_available': None,
+                'enabled': False,
+            }
+
         now = time.time()
         times = _message_times[phone]
         
@@ -94,6 +146,7 @@ def get_rate_limit_status(phone: str) -> dict:
             'wait_seconds': wait_seconds,
             'messages_in_hour': messages_in_hour,
             'messages_remaining': 60 - messages_in_hour,
-            'next_available': next_available.isoformat() if next_available else None
+            'next_available': next_available.isoformat() if next_available else None,
+            'enabled': True,
         }
 
