@@ -30,7 +30,8 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'jwt-secret-key-change-in-production'
     JWT_ALGORITHM = 'HS256'
-    JWT_EXPIRATION_DELTA = 86400  # 24 hours
+    # ВАЖНО: срок жизни JWT синхронизирован с auth cookie (3 дня)
+    JWT_EXPIRATION_DELTA = 3 * 24 * 60 * 60  # 3 days
     
     # Папки для файлов
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads')

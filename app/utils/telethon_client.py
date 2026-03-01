@@ -92,6 +92,25 @@ async def create_client(phone: str) -> TelegramClient:
     return client
 
 
+async def validate_chat_peer(client: TelegramClient, telegram_chat_id: int) -> bool:
+    """
+    Проверяет, что для данного клиента существует валидный peer с указанным telegram_chat_id.
+    Используется перед отправкой сообщения, чтобы избежать Invalid Peer.
+    """
+    try:
+        # Получаем диалог/чат по ID, если не удаётся — peer невалиден
+        dialogs = await client.get_dialogs(limit=200)
+        for dlg in dialogs:
+            entity = dlg.entity
+            if hasattr(entity, 'id') and int(getattr(entity, 'id')) == int(telegram_chat_id):
+                return True
+        return False
+    except Exception as e:
+        logger.error(f"Error validating chat peer {telegram_chat_id}: {e}", exc_info=True)
+        telethon_logger.error(f"Error validating chat peer {telegram_chat_id}: {e}", exc_info=True)
+        return False
+
+
 async def start_connection(phone: str) -> Tuple[bool, Optional[str], Optional[str]]:
     """
     Start connection process for phone number
@@ -752,6 +771,17 @@ async def send_object_message(phone: str, chat_id: str, message_text: str, photo
             else:
                 return (False, "Account not authorized. Please connect first.", None)
         
+        # Перед отправкой проверяем, что peer валиден для данного клиента
+        try:
+            is_valid_peer = await validate_chat_peer(client, int(chat_id))
+        except Exception as peer_check_error:
+            logger.error(f"Error while validating peer for chat_id={chat_id}: {peer_check_error}", exc_info=True)
+            is_valid_peer = False
+
+        if not is_valid_peer:
+            await client.disconnect()
+            return (False, "Выбранный чат недоступен для этого аккаунта. Проверьте, что аккаунт состоит в чате и чат активен.", None)
+
         # Send message with photo if available - всегда отправляем фото если оно есть
         if photos and len(photos) > 0:
             # Берем первое фото (только одно фото разрешено)

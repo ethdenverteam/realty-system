@@ -68,19 +68,32 @@ def main():
     flask_app.app_context().push()
 
     # Create application
+    # ВАЖНО: использовать drop_pending_updates=True и уникальный токен,
+    # но контроль количества инстансов бота должен быть на уровне оркестрации (Docker/systemd).
     application = Application.builder().token(BOT_TOKEN).build()
     
     # Add error handler first
     async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-        """Log errors"""
+        """Log errors (с мягкой обработкой сетевых и конфликтных ошибок)"""
         error = context.error
-        # Skip logging for Conflict errors (multiple bot instances)
-        if error and hasattr(error, '__class__'):
-            error_name = error.__class__.__name__
-            error_msg = str(error)
-            if 'Conflict' in error_name or 'Conflict' in error_msg or 'getUpdates' in error_msg:
-                logger.debug(f"Bot conflict detected (non-critical): {error_msg}")
-                return
+        if not error:
+            return
+
+        error_name = error.__class__.__name__
+        error_msg = str(error)
+
+        # Конфликт getUpdates — признак второго инстанса, логируем мягко без трейсбека
+        if 'Conflict' in error_name or 'Conflict' in error_msg or 'getUpdates' in error_msg:
+            logger.warning(f"Bot getUpdates conflict detected (probably multiple instances): {error_msg}")
+            return
+
+        # Сетевые ошибки Telegram (Bad Gateway, ConnectError) — логируем как warning
+        network_keywords = ['Bad Gateway', 'ConnectError', 'NetworkError', 'All connection attempts failed']
+        if any(k in error_msg for k in network_keywords):
+            logger.warning(f"Transient network error while handling update: {error_msg}")
+            return
+
+        # Остальное — полноценный error с трейсбеком
         logger.error(f"Exception while handling an update: {error}", exc_info=error)
     
     application.add_error_handler(error_handler)

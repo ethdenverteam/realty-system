@@ -408,6 +408,8 @@ def update_object(object_id, current_user):
 def delete_object(object_id, current_user):
     """Delete object"""
     from app.models.publication_history import PublicationHistory
+    from app.models.publication_queue import PublicationQueue
+    from app.models.account_publication_queue import AccountPublicationQueue
     
     obj = Object.query.filter_by(object_id=object_id, user_id=current_user.user_id).first()
     
@@ -422,12 +424,16 @@ def delete_object(object_id, current_user):
             'price': obj.price,
             'status': obj.status
         }
+        # 1) Удаляем все связанные очереди публикаций аккаунтов
+        AccountPublicationQueue.query.filter_by(object_id=object_id).delete()
         
-        # First, delete all related publication_history records
-        # This prevents NOT NULL constraint violation
+        # 2) Удаляем все связанные очереди публикаций бота
+        PublicationQueue.query.filter_by(object_id=object_id).delete()
+        
+        # 3) Удаляем историю публикаций
         PublicationHistory.query.filter_by(object_id=object_id).delete()
         
-        # Now delete the object
+        # 4) Удаляем сам объект
         db.session.delete(obj)
         db.session.commit()
         

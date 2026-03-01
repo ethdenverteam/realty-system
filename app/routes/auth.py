@@ -131,10 +131,12 @@ def login():
             'token': token
         }))
         
+        # Срок жизни cookie синхронизирован со сроком жизни JWT (3 дня)
+        from app.config import Config
         response.set_cookie(
             'jwt_token',
             token,
-            max_age=7 * 24 * 60 * 60,  # 7 дней
+            max_age=Config.JWT_EXPIRATION_DELTA,  # 3 дня
             httponly=True,
             secure=False,  # В продакшене с HTTPS установить True
             samesite='Lax'

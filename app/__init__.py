@@ -115,6 +115,31 @@ def create_app(config_class=Config):
     logs_viewer_api_bp.add_url_rule('/test', 'download_test_logs', download_test_logs, methods=['GET'])
     app.register_blueprint(logs_viewer_api_bp, url_prefix='/api/logs')
     
+    # Явный обработчик POST / для снижения шума от сканеров (405 без трассировки)
+    @app.route('/', methods=['POST'])
+    def root_post_not_allowed():
+        from flask import jsonify, request
+        ip = request.remote_addr
+        path = request.path
+        logger = logging.getLogger('app.requests')
+        # Логируем на уровне WARNING без трейсбека
+        logger.warning(f"Blocked POST {path} from {ip} (method not allowed for root)")
+        return jsonify({'error': 'Method Not Allowed'}), 405
+
+    # Простой rate-limit/блокировка для явно вредоносных путей (сканеры, .env, wp-config и т.п.)
+    @app.before_request
+    def block_obvious_scanners():
+        from flask import request, jsonify
+        path = request.path or ''
+        bad_substrings = [
+            '.env', '.git', 'wp-config', 'phpunit', 'laravel.log',
+            'wp-includes', '/boaform/', 'eval-stdin.php'
+        ]
+        if any(sub in path for sub in bad_substrings):
+            logger = logging.getLogger('app.requests')
+            logger.warning(f"Blocked suspicious request path={path} ip={request.remote_addr}")
+            return jsonify({'error': 'Forbidden'}), 403
+
     # Serve React app static files (must be last to catch all non-API routes)
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
