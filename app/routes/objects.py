@@ -410,6 +410,7 @@ def delete_object(object_id, current_user):
     from app.models.publication_history import PublicationHistory
     from app.models.publication_queue import PublicationQueue
     from app.models.account_publication_queue import AccountPublicationQueue
+    from app.models.autopublish_config import AutopublishConfig
     
     obj = Object.query.filter_by(object_id=object_id, user_id=current_user.user_id).first()
     
@@ -427,13 +428,16 @@ def delete_object(object_id, current_user):
         # 1) Удаляем историю публикаций (в т.ч. записи, ссылающиеся на очереди)
         PublicationHistory.query.filter_by(object_id=object_id).delete()
 
-        # 2) Удаляем все связанные очереди публикаций аккаунтов
+        # 2) Удаляем конфигурацию автопубликации для этого объекта (если есть)
+        AutopublishConfig.query.filter_by(object_id=object_id).delete()
+
+        # 3) Удаляем все связанные очереди публикаций аккаунтов
         AccountPublicationQueue.query.filter_by(object_id=object_id).delete()
         
-        # 3) Удаляем все связанные очереди публикаций бота
+        # 4) Удаляем все связанные очереди публикаций бота
         PublicationQueue.query.filter_by(object_id=object_id).delete()
         
-        # 4) Удаляем сам объект
+        # 5) Удаляем сам объект
         db.session.delete(obj)
         db.session.commit()
         
