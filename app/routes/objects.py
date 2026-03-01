@@ -424,14 +424,14 @@ def delete_object(object_id, current_user):
             'price': obj.price,
             'status': obj.status
         }
-        # 1) Удаляем все связанные очереди публикаций аккаунтов
+        # 1) Удаляем историю публикаций (в т.ч. записи, ссылающиеся на очереди)
+        PublicationHistory.query.filter_by(object_id=object_id).delete()
+
+        # 2) Удаляем все связанные очереди публикаций аккаунтов
         AccountPublicationQueue.query.filter_by(object_id=object_id).delete()
         
-        # 2) Удаляем все связанные очереди публикаций бота
+        # 3) Удаляем все связанные очереди публикаций бота
         PublicationQueue.query.filter_by(object_id=object_id).delete()
-        
-        # 3) Удаляем историю публикаций
-        PublicationHistory.query.filter_by(object_id=object_id).delete()
         
         # 4) Удаляем сам объект
         db.session.delete(obj)
