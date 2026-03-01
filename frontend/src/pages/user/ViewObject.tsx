@@ -13,6 +13,8 @@ export default function ViewObject(): JSX.Element {
   const [object, setObject] = useState<RealtyObject | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+  const [deleting, setDeleting] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [publishError, setPublishError] = useState('')
   const [publishSuccess, setPublishSuccess] = useState(false)
@@ -137,6 +139,29 @@ export default function ViewObject(): JSX.Element {
     }
   }
 
+  const handleDelete = async (): Promise<void> => {
+    if (!objectId) return
+
+    if (!confirm('Вы уверены, что хотите безвозвратно удалить этот объект?')) {
+      return
+    }
+
+    try {
+      setDeleting(true)
+      setDeleteError('')
+      await api.delete(`/objects/${objectId}`)
+      navigate('/user/dashboard/objects', { replace: true })
+    } catch (err: unknown) {
+      let message = 'Ошибка при удалении объекта'
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+        message = err.response?.data?.error || err.message || message
+      }
+      setDeleteError(message)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (loading) {
     return (
       <Layout title="Просмотр объекта">
@@ -191,6 +216,7 @@ export default function ViewObject(): JSX.Element {
       }
     >
       <div className="view-object-page">
+        {deleteError && <div className="alert alert-error">{deleteError}</div>}
         {publishError && <div className="alert alert-error">{publishError}</div>}
         {publishSuccess && (
           <div className="alert alert-success">
@@ -474,6 +500,13 @@ export default function ViewObject(): JSX.Element {
           </div>
 
           <div className="object-actions">
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="btn btn-danger"
+            >
+              {deleting ? 'Удаление...' : 'Удалить объект'}
+            </button>
             <Link
               to={`/user/dashboard/objects/${object.object_id}/edit`}
               className="btn btn-secondary"
