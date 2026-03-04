@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import ObjectForm from '../../components/ObjectForm'
 import api from '../../utils/api'
+import { validatePhones } from '../../utils/phoneValidation'
 import type {
   ObjectFormData,
   RealtyObject,
@@ -86,20 +87,11 @@ export default function EditObject(): JSX.Element {
 
     setError('')
     
-    // Validate phone numbers if provided
-    if (formData.phone_number && formData.phone_number.trim()) {
-      const phonePattern = /^8\d{10}$/
-      if (!phonePattern.test(formData.phone_number.trim())) {
-        setError('Номер телефона должен быть в формате 89693386969 (11 цифр, начинается с 8)')
-        return
-      }
-    }
-    if (formData.phone_number_2 && formData.phone_number_2.trim()) {
-      const phonePattern = /^8\d{10}$/
-      if (!phonePattern.test(formData.phone_number_2.trim())) {
-        setError('Второй номер телефона должен быть в формате 89693386969 (11 цифр, начинается с 8)')
-        return
-      }
+    // Валидация телефонов
+    const phoneValidation = validatePhones(formData.phone_number, formData.phone_number_2)
+    if (!phoneValidation.isValid) {
+      setError(phoneValidation.error || 'Ошибка валидации телефона')
+      return
     }
     
     setSaving(true)

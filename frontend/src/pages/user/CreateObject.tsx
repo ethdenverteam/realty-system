@@ -4,7 +4,7 @@ import Layout from '../../components/Layout'
 import ObjectForm from '../../components/ObjectForm'
 import { useApiData } from '../../hooks/useApiData'
 import { useApiMutation } from '../../hooks/useApiMutation'
-import { PHONE_PATTERN, PHONE_ERROR_MESSAGE } from '../../utils/constants'
+import { validatePhones } from '../../utils/phoneValidation'
 import type { ObjectFormData, CreateObjectRequest, CreateObjectResponse } from '../../types/models'
 import './CreateObject.css'
 
@@ -92,18 +92,10 @@ export default function UserCreateObject(): JSX.Element {
     clearError()
 
     // Валидация телефонов
-    if (formData.phone_number && formData.phone_number.trim()) {
-      if (!PHONE_PATTERN.test(formData.phone_number.trim())) {
-        clearError()
-        // Устанавливаем ошибку через состояние (можно улучшить через setError в хуке)
-        return
-      }
-    }
-    if (formData.phone_number_2 && formData.phone_number_2.trim()) {
-      if (!PHONE_PATTERN.test(formData.phone_number_2.trim())) {
-        clearError()
-        return
-      }
+    const phoneValidation = validatePhones(formData.phone_number, formData.phone_number_2)
+    if (!phoneValidation.isValid) {
+      setError(phoneValidation.error || 'Ошибка валидации телефона')
+      return
     }
 
     // Подготовка данных
@@ -198,8 +190,7 @@ export default function UserCreateObject(): JSX.Element {
           cancelLabel="Отмена"
           onCancel={handleCancel}
           error={currentError || 
-            (formData.phone_number && formData.phone_number.trim() && !PHONE_PATTERN.test(formData.phone_number.trim()) ? PHONE_ERROR_MESSAGE : '') ||
-            (formData.phone_number_2 && formData.phone_number_2.trim() && !PHONE_PATTERN.test(formData.phone_number_2.trim()) ? 'Второй номер телефона должен быть в формате 89693386969' : '')
+            (validatePhones(formData.phone_number, formData.phone_number_2).error || '')
           }
         />
       </div>

@@ -557,18 +557,24 @@ export default function Autopublish(): JSX.Element {
                               const newFormat = e.target.value as 'default' | 'compact'
                               try {
                                 setError('')
-                                const currentConfig = accCfg || { accounts: [] }
-                                await api.put<{ success: boolean }>(`/user/dashboard/autopublish/${obj.object_id}`, {
-                                  accounts_config_json: {
-                                    ...currentConfig,
-                                    publication_format: newFormat,
-                                  },
+                                setSaving(true)
+                                // Сохраняем текущую конфигурацию или создаем новую с сохранением publication_format
+                                const currentConfig: AutopublishAccountsConfig = accCfg 
+                                  ? { ...accCfg, publication_format: newFormat }
+                                  : { accounts: [], publication_format: newFormat }
+                                
+                                const response = await api.put<{ success: boolean }>(`/user/dashboard/autopublish/${obj.object_id}`, {
+                                  accounts_config_json: currentConfig,
                                 })
-                                void reloadAutopublish()
+                                if (response.data.success) {
+                                  await reloadAutopublish()
+                                }
                               } catch (err: unknown) {
                                 const message = getErrorMessage(err, 'Ошибка изменения формата')
                                 setError(message)
                                 logError(err, 'Changing publication format')
+                              } finally {
+                                setSaving(false)
                               }
                             }}
                             disabled={saving || addingObject}

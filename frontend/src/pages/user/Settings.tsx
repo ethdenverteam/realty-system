@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import Layout from '../../components/Layout'
 import { GlassCard } from '../../components/GlassCard'
 import { useAuth } from '../../contexts/AuthContext'
-import { useTheme } from '../../contexts/ThemeContext'
-import Dropdown, { type DropdownOption } from '../../components/Dropdown'
+import { ContactSettings } from '../../components/settings/ContactSettings'
+import { DisplaySettings } from '../../components/settings/DisplaySettings'
+import { ThemeSettings } from '../../components/settings/ThemeSettings'
+import { ClearAutopublishButton } from '../../components/settings/ClearAutopublishButton'
 import { useApiData } from '../../hooks/useApiData'
 import { useApiMutation } from '../../hooks/useApiMutation'
 import { PHONE_PATTERN, PHONE_ERROR_MESSAGE } from '../../utils/constants'
@@ -19,7 +21,6 @@ interface UserSettings {
 
 export default function UserSettings(): JSX.Element {
   const { logout } = useAuth()
-  const { theme, setTheme, availableThemes } = useTheme()
   const [error, setError] = useState<string>('')
   const [success, setSuccess] = useState<string>('')
 
@@ -37,18 +38,6 @@ export default function UserSettings(): JSX.Element {
     object_card_display_types: [],
     object_list_display_types: [],
   })
-
-  // Поля объекта для отображения
-  const objectDisplayFields = [
-    { key: 'rooms_type', label: 'Тип комнат' },
-    { key: 'price', label: 'Цена' },
-    { key: 'area', label: 'Площадь' },
-    { key: 'floor', label: 'Этаж' },
-    { key: 'districts', label: 'Районы' },
-    { key: 'address', label: 'Адрес' },
-    { key: 'renovation', label: 'Ремонт' },
-    { key: 'comment', label: 'Комментарий' },
-  ]
 
   const handleLogout = (): void => {
     if (confirm('Вам придется заново зайти через код. Вы уверены, что хотите выйти?')) {
@@ -110,105 +99,8 @@ export default function UserSettings(): JSX.Element {
           {success && <div className="alert alert-success">{success}</div>}
 
           <form onSubmit={handleSubmit} className="settings-form">
-            <div className="form-section">
-              <div className="form-group">
-                <label className="form-label">Номер телефона</label>
-                <input
-                  type="tel"
-                  className="form-input"
-                  value={settings.phone}
-                  onChange={(e) => handleChange('phone', e.target.value)}
-                  placeholder="89693386969"
-                  pattern="^8\d{10}$"
-                  title="Номер должен быть в формате 89693386969 (11 цифр, начинается с 8)"
-                />
-                <small className="form-hint">Формат: 89693386969 (11 цифр, начинается с 8)</small>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Имя контакта</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={settings.contact_name}
-                  onChange={(e) => handleChange('contact_name', e.target.value)}
-                  placeholder="Ваше имя"
-                />
-                <small className="form-hint">Имя будет отображаться в объявлениях</small>
-              </div>
-
-              <div className="form-group">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={settings.default_show_username}
-                    onChange={(e) => handleChange('default_show_username', e.target.checked)}
-                  />
-                  <span>Показывать username Telegram по умолчанию</span>
-                </label>
-                <small className="form-hint">
-                  При создании новых объектов будет включено отображение вашего Telegram username
-                </small>
-              </div>
-            </div>
-
-            <div className="form-section">
-              <h3 className="card-title">Настройки отображения объектов</h3>
-              <p className="card-description">
-                Выберите поля объекта для отображения в карточке объекта и списке объектов
-              </p>
-
-              <div className="form-group">
-                <label className="form-label">Поля для карточки объекта (короткое описание)</label>
-                <div className="checkbox-group">
-                  {objectDisplayFields.map((field) => (
-                    <label key={field.key} className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={settings.object_card_display_types?.includes(field.key) || false}
-                        onChange={(e) => {
-                          const current = settings.object_card_display_types || []
-                          const updated = e.target.checked
-                            ? [...current, field.key]
-                            : current.filter((t) => t !== field.key)
-                          handleChange('object_card_display_types', updated)
-                        }}
-                      />
-                      <span>{field.label}</span>
-                    </label>
-                  ))}
-                </div>
-                <small className="form-hint">
-                  Если ничего не выбрано, будут показываться все поля
-                </small>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Поля для списка объектов (одна строка)</label>
-                <div className="checkbox-group">
-                  {objectDisplayFields.map((field) => (
-                    <label key={field.key} className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={settings.object_list_display_types?.includes(field.key) || false}
-                        onChange={(e) => {
-                          const current = settings.object_list_display_types || []
-                          const updated = e.target.checked
-                            ? [...current, field.key]
-                            : current.filter((t) => t !== field.key)
-                          handleChange('object_list_display_types', updated)
-                        }}
-                      />
-                      <span>{field.label}</span>
-                    </label>
-                  ))}
-                </div>
-                <small className="form-hint">
-                  Если ничего не выбрано, будут показываться все поля
-                </small>
-              </div>
-            </div>
-
+            <ContactSettings settings={settings} onChange={handleChange} />
+            <DisplaySettings settings={settings} onChange={handleChange} />
             <div className="form-actions">
               <button type="submit" className="btn btn-primary btn-block" disabled={saving || loadingSettings}>
                 {saving ? 'Сохранение...' : 'Сохранить настройки'}
@@ -216,31 +108,7 @@ export default function UserSettings(): JSX.Element {
             </div>
           </form>
 
-          <div className="form-section">
-            <h3 className="card-title">Выбор темы</h3>
-            <p className="card-description">
-              Выберите тему оформления приложения. Изменения применяются сразу.
-            </p>
-            <div className="form-group">
-              <label className="form-label">Тема оформления</label>
-              <div className="theme-selector-wrapper">
-                <Dropdown
-                  options={availableThemes.map((t) => ({
-                    value: t.value,
-                    label: t.label,
-                  })) as DropdownOption[]}
-                  value={theme}
-                  onChange={(value) => {
-                    setTheme(value as typeof theme)
-                  }}
-                  placeholder="Выберите тему..."
-                />
-              </div>
-              <small className="form-hint">
-                Текущая тема: <strong>{availableThemes.find((t) => t.value === theme)?.label}</strong>
-              </small>
-            </div>
-          </div>
+          <ThemeSettings />
 
           <div className="form-section">
             <h3 className="card-title">Управление автопубликацией</h3>
@@ -269,41 +137,4 @@ export default function UserSettings(): JSX.Element {
   )
 }
 
-function ClearAutopublishButton(): JSX.Element {
-  const [success, setSuccess] = useState<string>('')
-
-  const { mutate: clearAutopublish, loading, error } = useApiMutation<Record<string, never>, { success: boolean; message: string; deleted: { configs: number; publication_queues: number; account_queues: number } }>({
-    url: '/user/dashboard/settings/clear-autopublish',
-    method: 'POST',
-    errorContext: 'Clearing autopublish',
-    defaultErrorMessage: 'Ошибка при очистке автопубликации',
-    onSuccess: (data) => {
-      setSuccess(`Автопубликация успешно очищена. Удалено: ${data.deleted.configs} конфигураций, ${data.deleted.publication_queues + data.deleted.account_queues} задач в очереди.`)
-    },
-  })
-
-  const handleClear = (): void => {
-    if (!confirm('Вы уверены, что хотите снять все объекты с автопубликации и очистить очередь? Это действие нельзя отменить.')) {
-      return
-    }
-
-    setSuccess('')
-    void clearAutopublish({})
-  }
-
-  return (
-    <div>
-      {error && <div className="alert alert-error">{error}</div>}
-      {success && <div className="alert alert-success">{success}</div>}
-      <button
-        type="button"
-        className="btn btn-warning btn-block"
-        onClick={handleClear}
-        disabled={loading}
-      >
-        {loading ? 'Очистка...' : 'Снять автопубликацию и очистить очередь'}
-      </button>
-    </div>
-  )
-}
 
