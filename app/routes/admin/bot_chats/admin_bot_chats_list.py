@@ -1268,3 +1268,33 @@ def admin_test_publish_to_chat(chat_id, current_user):
             elif chat.category.startswith('price_'):
                 parts = chat.category.replace('price_', '').split('_')
                 if len(parts) == 2:
+                    price_min = parts[0]
+                    price_max = parts[1]
+                    binding_parts.append(f"Цена: {price_min} - {price_max} тыс. руб.")
+        
+        if binding_parts:
+            test_message += "Привязка:\n" + "\n".join(f"• {part}" for part in binding_parts) + "\n"
+        
+        # Send test message via Telegram Bot API
+        telegram_chat_id = chat.telegram_chat_id
+        api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        
+        response = requests.post(api_url, json={
+            'chat_id': telegram_chat_id,
+            'text': test_message,
+            'parse_mode': 'HTML'
+        })
+        
+        if response.status_code == 200:
+            return jsonify({
+                'success': True,
+                'message': 'Test message sent successfully'
+            })
+        else:
+            return jsonify({
+                'error': f'Failed to send message: {response.text}'
+            }), response.status_code
+            
+    except Exception as e:
+        logger.error(f"Error in test publish to chat {chat_id}: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500

@@ -19,61 +19,6 @@ import logging
 admin_bot_chats_crud_bp = Blueprint('admin_bot_chats_crud', __name__)
 logger = logging.getLogger(__name__)
 
-                    binding_parts.append(f"Цена: {parts[0]} - {parts[1]} тыс. руб.")
-        
-        if binding_parts:
-            test_message += "<b>Привязка чата:</b>\n"
-            for part in binding_parts:
-                test_message += f"• {part}\n"
-        else:
-            test_message += "<b>Привязка чата:</b> не указана\n"
-        
-        # Send message via Telegram API
-        url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
-        payload = {
-            'chat_id': chat.telegram_chat_id,
-            'text': test_message,
-            'parse_mode': 'HTML'
-        }
-        
-        response = requests.post(url, json=payload, timeout=10)
-        response.raise_for_status()
-        result = response.json()
-        
-        if not result.get('ok'):
-            error_description = result.get('description', 'Unknown error')
-            return jsonify({
-                'error': f'Failed to send message: {error_description}',
-                'details': 'Check that the bot is added to the chat and has permission to send messages'
-            }), 500
-        
-        # Log action
-        try:
-            log_action(
-                action='admin_test_publish',
-                user_id=current_user.user_id,
-                details={'chat_id': chat_id, 'telegram_chat_id': chat.telegram_chat_id}
-            )
-        except Exception as log_error:
-            logger.warning(f"Failed to log test publish: {log_error}")
-        
-        return jsonify({
-            'success': True,
-            'message': 'Test message sent successfully',
-            'message_id': result.get('result', {}).get('message_id')
-        }), 200
-        
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error sending test message: {e}", exc_info=True)
-        return jsonify({
-            'error': f'Request error: {str(e)}',
-            'details': 'Check your internet connection and bot token'
-        }), 500
-    except Exception as e:
-        logger.error(f"Error in test publish: {e}", exc_info=True)
-        log_error(e, 'admin_test_publish_failed', current_user.user_id, {'chat_id': chat_id})
-        return jsonify({'error': str(e)}), 500
-
 
 @admin_bot_chats_crud_bp.route('/dashboard/bot-chats/<int:chat_id>/publish-object', methods=['POST'])
 @jwt_required

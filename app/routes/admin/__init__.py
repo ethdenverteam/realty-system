@@ -29,3 +29,5 @@ admin_routes_bp.register_blueprint(admin_bot_chats_bp)
 admin_routes_bp.register_blueprint(admin_publication_queues_bp)
 admin_routes_bp.register_blueprint(admin_account_autopublish_bp)
 
+# Legacy alias for backward compatibility
+admin_bp = admin_routes_bp

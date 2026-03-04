@@ -97,7 +97,7 @@ def create_app(config_class=Config):
     app.register_blueprint(chats_bp, url_prefix='/system/chats')
     app.register_blueprint(publications_bp, url_prefix='/system/publications')
     app.register_blueprint(account_publications_bp, url_prefix='/system/account-publications')
-    app.register_blueprint(admin_bp, url_prefix='/system/admin/legacy')
+    # admin_bp is an alias for admin_routes_bp, so we don't register it again to avoid duplicate registration
     app.register_blueprint(dashboard_bp, url_prefix='/system/dashboard/legacy')
     app.register_blueprint(logs_bp, url_prefix='/system/logs/legacy')
     app.register_blueprint(logs_viewer_bp, url_prefix='/system/logs-viewer/legacy')

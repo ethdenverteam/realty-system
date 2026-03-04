@@ -18,7 +18,6 @@ from app.utils.telethon.telethon_connection import (
 )
 from app.utils.telethon.telethon_chats import (
     get_chats,
-    subscribe_to_chat,
 )
 from app.utils.telethon.telethon_messages import (
     send_test_message,
@@ -39,7 +38,6 @@ __all__ = [
     'validate_chat_peer',
     '_is_connection_error',
     'get_chats',
-    'subscribe_to_chat',
     'send_test_message',
     'send_object_message',
     'run_async',
