@@ -81,7 +81,7 @@ def create_app(config_class=Config):
     from app.routes.dashboard import dashboard_bp  # Legacy
     from app.routes.logs import logs_bp  # Legacy
     from app.routes.logs_viewer import logs_viewer_bp  # Legacy
-    from app.routes.admin_routes import admin_routes_bp
+    from app.routes.admin import admin_routes_bp
     from app.routes.user_routes import user_routes_bp
     from app.routes.chat_subscriptions import chat_subscriptions_bp
     
