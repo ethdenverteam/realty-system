@@ -23,7 +23,7 @@ from bot.handlers import (
 from bot.handlers_object import create_object_conversation_handler
 from bot.handlers_settings import create_settings_conversation_handler
 from bot.handlers_objects_view import my_objects_command, my_objects_callback, edit_object_from_list
-from bot.handlers_object_edit import (
+from bot.handlers.object_edit import (
     edit_price_handler, edit_area_handler, edit_floor_handler, edit_comment_handler,
     edit_residential_complex_handler, edit_renovation_handler, edit_address_handler, edit_contacts_handler,
     edit_rooms_handler, edit_district_handler, add_district_handler,
@@ -108,7 +108,7 @@ def main():
     application.add_handler(CallbackQueryHandler(my_objects_callback, pattern="^(my_objects|my_objects_page_|edit_object_from_list_)"))
     # Register publish and delete handlers outside conversation for list view
     from bot.handlers_publication import publish_immediate_handler
-    from bot.handlers_object_edit import delete_object_handler, confirm_delete_object_handler
+    from bot.handlers.object_edit import delete_object_handler, confirm_delete_object_handler
     application.add_handler(CallbackQueryHandler(publish_immediate_handler, pattern="^publish_immediate_"))
     application.add_handler(CallbackQueryHandler(delete_object_handler, pattern="^delete_object_"))
     application.add_handler(CallbackQueryHandler(confirm_delete_object_handler, pattern="^confirm_delete_"))

@@ -1,6 +1,6 @@
 """
-API роуты для работы с объектами недвижимости
-Цель: CRUD операции для объектов, логирование всех действий пользователя
+Objects CRUD routes
+Логика: CRUD операции для объектов недвижимости
 """
 from flask import Blueprint, request, jsonify, current_app, render_template
 from app.database import db
@@ -10,25 +10,10 @@ from app.utils.logger import log_action, log_error
 from sqlalchemy import or_, and_
 import logging
 
-objects_bp = Blueprint('objects', __name__)
+objects_crud_bp = Blueprint('objects_crud', __name__)
 logger = logging.getLogger(__name__)
 
-
-@objects_bp.route('/create', methods=['GET'])
-@jwt_required
-def create_object_page(current_user):
-    """Show object creation page"""
-    return render_template('create_object.html')
-
-
-@objects_bp.route('/list', methods=['GET'])
-@jwt_required
-def list_objects_page(current_user):
-    """Show objects list page"""
-    return render_template('objects_list.html')
-
-
-@objects_bp.route('/', methods=['GET'])
+@objects_crud_bp.route('/', methods=['GET'])
 @jwt_required
 def list_objects(current_user):
     """
@@ -114,7 +99,7 @@ def list_objects(current_user):
         return jsonify({'error': 'Failed to retrieve objects'}), 500
 
 
-@objects_bp.route('/<object_id>', methods=['GET'])
+@objects_crud_bp.route('/<object_id>', methods=['GET'])
 @jwt_required
 def get_object(object_id, current_user):
     """
@@ -154,7 +139,7 @@ def get_object(object_id, current_user):
         return jsonify({'error': 'Failed to retrieve object'}), 500
 
 
-@objects_bp.route('/', methods=['POST'])
+@objects_crud_bp.route('/', methods=['POST'])
 @jwt_required
 def create_object(current_user):
     """
@@ -318,7 +303,7 @@ def create_object(current_user):
         return jsonify({'error': str(e)}), 500
 
 
-@objects_bp.route('/<object_id>', methods=['PUT'])
+@objects_crud_bp.route('/<object_id>', methods=['PUT'])
 @jwt_required
 def update_object(object_id, current_user):
     """Update object"""
@@ -403,7 +388,7 @@ def update_object(object_id, current_user):
         return jsonify({'error': str(e)}), 500
 
 
-@objects_bp.route('/<object_id>', methods=['DELETE'])
+@objects_crud_bp.route('/<object_id>', methods=['DELETE'])
 @jwt_required
 def delete_object(object_id, current_user):
     """Delete object"""
@@ -455,7 +440,7 @@ def delete_object(object_id, current_user):
         return jsonify({'error': str(e)}), 500
 
 
-@objects_bp.route('/publish-via-account', methods=['POST'])
+@objects_crud_bp.route('/publish-via-account', methods=['POST'])
 @jwt_required
 def publish_object_via_account(current_user):
     """Publish object via user Telegram account"""
@@ -672,7 +657,7 @@ def publish_object_via_account(current_user):
         return jsonify({'error': str(e)}), 500
 
 
-@objects_bp.route('/publish', methods=['POST'])
+@objects_crud_bp.route('/publish', methods=['POST'])
 @jwt_required
 def publish_object_via_bot(current_user):
     """Publish object via bot"""

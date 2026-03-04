@@ -72,7 +72,7 @@ def create_app(config_class=Config):
     
     # Register blueprints
     from app.routes.auth import auth_bp
-    from app.routes.objects import objects_bp
+    from app.routes.objects_handlers import objects_bp
     from app.routes.accounts import accounts_bp
     from app.routes.chats import chats_bp
     from app.routes.publications import publications_bp
@@ -82,7 +82,7 @@ def create_app(config_class=Config):
     from app.routes.logs import logs_bp  # Legacy
     from app.routes.logs_viewer import logs_viewer_bp  # Legacy
     from app.routes.admin import admin_routes_bp
-    from app.routes.user_routes import user_routes_bp
+    from app.routes.user import user_routes_bp
     from app.routes.chat_subscriptions import chat_subscriptions_bp
     
     # New structure
