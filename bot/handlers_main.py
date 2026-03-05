@@ -22,28 +22,39 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     telegram_id = str(user.id)
     
     # Логируем начало обработки команды
-    logger.info(f"Received /start command from user {user.id} (@{user.username})")
-    log_bot_action(
-        action='bot_command_start',
-        telegram_id=telegram_id,
-        username=user.username,
-        details={'args': context.args or []}
-    )
+    logger.info(f"[START_COMMAND] Received /start command from user {user.id} (@{user.username})")
+    logger.debug(f"[START_COMMAND] Update type: {type(update)}, Message: {update.message}, CallbackQuery: {update.callback_query}")
+    logger.debug(f"[START_COMMAND] Context args: {context.args}")
     sys.stdout.flush()
     
     try:
+        log_bot_action(
+            action='bot_command_start',
+            telegram_id=telegram_id,
+            username=user.username,
+            details={'args': context.args or []}
+        )
+    except Exception as e:
+        logger.warning(f"[START_COMMAND] Failed to log action: {e}", exc_info=True)
+    
+    sys.stdout.flush()
+    
+    try:
+        logger.debug(f"[START_COMMAND] Step 1: Updating user activity for {telegram_id}")
         # Обновляем активность пользователя в БД
         update_user_activity(telegram_id, user.username)
+        logger.debug(f"[START_COMMAND] Step 2: User activity updated")
         
         # Проверяем параметр start: если 'getcode', сразу генерируем код
         if context.args and len(context.args) > 0 and context.args[0] == 'getcode':
-            logger.info(f"Start parameter 'getcode' detected for user {user.id}")
+            logger.info(f"[START_COMMAND] Start parameter 'getcode' detected for user {user.id}")
             await getcode_command(update, context)
         else:
             # Иначе показываем главное меню
+            logger.debug(f"[START_COMMAND] Step 3: Showing main menu for user {user.id}")
             await show_main_menu(update, context)
         
-        logger.info(f"Successfully processed /start for user {user.id}")
+        logger.info(f"[START_COMMAND] Successfully processed /start for user {user.id}")
         sys.stdout.flush()
     except Exception as e:
         # Логируем ошибку с полным контекстом
@@ -90,22 +101,30 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "Добро пожаловать! Выберите действие:"
     
     try:
+        logger.debug(f"[SHOW_MAIN_MENU] Step 1: Preparing to send message")
         # Отправляем или редактируем сообщение в зависимости от типа update
         if update.callback_query:
+            logger.debug(f"[SHOW_MAIN_MENU] Step 2: Editing callback query message")
             await update.callback_query.edit_message_text(text, reply_markup=reply_markup)
-            logger.info(f"Edited message for user {user.id}")
+            logger.info(f"[SHOW_MAIN_MENU] Edited message for user {user.id}")
         elif update.message:
+            logger.debug(f"[SHOW_MAIN_MENU] Step 2: Replying to message")
             await update.message.reply_text(text, reply_markup=reply_markup)
-            logger.info(f"Sent message to user {user.id}")
+            logger.info(f"[SHOW_MAIN_MENU] Sent message to user {user.id}")
+        else:
+            logger.warning(f"[SHOW_MAIN_MENU] No message or callback_query in update")
         sys.stdout.flush()
     except Exception as e:
-        logger.error(f"Error showing main menu for user {user.id}: {e}", exc_info=True)
-        log_bot_error(
-            error=e,
-            action='bot_menu_main_shown',
-            telegram_id=telegram_id,
-            username=user.username
-        )
+        logger.error(f"[SHOW_MAIN_MENU] Error showing main menu for user {user.id}: {e}", exc_info=True)
+        try:
+            log_bot_error(
+                error=e,
+                action='bot_menu_main_shown',
+                telegram_id=telegram_id,
+                username=user.username
+            )
+        except Exception as log_err:
+            logger.error(f"[SHOW_MAIN_MENU] Failed to log error: {log_err}")
         sys.stdout.flush()
         raise
 

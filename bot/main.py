@@ -81,27 +81,62 @@ def main():
 
         error_name = error.__class__.__name__
         error_msg = str(error)
+        
+        # Логируем информацию об update
+        update_info = "unknown"
+        if isinstance(update, Update):
+            if update.message:
+                update_info = f"message from {update.effective_user.id if update.effective_user else 'unknown'}: {update.message.text or 'media'}"
+            elif update.callback_query:
+                update_info = f"callback_query from {update.effective_user.id if update.effective_user else 'unknown'}: {update.callback_query.data}"
+            else:
+                update_info = f"update type: {type(update)}"
+        
+        logger.debug(f"[ERROR_HANDLER] Processing error: {error_name} for {update_info}")
 
         # Конфликт getUpdates — признак второго инстанса, логируем мягко без трейсбека
         if 'Conflict' in error_name or 'Conflict' in error_msg or 'getUpdates' in error_msg:
-            logger.warning(f"Bot getUpdates conflict detected (probably multiple instances): {error_msg}")
+            logger.warning(f"[ERROR_HANDLER] Bot getUpdates conflict detected (probably multiple instances): {error_msg}")
             return
 
         # Сетевые ошибки Telegram (Bad Gateway, ConnectError) — логируем как warning
         network_keywords = ['Bad Gateway', 'ConnectError', 'NetworkError', 'All connection attempts failed']
         if any(k in error_msg for k in network_keywords):
-            logger.warning(f"Transient network error while handling update: {error_msg}")
+            logger.warning(f"[ERROR_HANDLER] Transient network error while handling update: {error_msg}")
             return
 
         # Остальное — полноценный error с трейсбеком
-        logger.error(f"Exception while handling an update: {error}", exc_info=error)
+        logger.error(f"[ERROR_HANDLER] Exception while handling an update ({update_info}): {error}", exc_info=error)
+        
+        # Логируем в test_bot_errors.log через test handler
+        try:
+            error_logger = logging.getLogger('bot.errors')
+            error_logger.error(f"Error in update {update_info}: {error_name}: {error_msg}", exc_info=error)
+        except Exception as e:
+            logger.error(f"Failed to log error to test_bot_errors.log: {e}")
     
     application.add_error_handler(error_handler)
     
     # Register handlers
     logger.info("Registering command handlers...")
+    
+    # Добавляем логирование всех входящих команд перед обработкой
+    async def log_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Логируем все входящие команды"""
+        if update.message and update.message.text:
+            command = update.message.text.split()[0] if update.message.text.split() else ""
+            user = update.effective_user
+            logger.info(f"COMMAND_RECEIVED: {command} from user {user.id if user else 'unknown'} (@{user.username if user else 'unknown'})")
+            sys.stdout.flush()
+    
+    # Добавляем обработчик логирования команд с низким приоритетом
+    application.add_handler(MessageHandler(filters.COMMAND, log_command_handler), group=-2)
+    
+    logger.info("Registering /start command handler...")
     application.add_handler(CommandHandler("start", start_command))
+    logger.info("Registering /getcode command handler...")
     application.add_handler(CommandHandler("getcode", getcode_command))
+    logger.info("Registering /myobjects command handler...")
     application.add_handler(CommandHandler("myobjects", my_objects_command))
     application.add_handler(CallbackQueryHandler(show_main_menu, pattern="^main_menu$"))
     application.add_handler(CallbackQueryHandler(getcode_command, pattern="^getcode$"))

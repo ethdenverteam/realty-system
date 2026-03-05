@@ -571,7 +571,7 @@ def format_publication_text(obj: Object, user: User = None, is_preview: bool = F
             lines.append("🔑¦<a href=\"http://t.me/keyskrd\">Ключи</a>")
             lines.append("🏢¦<a href=\"http://t.me/MasterKeyRobot\">@MasterKeyRobot</a>")
             lines.append("🗂¦<a href=\"https://t.me/addlist/QDGm9RwOldE4YzM6\">Папка со всеми чатами</a>")
-        lines.append("")
+            lines.append("")
     
     # Контакты
     phone = obj.phone_number or (user.phone if user else None)
@@ -581,7 +581,7 @@ def format_publication_text(obj: Object, user: User = None, is_preview: bool = F
     show_username = obj.show_username or False
     
     if contact_name or phone or contact_name_2 or phone_2 or (show_username and user and user.username):
-            lines.append("")
+        lines.append("")
         if contact_name:
             lines.append(f"🕴🏻¦{contact_name}")  # Обычные символы, не заменяем
         if phone:
