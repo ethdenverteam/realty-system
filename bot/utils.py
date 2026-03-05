@@ -327,21 +327,36 @@ def generate_district_hashtag(district_name: str, suffix: str = "_ф") -> str:
     return f"#_{hashtag_name}{suffix}"
 
 
-def generate_room_hashtag(room_type: str, suffix: str = "_ф") -> str:
-    """Генерировать хэштег для типа комнат"""
-    room_mapping = {
-        "Студия": "студия_ст",
-        "1к": "однокомнатная_1к",
-        "2к": "двухкомнатная_2к",
-        "3к": "трехкомнатная_3к",
-        "4+к": "четырехкомнатная_4к",
-        "Дом": "дом",
-        "евро1к": "еврооднокомнатная_евро1к",
-        "евро2к": "евродвухкомнатная_евро2к",
-        "евро3к": "евротрехкомнатная_евро3к"
+def generate_room_hashtags(room_type: str) -> list:
+    """
+    Генерировать хэштеги для типа комнат
+    Возвращает список хэштегов (может быть несколько для евро-типов)
+    Для типа "Дом" возвращает пустой список
+    """
+    if room_type == "Дом":
+        return []
+    
+    hashtags = []
+    
+    # Маппинг типов комнат на хэштеги
+    room_hashtag_mapping = {
+        "Студия": ["студия"],
+        "1к": ["однокомнатная"],
+        "2к": ["двухкомнатная"],
+        "3к": ["трехкомнатная"],
+        "4+к": ["четырехкомнатная"],
+        "евро1к": ["однокомнатная", "еврооднокомнатная"],
+        "евро2к": ["двухкомнатная", "евродвухкомнатная"],
+        "евро3к": ["трехкомнатная", "евротрехкомнатная"]
     }
-    room_key = room_mapping.get(room_type, room_type.lower().replace(" ", ""))
-    return f"#_{room_key}{suffix}"
+    
+    hashtag_names = room_hashtag_mapping.get(room_type, [room_type.lower().replace(" ", "_")])
+    
+    # Формируем хэштеги в формате #_название (без суффикса)
+    for name in hashtag_names:
+        hashtags.append(f"#_{name}")
+    
+    return hashtags
 
 
 def generate_price_range_hashtag(range_name: str, suffix: str = "_ф") -> str:
@@ -444,6 +459,13 @@ def _format_publication_text_compact(obj: Object, user: User = None, is_preview:
         contact2_parts.append(f"@{user.username}")  # Обычные символы
     if contact2_parts:
         lines.append(" ".join(contact2_parts))
+    
+    # Хэштеги в самом низу (только для типа комнат, без суффикса)
+    if obj.rooms_type:
+        room_hashtags = generate_room_hashtags(obj.rooms_type)
+        if room_hashtags:
+            lines.append("")
+            lines.append(" ".join(room_hashtags))
     
     return "\n".join(lines)
 
@@ -553,29 +575,6 @@ def format_publication_text(obj: Object, user: User = None, is_preview: bool = F
             lines.append("🗂¦<a href=\"https://t.me/addlist/QDGm9RwOldE4YzM6\">Папка со всеми чатами</a>")
             lines.append("")
     
-    # Хэштеги
-    hashtags = []
-    suffix = get_hashtag_suffix()
-    
-    if obj.rooms_type:
-        hashtags.append(generate_room_hashtag(obj.rooms_type, suffix))
-    
-    for district in districts:
-        if isinstance(district, str):
-            hashtags.append(generate_district_hashtag(district, suffix))
-    
-    price_ranges = get_price_ranges()
-    if price > 0 and price_ranges:
-        for range_name, range_values in price_ranges.items():
-            if isinstance(range_values, list) and len(range_values) >= 2:
-                if range_values[0] <= price < range_values[1]:
-                    hashtags.append(generate_price_range_hashtag(range_name, suffix))
-                    break
-    
-    if hashtags:
-        lines.append(" ".join(hashtags))
-        lines.append("")
-    
     # Контакты
     phone = obj.phone_number or (user.phone if user else None)
     contact_name = obj.contact_name or ""
@@ -584,8 +583,7 @@ def format_publication_text(obj: Object, user: User = None, is_preview: bool = F
     show_username = obj.show_username or False
     
     if contact_name or phone or contact_name_2 or phone_2 or (show_username and user and user.username):
-        if not hashtags:
-            lines.append("")
+        lines.append("")
         if contact_name:
             lines.append(f"🕴🏻¦{contact_name}")  # Обычные символы, не заменяем
         if phone:
@@ -608,5 +606,12 @@ def format_publication_text(obj: Object, user: User = None, is_preview: bool = F
     # Районы второго уровня
     if len(second_level_districts) > 1:
         lines.append(f"🗾¦ {', '.join(second_level_districts)}")
+    
+    # Хэштеги в самом низу (только для типа комнат, без суффикса)
+    if obj.rooms_type:
+        room_hashtags = generate_room_hashtags(obj.rooms_type)
+        if room_hashtags:
+            lines.append("")
+            lines.append(" ".join(room_hashtags))
     
     return "\n".join(lines)
