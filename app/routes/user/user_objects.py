@@ -83,23 +83,8 @@ def user_objects_list(current_user):
     for obj in pagination.items:
         obj_dict = obj.to_dict()
         
-        if current_user.web_role != 'admin':
-            # Check if can publish (not published within last 24 hours)
-            from datetime import timedelta
-            yesterday = datetime.utcnow() - timedelta(days=1)
-            recent_publications = PublicationHistory.query.filter(
-                PublicationHistory.object_id == obj.object_id,
-                PublicationHistory.published_at >= yesterday,
-                PublicationHistory.deleted == False
-            ).all()
-            
-            obj_dict['can_publish'] = len(recent_publications) == 0
-            if recent_publications:
-                last_pub = max(recent_publications, key=lambda p: p.published_at)
-                obj_dict['last_publication'] = last_pub.published_at.isoformat()
-        else:
-            # Админы всегда могут публиковать
-            obj_dict['can_publish'] = True
+        # Всегда разрешаем публикацию
+        obj_dict['can_publish'] = True
         
         objects_list.append(obj_dict)
     
@@ -128,24 +113,9 @@ def user_get_object(object_id, current_user):
     if not obj:
         return jsonify({'error': 'Object not found'}), 404
     
-    # Check if can publish (not published within last 24 hours)
-    # Проверка не применяется для админов (они могут публиковать без ограничений)
+    # Всегда разрешаем публикацию
     can_publish = True
     last_publication = None
-    
-    if current_user.web_role != 'admin':
-        from datetime import timedelta
-        yesterday = datetime.utcnow() - timedelta(days=1)
-        recent_publications = PublicationHistory.query.filter(
-            PublicationHistory.object_id == object_id,
-            PublicationHistory.published_at >= yesterday,
-            PublicationHistory.deleted == False
-        ).all()
-        
-        can_publish = len(recent_publications) == 0
-        if recent_publications:
-            last_pub = max(recent_publications, key=lambda p: p.published_at)
-            last_publication = last_pub.published_at.isoformat()
     
     obj_dict = obj.to_dict()
     obj_dict['can_publish'] = can_publish
@@ -337,24 +307,6 @@ def user_publish_object_via_bot(current_user):
                 'details': 'No active chats match the object parameters'
             }), 400
         
-        # Check if object was published within last 24 hours
-        # Проверка не применяется для админов (они могут публиковать без ограничений)
-        if current_user.web_role != 'admin':
-            yesterday = datetime.utcnow() - timedelta(days=1)
-            recent_publications = PublicationHistory.query.filter(
-                PublicationHistory.object_id == object_id,
-                PublicationHistory.chat_id.in_(target_chats),
-                PublicationHistory.published_at >= yesterday,
-                PublicationHistory.deleted == False
-            ).all()
-            
-            if recent_publications:
-                blocked_chats = [p.chat_id for p in recent_publications]
-                return jsonify({
-                    'error': 'Object was already published to some chats within 24 hours',
-                    'blocked_chat_ids': blocked_chats
-                }), 400
-        
         # Publish to each chat
         published_count = 0
         errors = []
@@ -366,20 +318,6 @@ def user_publish_object_via_bot(current_user):
                 chat = Chat.query.filter_by(chat_id=chat_id).first()
                 if not chat:
                     continue
-                
-                # Check if already published to this chat within 24 hours
-                # Проверка не применяется для админов (они могут публиковать без ограничений)
-                if current_user.web_role != 'admin':
-                    yesterday = datetime.utcnow() - timedelta(days=1)
-                    recent_pub = PublicationHistory.query.filter(
-                        PublicationHistory.object_id == object_id,
-                        PublicationHistory.chat_id == chat_id,
-                        PublicationHistory.published_at >= yesterday,
-                        PublicationHistory.deleted == False
-                    ).first()
-                    
-                    if recent_pub:
-                        continue
                 
                 telegram_chat_id = chat.telegram_chat_id
                 

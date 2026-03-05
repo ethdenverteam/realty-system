@@ -169,23 +169,7 @@ def process_account_autopublish():
                                     app_db.session.commit()
                                     continue
                         
-                        # Проверка дубликатов через унифицированную утилиту
-                        from app.utils.duplicate_checker import check_duplicate_publication
-                        can_publish, reason = check_duplicate_publication(
-                            object_id=queue.object_id,
-                            chat_id=queue.chat_id,
-                            account_id=queue.account_id,
-                            publication_type='autopublish_account',
-                            user_id=queue.user_id,
-                            allow_duplicates_setting=None  # Получит из SystemSetting автоматически
-                        )
-                        
-                        if not can_publish:
-                            logger.info(f"Object {queue.object_id} cannot be published to chat {queue.chat_id} via account {queue.account_id}: {reason}")
-                            queue.status = 'failed'
-                            queue.error_message = reason
-                            app_db.session.commit()
-                            continue
+                        # Проверка дубликатов удалена - публикация всегда разрешена
                         
                         # Проверка rate limit
                         rate_status = get_rate_limit_status(account.phone)

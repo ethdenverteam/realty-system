@@ -52,10 +52,6 @@ def admin_publish_object_to_chat(chat_id, current_user):
         if not obj:
             return jsonify({'error': 'Object not found'}), 404
         
-        # Check if object was published to this chat within last 24 hours
-        # Проверка не применяется для админов (они могут публиковать без ограничений)
-        # Админы уже проверены через @role_required('admin'), поэтому пропускаем проверку
-        
         if not BOT_TOKEN:
             return jsonify({'error': 'BOT_TOKEN is not configured'}), 500
         

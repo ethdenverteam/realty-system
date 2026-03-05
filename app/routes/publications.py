@@ -33,32 +33,6 @@ def create_publication(current_user):
     if not obj:
         return jsonify({'error': 'Object not found'}), 404
     
-    # Проверка дубликатов через унифицированную утилиту
-    from app.utils.duplicate_checker import check_duplicate_publication
-    
-    publication_type = 'manual_account' if account_id else 'manual_bot'
-    blocked_chats = []
-    
-    for chat_id in chat_ids:
-        can_publish, reason = check_duplicate_publication(
-            object_id=object_id,
-            chat_id=chat_id,
-            account_id=account_id,
-            publication_type=publication_type,
-            user_id=current_user.user_id,
-            allow_duplicates_setting=None
-        )
-        
-        if not can_publish:
-            blocked_chats.append(chat_id)
-    
-    if blocked_chats:
-        return jsonify({
-            'error': 'Object was already published to some chats within 24 hours',
-            'blocked_chat_ids': blocked_chats,
-            'reason': 'Duplicate publication check failed'
-        }), 400
-    
     # Create queue entries
     queue_ids = []
     for chat_id in chat_ids:

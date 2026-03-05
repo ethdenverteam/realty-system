@@ -112,27 +112,7 @@ def publish_to_telegram(queue_id: int):
                     db.session.commit()
                     return False
         
-        # Проверка дубликатов через унифицированную утилиту
-        from app.utils.duplicate_checker import check_duplicate_publication
-        
-        # Определяем тип публикации
-        publication_type = 'autopublish_bot' if queue.mode == 'autopublish' else 'manual_bot'
-        
-        can_publish, reason = check_duplicate_publication(
-            object_id=queue.object_id,
-            chat_id=queue.chat_id,
-            account_id=None,  # Бот
-            publication_type=publication_type,
-            user_id=queue.user_id,
-            allow_duplicates_setting=None  # Получит из SystemSetting автоматически
-        )
-        
-        if not can_publish:
-            logger.info(f"Object {queue.object_id} cannot be published to chat {queue.chat_id} via bot: {reason}")
-            queue.status = 'failed'
-            queue.error_message = reason
-            db.session.commit()
-            return False
+        # Проверка дубликатов удалена - публикация всегда разрешена
         
         # Реализация публикации через Telegram API
         import requests

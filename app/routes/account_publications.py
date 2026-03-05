@@ -9,7 +9,6 @@ from app.models.telegram_account import TelegramAccount
 from app.models.chat import Chat
 from app.utils.decorators import jwt_required
 from app.utils.logger import log_action, log_error
-from app.utils.duplicate_checker import check_duplicate_publication
 from app.utils.rate_limiter import get_rate_limit_status
 from app.utils.account_publication_utils import calculate_scheduled_times_for_account
 from app.utils.time_utils import get_moscow_time, msk_to_utc
@@ -85,27 +84,6 @@ def create_manual_account_publication(current_user):
         # Если готов - первое сообщение отправляется сейчас
         first_scheduled_time = now
         logger.info(f"Account {account_id} ready, scheduling first message immediately")
-    
-    # Проверяем дубликаты для каждого чата
-    blocked_chats = []
-    for chat in chats:
-        can_publish, reason = check_duplicate_publication(
-            object_id=object_id,
-            chat_id=chat.chat_id,
-            account_id=account_id,
-            publication_type='manual_account',
-            user_id=current_user.user_id,
-            allow_duplicates_setting=None
-        )
-        
-        if not can_publish:
-            blocked_chats.append(chat.chat_id)
-    
-    if blocked_chats:
-        return jsonify({
-            'error': 'Object was already published to some chats within 24 hours',
-            'blocked_chat_ids': blocked_chats
-        }), 400
     
     # Рассчитываем расписание для всех задач
     total_tasks = len(chats)

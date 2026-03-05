@@ -4,7 +4,7 @@ Publication handlers for bot
 import logging
 import asyncio
 from datetime import datetime
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo, InputFile
 from telegram.ext import ContextTypes, ConversationHandler
 from bot.utils import (
     get_user, get_object, update_object, get_districts_config, get_price_ranges,
@@ -166,44 +166,6 @@ async def publish_immediate_handler(update: Update, context: ContextTypes.DEFAUL
         
         return OBJECT_PREVIEW_MENU
     
-    # Check if object was already published within last 24 hours
-    # Проверка не применяется для админов (они могут публиковать без ограничений)
-    user_obj = get_user(str(user.id))
-    is_admin = user_obj and user_obj.web_role == 'admin'
-    
-    if not is_admin:
-        from datetime import timedelta
-        yesterday = datetime.utcnow() - timedelta(days=1)
-        recent_publications = db.session.query(PublicationHistory).filter(
-            PublicationHistory.object_id == object_id,
-            PublicationHistory.published_at >= yesterday,
-            PublicationHistory.deleted == False
-        ).all()
-        
-        if recent_publications:
-            blocked_chats = []
-            for pub in recent_publications:
-                chat = db.session.query(Chat).filter_by(chat_id=pub.chat_id).first()
-                if chat:
-                    blocked_chats.append(chat.title or f'Чат {chat.chat_id}')
-            
-            if blocked_chats:
-                error_text = "⚠️ <b>Ошибка!</b>\n\n"
-                error_text += "Этот объект уже был опубликован в следующие чаты в течение последних 24 часов:\n\n"
-                for i, name in enumerate(blocked_chats, 1):
-                    error_text += f"{i}. {name}\n"
-                error_text += "\nОдин объект не может быть опубликован в один и тот же чат чаще чем раз в сутки."
-                
-                keyboard = [[InlineKeyboardButton("⬅️ Назад к редактированию", callback_data="back_to_preview")]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                
-                try:
-                    await query.message.reply_text(error_text, reply_markup=reply_markup, parse_mode='HTML')
-                except:
-                    await query.edit_message_text(error_text, reply_markup=reply_markup, parse_mode='HTML')
-                
-                return OBJECT_PREVIEW_MENU
-    
     # Get target chats
     target_chats = await get_target_chats_for_object(obj)
     
@@ -309,36 +271,11 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
     # Publish to each chat
     for chat_id in target_chats:
         try:
-            # Check if object was published to this chat within last 24 hours
-            # Проверка не применяется для админов (они могут публиковать без ограничений)
-            user_obj = get_user(str(user.id))
-            is_admin = user_obj and user_obj.web_role == 'admin'
+            chat = db.session.query(Chat).filter_by(chat_id=chat_id).first()
+            if not chat:
+                continue
             
-            if not is_admin:
-                chat = db.session.query(Chat).filter_by(chat_id=chat_id).first()
-                if not chat:
-                    continue
-                
-                # Check publication history for this object and chat
-                yesterday = datetime.utcnow() - timedelta(days=1)
-                recent_publication = db.session.query(PublicationHistory).filter(
-                    PublicationHistory.object_id == object_id,
-                    PublicationHistory.chat_id == chat_id,
-                    PublicationHistory.published_at >= yesterday,
-                    PublicationHistory.deleted == False
-                ).first()
-                
-                if recent_publication:
-                    logger.info(f"Object {object_id} was already published to chat {chat_id} within 24 hours, skipping")
-                    continue
-                
-                telegram_chat_id = chat.telegram_chat_id
-            else:
-                # Для админов просто получаем telegram_chat_id без проверки
-                chat = db.session.query(Chat).filter_by(chat_id=chat_id).first()
-                if not chat:
-                    continue
-                telegram_chat_id = chat.telegram_chat_id
+            telegram_chat_id = chat.telegram_chat_id
             
             # Send message - всегда отправляем фото если оно есть
             # Всегда используем путь к файлу на сервере
@@ -382,14 +319,13 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
                     
                     logger.info(f"Trying to send photo in publication: photo_path={photo_path}, full_path={full_path}, exists={os.path.exists(full_path)}")
                     if os.path.exists(full_path):
-                        # Открываем файл и отправляем
-                        with open(full_path, 'rb') as f:
-                            await context.bot.send_photo(
-                                chat_id=telegram_chat_id,
-                                photo=f,
-                                caption=publication_text,
-                                parse_mode='HTML'
-                            )
+                        # Отправляем фото через InputFile для надежности
+                        await context.bot.send_photo(
+                            chat_id=telegram_chat_id,
+                            photo=InputFile(full_path),
+                            caption=publication_text,
+                            parse_mode='HTML'
+                        )
                     else:
                         logger.warning(f"Photo file not found: {full_path} (original: {photo_path})")
                         # Отправляем только текст если файл не найден

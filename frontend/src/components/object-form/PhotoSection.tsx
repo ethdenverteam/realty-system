@@ -1,12 +1,10 @@
-import { type ChangeEvent } from 'react'
+import { useState, useEffect, type ChangeEvent } from 'react'
 import type { ObjectFormData } from '../../types/models'
 
 interface PhotoSectionProps {
   formData: ObjectFormData
   onChange: (data: ObjectFormData) => void
 }
-
-import { useState, useEffect } from 'react'
 
 function PhotoPreview({ file }: { file: File }): JSX.Element {
   const [previewUrl, setPreviewUrl] = useState<string>('')

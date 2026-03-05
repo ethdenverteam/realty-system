@@ -513,22 +513,6 @@ def publish_object_via_account(current_user):
             'next_available': rate_status['next_available']
         }), 429
     
-    # Check if object was published to this chat within last 24 hours
-    # Проверка не применяется для админов (они могут публиковать без ограничений)
-    if current_user.web_role != 'admin':
-        yesterday = datetime.utcnow() - timedelta(days=1)
-        recent_pub = PublicationHistory.query.filter(
-            PublicationHistory.object_id == object_id,
-            PublicationHistory.chat_id == chat_id,
-            PublicationHistory.published_at >= yesterday,
-            PublicationHistory.deleted == False
-        ).first()
-        
-        if recent_pub:
-            return jsonify({
-                'error': 'Object was already published to this chat within 24 hours'
-            }), 400
-    
     try:
         # Get bot user and object for formatting
         bot_user = None
@@ -837,24 +821,6 @@ def publish_object_via_bot(current_user):
                 'details': 'No active chats match the object parameters'
             }), 400
         
-        # Check if object was published within last 24 hours
-        # Проверка не применяется для админов (они могут публиковать без ограничений)
-        if current_user.web_role != 'admin':
-            yesterday = datetime.utcnow() - timedelta(days=1)
-            recent_publications = PublicationHistory.query.filter(
-                PublicationHistory.object_id == object_id,
-                PublicationHistory.chat_id.in_(target_chats),
-                PublicationHistory.published_at >= yesterday,
-                PublicationHistory.deleted == False
-            ).all()
-            
-            if recent_publications:
-                blocked_chats = [p.chat_id for p in recent_publications]
-                return jsonify({
-                    'error': 'Object was already published to some chats within 24 hours',
-                    'blocked_chat_ids': blocked_chats
-                }), 400
-        
         # Publish to each chat
         published_count = 0
         errors = []
@@ -866,19 +832,6 @@ def publish_object_via_bot(current_user):
                 chat = Chat.query.filter_by(chat_id=chat_id).first()
                 if not chat:
                     continue
-                
-                # Check if already published to this chat within 24 hours
-                # Проверка не применяется для админов (они могут публиковать без ограничений)
-                if current_user.web_role != 'admin':
-                    recent_pub = PublicationHistory.query.filter(
-                        PublicationHistory.object_id == object_id,
-                        PublicationHistory.chat_id == chat_id,
-                        PublicationHistory.published_at >= yesterday,
-                        PublicationHistory.deleted == False
-                    ).first()
-                    
-                    if recent_pub:
-                        continue
                 
                 telegram_chat_id = chat.telegram_chat_id
                 
