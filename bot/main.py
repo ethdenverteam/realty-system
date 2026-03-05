@@ -15,7 +15,7 @@ from telegram.ext import (
 )
 from telegram import Update
 
-from bot.handlers import (
+from bot.handlers_main import (
     start_command,
     show_main_menu,
     getcode_command,

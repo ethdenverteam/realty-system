@@ -14,7 +14,7 @@ from app.database import db
 from bot.models import Object, ActionLog, Chat, PublicationHistory
 from datetime import timedelta
 from bot.handlers_object import user_data, show_object_preview_with_menu
-from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
+from bot.handlers.object_edit import OBJECT_PREVIEW_MENU
 
 logger = logging.getLogger(__name__)
 

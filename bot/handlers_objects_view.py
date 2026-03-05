@@ -151,7 +151,7 @@ async def edit_object_from_list(update: Update, context: ContextTypes.DEFAULT_TY
     
     # Show preview with menu
     from bot.handlers_object import show_object_preview_with_menu
-    from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
+    from bot.handlers.object_edit import OBJECT_PREVIEW_MENU
     await show_object_preview_with_menu(update, context, object_id)
     return OBJECT_PREVIEW_MENU
 

@@ -338,3 +338,75 @@ async def residential_complex_input(update: Update, context: ContextTypes.DEFAUL
 
 
 async def edit_renovation_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик кнопки редактирования ремонта"""
+    query = update.callback_query
+    await query.answer()
+    
+    object_id = query.data.replace("edit_renovation_", "")
+    
+    user = update.effective_user
+    if user.id not in user_data:
+        user_data[user.id] = {}
+    user_data[user.id]["object_id"] = object_id
+    
+    await delete_preview_and_menu(context, user.id)
+    
+    # Варианты ремонта
+    renovation_options = [
+        "Евроремонт",
+        "Косметический",
+        "Без ремонта",
+        "Требует ремонта"
+    ]
+    
+    keyboard = []
+    for option in renovation_options:
+        keyboard.append([InlineKeyboardButton(option, callback_data=f"renovation_{option}_{object_id}")])
+    keyboard.append([InlineKeyboardButton("🏠 Назад", callback_data="back_to_preview")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.message.reply_text("Выберите состояние ремонта:", reply_markup=reply_markup)
+    return OBJECT_WAITING_RENOVATION  # Ожидаем выбора ремонта
+
+
+async def renovation_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка выбора ремонта"""
+    query = update.callback_query
+    await query.answer()
+    
+    # Извлекаем вариант ремонта и object_id из callback_data
+    # Формат: renovation_{option}_{object_id}
+    callback_data = query.data
+    parts = callback_data.split("_", 2)  # Разделяем на ["renovation", "{option}", "{object_id}"]
+    
+    if len(parts) < 3:
+        await query.message.reply_text("Ошибка: неверный формат данных.")
+        return ConversationHandler.END
+    
+    renovation = parts[1]  # Вариант ремонта
+    object_id = parts[2]   # ID объекта
+    
+    user = update.effective_user
+    if user.id not in user_data:
+        user_data[user.id] = {}
+    user_data[user.id]["object_id"] = object_id
+    
+    # Обновляем объект
+    update_object(object_id, {"renovation": renovation})
+    
+    # Log action
+    try:
+        user_obj = get_user(str(user.id))
+        if user_obj:
+            action_log = ActionLog(
+                user_id=user_obj.user_id,
+                action='bot_object_renovation_updated',
+                details_json={'object_id': object_id, 'renovation': renovation},
+                created_at=datetime.utcnow()
+            )
+            db.session.add(action_log)
+            db.session.commit()
+    except Exception as e:
+        logger.error(f"Failed to log action: {e}")
+    
+    await show_object_preview_with_menu(update, context, object_id)
+    return OBJECT_PREVIEW_MENU

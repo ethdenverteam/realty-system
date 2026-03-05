@@ -269,7 +269,7 @@ async def object_area_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # If comment exists, this is editing from menu - return to preview
         if comment:
-            from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
+            from bot.handlers.object_edit import OBJECT_PREVIEW_MENU
             await show_object_preview_with_menu(update, context, object_id)
             return OBJECT_PREVIEW_MENU
         
@@ -321,7 +321,7 @@ async def object_floor_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # If comment exists, this is editing from menu - return to preview
     if comment:
-        from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
+        from bot.handlers.object_edit import OBJECT_PREVIEW_MENU
         await show_object_preview_with_menu(update, context, object_id)
         return OBJECT_PREVIEW_MENU
     
@@ -359,7 +359,7 @@ async def object_comment_input(update: Update, context: ContextTypes.DEFAULT_TYP
     
     # If photos exist, this is editing from menu - return to preview
     if photos_count > 0:
-        from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
+        from bot.handlers.object_edit import OBJECT_PREVIEW_MENU
         await show_object_preview_with_menu(update, context, object_id)
         return OBJECT_PREVIEW_MENU
     
@@ -458,7 +458,7 @@ async def object_media_received(update: Update, context: ContextTypes.DEFAULT_TY
         # Check if this is editing (comment exists) or creation
         obj = get_object(object_id)
         if obj and obj.comment:
-            from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
+            from bot.handlers.object_edit import OBJECT_PREVIEW_MENU
             await show_object_preview_with_menu(update, context, object_id)
             return OBJECT_PREVIEW_MENU
         return await finish_object_creation(update, context)
@@ -647,7 +647,7 @@ async def show_object_preview_with_menu(update: Update, context: ContextTypes.DE
         db_session.close()
     
     # Return preview menu state instead of END to allow editing
-    from bot.handlers_object_edit import OBJECT_PREVIEW_MENU
+    from bot.handlers.object_edit import OBJECT_PREVIEW_MENU
     return OBJECT_PREVIEW_MENU
 
 
