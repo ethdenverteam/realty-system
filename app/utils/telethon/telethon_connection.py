@@ -75,13 +75,88 @@ async def validate_chat_peer(client: TelegramClient, telegram_chat_id: int) -> b
     Проверяет, что для данного клиента существует валидный peer с указанным telegram_chat_id.
     Используется перед отправкой сообщения, чтобы избежать Invalid Peer.
     """
+    original_id = telegram_chat_id
     try:
-        # Получаем диалог/чат по ID, если не удаётся — peer невалиден
-        dialogs = await client.get_dialogs(limit=200)
+        # 1) Пытаемся напрямую получить сущность по тому ID/строке, который храним в БД.
+        # Это даёт нам корректное поведение как для Telethon‑ID, так и для Bot API chat_id (-100...).
+        target = telegram_chat_id
+        if isinstance(target, str):
+            try:
+                # Если это числовая строка — конвертируем в int (Telethon сам разрулит формат).
+                target = int(target)
+            except ValueError:
+                # Ненумерическое значение (username/ссылка) — пробуем как есть.
+                pass
+
+        try:
+            entity = await client.get_entity(target)
+            resolved_id = getattr(entity, 'id', None)
+            logger.debug(
+                f"validate_chat_peer: resolved telegram_chat_id={original_id} "
+                f"to entity id={resolved_id}"
+            )
+            return True
+        except (ChannelPrivateError, UsernameNotOccupiedError) as e:
+            # Аккаунт не имеет доступа к чату / чат приватный
+            logger.warning(
+                f"validate_chat_peer: chat {original_id} is not accessible for this account: {e}"
+            )
+            telethon_logger.warning(
+                f"validate_chat_peer: chat {original_id} is not accessible for this account: {e}"
+            )
+            return False
+        except Exception as e:
+            # Любая другая ошибка при get_entity — логируем и переходим к запасному пути.
+            logger.warning(
+                f"validate_chat_peer: get_entity failed for {original_id}, "
+                f"falling back to dialogs scan: {e}"
+            )
+            telethon_logger.warning(
+                f"validate_chat_peer: get_entity failed for {original_id}, "
+                f"falling back to dialogs scan: {e}"
+            )
+
+        # 2) Запасной путь: просматриваем все диалоги и ищем совпадение по ID.
+        # Используем limit=None, чтобы не отваливаться на аккаунтах с большим числом чатов.
+        dialogs = await client.get_dialogs(limit=None)
         for dlg in dialogs:
             entity = dlg.entity
-            if hasattr(entity, 'id') and int(getattr(entity, 'id')) == int(telegram_chat_id):
-                return True
+            ent_id = getattr(entity, 'id', None)
+            if ent_id is None:
+                continue
+
+            try:
+                if isinstance(original_id, str):
+                    # В БД могли сохранить строку из Telethon (str(entity.id)).
+                    if str(ent_id) == original_id:
+                        logger.debug(
+                            f"validate_chat_peer: matched dialog entity.id={ent_id} "
+                            f"for telegram_chat_id={original_id}"
+                        )
+                        return True
+                else:
+                    if int(ent_id) == int(original_id):
+                        logger.debug(
+                            f"validate_chat_peer: matched dialog entity.id={ent_id} "
+                            f"for telegram_chat_id={original_id}"
+                        )
+                        return True
+            except Exception as cmp_err:
+                # Не даём сравнительной ошибке прервать проверку остальных диалогов
+                logger.debug(
+                    f"validate_chat_peer: error while comparing ids "
+                    f"(entity_id={ent_id}, telegram_chat_id={original_id}): {cmp_err}"
+                )
+                continue
+
+        logger.warning(
+            f"validate_chat_peer: chat {original_id} not found in account dialogs; "
+            f"peer considered invalid"
+        )
+        telethon_logger.warning(
+            f"validate_chat_peer: chat {original_id} not found in account dialogs; "
+            f"peer considered invalid"
+        )
         return False
     except Exception as e:
         logger.error(f"Error validating chat peer {telegram_chat_id}: {e}", exc_info=True)
