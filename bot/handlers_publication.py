@@ -163,8 +163,8 @@ async def publish_immediate_handler(update: Update, context: ContextTypes.DEFAUL
             await query.message.reply_text(warning_text, reply_markup=reply_markup, parse_mode='HTML')
         except:
             await query.edit_message_text(warning_text, reply_markup=reply_markup, parse_mode='HTML')
-        
-        return OBJECT_PREVIEW_MENU
+                
+                return OBJECT_PREVIEW_MENU
     
     # Get target chats
     target_chats = await get_target_chats_for_object(obj)
@@ -271,11 +271,11 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
     # Publish to each chat
     for chat_id in target_chats:
         try:
-            chat = db.session.query(Chat).filter_by(chat_id=chat_id).first()
-            if not chat:
-                continue
-            
-            telegram_chat_id = chat.telegram_chat_id
+                chat = db.session.query(Chat).filter_by(chat_id=chat_id).first()
+                if not chat:
+                    continue
+                
+                telegram_chat_id = chat.telegram_chat_id
             
             # Send message - всегда отправляем фото если оно есть
             # Всегда используем путь к файлу на сервере
@@ -320,12 +320,12 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
                     logger.info(f"Trying to send photo in publication: photo_path={photo_path}, full_path={full_path}, exists={os.path.exists(full_path)}")
                     if os.path.exists(full_path):
                         # Отправляем фото через InputFile для надежности
-                        await context.bot.send_photo(
-                            chat_id=telegram_chat_id,
+                            await context.bot.send_photo(
+                                chat_id=telegram_chat_id,
                             photo=InputFile(full_path),
-                            caption=publication_text,
-                            parse_mode='HTML'
-                        )
+                                caption=publication_text,
+                                parse_mode='HTML'
+                            )
                     else:
                         logger.warning(f"Photo file not found: {full_path} (original: {photo_path})")
                         # Отправляем только текст если файл не найден

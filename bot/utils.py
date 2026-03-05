@@ -330,33 +330,31 @@ def generate_district_hashtag(district_name: str, suffix: str = "_ф") -> str:
 def generate_room_hashtags(room_type: str) -> list:
     """
     Генерировать хэштеги для типа комнат
-    Возвращает список хэштегов (может быть несколько для евро-типов)
-    Для типа "Дом" возвращает пустой список
+    Возвращает список хэштегов (один хэштег для каждого типа)
+    Для типа "Дом" и "4+к" возвращает пустой список
     """
-    if room_type == "Дом":
+    if room_type == "Дом" or room_type == "4+к":
         return []
     
-    hashtags = []
-    
     # Маппинг типов комнат на хэштеги
+    # Все типы объединяем в один хэштег через подчеркивание
     room_hashtag_mapping = {
-        "Студия": ["студия"],
-        "1к": ["однокомнатная"],
-        "2к": ["двухкомнатная"],
-        "3к": ["трехкомнатная"],
-        "4+к": ["четырехкомнатная"],
-        "евро1к": ["однокомнатная", "еврооднокомнатная"],
-        "евро2к": ["двухкомнатная", "евродвухкомнатная"],
-        "евро3к": ["трехкомнатная", "евротрехкомнатная"]
+        "Студия": "еврооднокомнатная",
+        "1к": "однокомнатная_однушка",
+        "2к": "двухкомнатная_двушка",
+        "3к": "трехкомнатная_трешка",
+        "евро1к": "однокомнатная_еврооднокомнатная_однушка",
+        "евро2к": "двухкомнатная_евродвухкомнатная_двушка",
+        "евро3к": "трехкомнатная_евротрехкомнатная_трешка"
     }
     
-    hashtag_names = room_hashtag_mapping.get(room_type, [room_type.lower().replace(" ", "_")])
+    hashtag_name = room_hashtag_mapping.get(room_type)
     
-    # Формируем хэштеги в формате #_название (без суффикса)
-    for name in hashtag_names:
-        hashtags.append(f"#_{name}")
+    if hashtag_name:
+        return [f"#_{hashtag_name}"]
     
-    return hashtags
+    # Для неизвестных типов используем тип как есть
+    return [f"#_{room_type.lower().replace(' ', '_')}"]
 
 
 def generate_price_range_hashtag(range_name: str, suffix: str = "_ф") -> str:
@@ -573,7 +571,7 @@ def format_publication_text(obj: Object, user: User = None, is_preview: bool = F
             lines.append("🔑¦<a href=\"http://t.me/keyskrd\">Ключи</a>")
             lines.append("🏢¦<a href=\"http://t.me/MasterKeyRobot\">@MasterKeyRobot</a>")
             lines.append("🗂¦<a href=\"https://t.me/addlist/QDGm9RwOldE4YzM6\">Папка со всеми чатами</a>")
-            lines.append("")
+        lines.append("")
     
     # Контакты
     phone = obj.phone_number or (user.phone if user else None)
@@ -583,7 +581,7 @@ def format_publication_text(obj: Object, user: User = None, is_preview: bool = F
     show_username = obj.show_username or False
     
     if contact_name or phone or contact_name_2 or phone_2 or (show_username and user and user.username):
-        lines.append("")
+            lines.append("")
         if contact_name:
             lines.append(f"🕴🏻¦{contact_name}")  # Обычные символы, не заменяем
         if phone:
