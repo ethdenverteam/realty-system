@@ -278,21 +278,27 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
             telegram_chat_id = chat.telegram_chat_id
             
             # Send message - всегда отправляем фото если оно есть
-            # Всегда используем путь к файлу на сервере
+            # Поддерживаем два формата хранения фото:
+            # 1) Новый: путь к файлу на сервере (str или dict с key 'path')
+            # 2) Старый (legacy): dict только с 'file_id' из Telegram
             if photos_json and len(photos_json) > 0:
                 # Берем первое фото (только одно фото разрешено)
                 photo_data = photos_json[0]
                 
                 # Извлекаем путь к файлу
                 photo_path = None
+                photo_file_id = None
                 if isinstance(photo_data, dict):
-                    # Если это объект - берем path
-                    photo_path = photo_data.get('path', '')
+                    # Если это объект - сначала пробуем path (новый формат)
+                    photo_path = photo_data.get('path') or ''
+                    # Если path нет, пробуем legacy-формат с file_id
+                    if not photo_path:
+                        photo_file_id = photo_data.get('file_id') or None
                 elif isinstance(photo_data, str):
                     # Если это строка - это путь к файлу
                     photo_path = photo_data
                 
-                # Загружаем файл с сервера и отправляем
+                # Сначала пытаемся отправить фото по пути к файлу
                 if photo_path:
                     import os
                     
@@ -328,14 +334,33 @@ async def publish_object_immediate(update: Update, context: ContextTypes.DEFAULT
                         )
                     else:
                         logger.warning(f"Photo file not found: {full_path} (original: {photo_path})")
-                        # Отправляем только текст если файл не найден
-                        await context.bot.send_message(
-                            chat_id=telegram_chat_id,
-                            text=publication_text,
-                            parse_mode='HTML'
-                        )
+                        # Если файл по пути не найден, но есть legacy file_id – пробуем отправить по file_id
+                        if photo_file_id:
+                            logger.info(f"Falling back to legacy file_id for publication: {photo_file_id}")
+                            await context.bot.send_photo(
+                                chat_id=telegram_chat_id,
+                                photo=photo_file_id,
+                                caption=publication_text,
+                                parse_mode='HTML'
+                            )
+                        else:
+                            # Отправляем только текст если ничего не получилось
+                            await context.bot.send_message(
+                                chat_id=telegram_chat_id,
+                                text=publication_text,
+                                parse_mode='HTML'
+                            )
+                elif photo_file_id:
+                    # Нет пути, но есть старый file_id – отправляем фото напрямую через Telegram
+                    logger.info(f"Sending publication photo using legacy file_id without local path: {photo_file_id}")
+                    await context.bot.send_photo(
+                        chat_id=telegram_chat_id,
+                        photo=photo_file_id,
+                        caption=publication_text,
+                        parse_mode='HTML'
+                    )
                 else:
-                    # Если путь не найден - отправляем только текст
+                    # Если путь не найден и нет file_id - отправляем только текст
                     await context.bot.send_message(
                         chat_id=telegram_chat_id,
                         text=publication_text,
