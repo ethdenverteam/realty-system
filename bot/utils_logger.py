@@ -87,11 +87,19 @@ def setup_bot_logging():
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(detailed_formatter)
     
+    # Добавляем основные обработчики сначала
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+    logger.addHandler(error_handler)
+    
     # ========== TEST LOGS (очищаются при деплое, для анализа нейросетью) ==========
+    # ВАЖНО: Создаём тестовые логи ПОСЛЕ основных обработчиков, чтобы логирование работало
     
     # Тестовые логи бота (очищаются при каждом деплое)
     test_bot_logs_file = os.path.join(LOG_FOLDER, 'test_bot.log')
+    test_bot_handler = None
     try:
+        # Убеждаемся, что файл создаётся
         test_bot_handler = logging.FileHandler(
             test_bot_logs_file,
             mode='a',  # Append mode (очищается deploy.sh)
@@ -100,12 +108,17 @@ def setup_bot_logging():
         test_bot_handler.setLevel(logging.DEBUG)
         test_bot_handler.setFormatter(detailed_formatter)
         logger.addHandler(test_bot_handler)
+        # Теперь можем логировать - обработчики уже добавлены
         logger.info(f"Test bot log handler initialized: {test_bot_logs_file}")
     except Exception as e:
-        logger.error(f"Failed to create test_bot.log handler: {e}", exc_info=True)
+        # Используем console_handler для логирования ошибки создания
+        print(f"ERROR: Failed to create test_bot.log handler: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
     
     # Тестовые ошибки бота
     test_bot_errors_file = os.path.join(LOG_FOLDER, 'test_bot_errors.log')
+    test_bot_errors_handler = None
     try:
         test_bot_errors_handler = logging.FileHandler(
             test_bot_errors_file,
@@ -115,15 +128,13 @@ def setup_bot_logging():
         test_bot_errors_handler.setLevel(logging.ERROR)
         test_bot_errors_handler.setFormatter(detailed_formatter)
         logger.addHandler(test_bot_errors_handler)
+        # Теперь можем логировать - обработчики уже добавлены
         logger.info(f"Test bot errors log handler initialized: {test_bot_errors_file}")
     except Exception as e:
-        logger.error(f"Failed to create test_bot_errors.log handler: {e}", exc_info=True)
-    
-    # Добавляем обработчики
-    logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
-    logger.addHandler(error_handler)
-    # test_bot_handler и test_bot_errors_handler добавляются выше с обработкой ошибок
+        # Используем console_handler для логирования ошибки создания
+        print(f"ERROR: Failed to create test_bot_errors.log handler: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
     
     # Настройка уровней для библиотек
     logging.getLogger('telegram').setLevel(logging.INFO)  # INFO для деталей бота

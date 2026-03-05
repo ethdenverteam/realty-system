@@ -3,6 +3,7 @@ Main bot file - адаптированная версия из botOLD.py
 """
 import asyncio
 import os
+import sys
 import logging
 from telegram import Update
 from telegram.ext import (
@@ -120,22 +121,26 @@ def main():
     # Register handlers
     logger.info("Registering command handlers...")
     
-    # Добавляем логирование всех входящих команд перед обработкой
+    # ВАЖНО: Сначала регистрируем обработчики команд, потом логирование
+    # Обработчики команд должны быть в группе по умолчанию (0) или выше
+    logger.info("Registering /start command handler...")
+    application.add_handler(CommandHandler("start", start_command))
+    logger.info("Registering /getcode command handler...")
+    application.add_handler(CommandHandler("getcode", getcode_command))
+    
+    # Добавляем логирование всех входящих команд ПОСЛЕ регистрации обработчиков
+    # Используем низкий приоритет, чтобы не блокировать обработку
     async def log_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Логируем все входящие команды"""
+        """Логируем все входящие команды (не блокируем обработку)"""
         if update.message and update.message.text:
             command = update.message.text.split()[0] if update.message.text.split() else ""
             user = update.effective_user
             logger.info(f"COMMAND_RECEIVED: {command} from user {user.id if user else 'unknown'} (@{user.username if user else 'unknown'})")
             sys.stdout.flush()
+        # НЕ блокируем обработку - просто логируем
     
-    # Добавляем обработчик логирования команд с низким приоритетом
-    application.add_handler(MessageHandler(filters.COMMAND, log_command_handler), group=-2)
-    
-    logger.info("Registering /start command handler...")
-    application.add_handler(CommandHandler("start", start_command))
-    logger.info("Registering /getcode command handler...")
-    application.add_handler(CommandHandler("getcode", getcode_command))
+    # Добавляем обработчик логирования команд с низким приоритетом (после обработчиков команд)
+    application.add_handler(MessageHandler(filters.COMMAND, log_command_handler), group=-1)
     logger.info("Registering /myobjects command handler...")
     application.add_handler(CommandHandler("myobjects", my_objects_command))
     application.add_handler(CallbackQueryHandler(show_main_menu, pattern="^main_menu$"))
@@ -254,17 +259,22 @@ def main():
     application.add_handler(edit_conversation)
     
     # Save chats from updates to database
+    # ВАЖНО: Делаем это асинхронно и не блокируем обработку сообщений
     async def save_chat_from_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Save chat from update to database"""
+        """Save chat from update to database (async, non-blocking)"""
         from bot.utils_chat import save_chat_from_update as save_chat
         try:
-            save_chat(update)
+            # Выполняем синхронную операцию в executor, чтобы не блокировать event loop
+            import asyncio
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, save_chat, update)
         except Exception as e:
             logger.error(f"Error saving chat from update: {e}", exc_info=True)
     
-    # Add chat saver handler - should run for all updates
-    application.add_handler(MessageHandler(filters.ALL, save_chat_from_update), group=0)
-    application.add_handler(CallbackQueryHandler(save_chat_from_update), group=0)
+    # Add chat saver handler - должен выполняться для всех обновлений, но не блокировать
+    # Используем низкий приоритет, чтобы не мешать обработке команд
+    application.add_handler(MessageHandler(filters.ALL, save_chat_from_update), group=-1)
+    application.add_handler(CallbackQueryHandler(save_chat_from_update), group=-1)
     
     # Log all updates (for debugging) - only non-command messages to avoid duplication
     # NOTE: This handler should be added AFTER conversation handlers to avoid intercepting messages
