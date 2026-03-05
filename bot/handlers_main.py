@@ -21,8 +21,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     telegram_id = str(user.id)
     
-    # Логируем начало обработки команды
+    # Логируем начало обработки команды В ТЕСТОВЫЙ ЛОГ
     logger.info(f"[START_COMMAND] Received /start command from user {user.id} (@{user.username})")
+    logger.info(f"[START_COMMAND] Processing /start command - user_id={user.id}, username=@{user.username}")
     logger.debug(f"[START_COMMAND] Update type: {type(update)}, Message: {update.message}, CallbackQuery: {update.callback_query}")
     logger.debug(f"[START_COMMAND] Context args: {context.args}")
     sys.stdout.flush()
@@ -55,10 +56,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_main_menu(update, context)
         
         logger.info(f"[START_COMMAND] Successfully processed /start for user {user.id}")
+        logger.info(f"[START_COMMAND] Response sent to user {user.id}")
         sys.stdout.flush()
     except Exception as e:
-        # Логируем ошибку с полным контекстом
-        logger.error(f"Error in start_command for user {user.id}: {e}", exc_info=True)
+        # Логируем ошибку с полным контекстом В ТЕСТОВЫЙ ЛОГ
+        logger.error(f"[START_COMMAND] Error in start_command for user {user.id}: {e}", exc_info=True)
+        logger.error(f"[START_COMMAND] Failed to process /start command - user_id={user.id}, error={str(e)}")
         log_bot_error(
             error=e,
             action='bot_command_start',

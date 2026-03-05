@@ -135,7 +135,8 @@ def main():
         if update.message and update.message.text:
             command = update.message.text.split()[0] if update.message.text.split() else ""
             user = update.effective_user
-            logger.info(f"COMMAND_RECEIVED: {command} from user {user.id if user else 'unknown'} (@{user.username if user else 'unknown'})")
+            logger.info(f"[LOG_COMMAND] COMMAND_RECEIVED: {command} from user {user.id if user else 'unknown'} (@{user.username if user else 'unknown'})")
+            logger.info(f"[LOG_COMMAND] User sent command: {command} - user_id={user.id if user else 'unknown'}, text={update.message.text}")
             sys.stdout.flush()
         # НЕ блокируем обработку - просто логируем
     
