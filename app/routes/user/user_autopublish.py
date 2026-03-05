@@ -529,9 +529,11 @@ def update_autopublish_config(object_id, current_user):
         if isinstance(accounts_config, dict) and accounts_config.get('accounts') == []:
             old_config = cfg.accounts_config_json
             if isinstance(old_config, dict):
-                # Восстанавливаем аккаунты с пустыми chat_ids, но сохраняем всю старую конфигурацию
+                # Восстанавливаем аккаунты с пустыми chat_ids, но сохраняем формат публикации из нового запроса (если есть)
+                # Если в новом запросе нет формата, используем старый
+                new_format = accounts_config.get('publication_format')
                 restored_config = {
-                    'publication_format': old_config.get('publication_format', 'default'),
+                    'publication_format': new_format if new_format is not None else old_config.get('publication_format', 'default'),
                     'accounts': []
                 }
                 # Восстанавливаем аккаунты с пустыми chat_ids
