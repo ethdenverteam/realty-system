@@ -519,3 +519,134 @@ def admin_test_account_publication_publish(current_user):
             'chat_id': chat_id
         })
         return jsonify({'error': str(e)}), 500
+
+
+@admin_account_autopublish_bp.route('/dashboard/check-chat-access', methods=['POST'])
+@jwt_required
+@role_required('admin')
+def admin_check_chat_access(current_user):
+    """
+    Проверка доступности чата для аккаунта.
+    Два варианта:
+    1. Только проверка validate_chat_peer (без отправки)
+    2. Проверка с реальной отправкой тестового сообщения
+    """
+    from app.models.telegram_account import TelegramAccount
+    from app.utils.telethon.telethon_connection import create_client, validate_chat_peer
+    from app.utils.telethon_client import run_async, send_test_message
+    
+    data = request.get_json()
+    account_id = data.get('account_id')
+    chat_id = data.get('chat_id')
+    with_send = data.get('with_send', False)  # Если True - отправляем тестовое сообщение
+    
+    if not account_id or not chat_id:
+        return jsonify({'error': 'account_id and chat_id are required'}), 400
+    
+    # Get account
+    account = TelegramAccount.query.get(account_id)
+    if not account:
+        return jsonify({'error': 'Account not found'}), 404
+    
+    # Get chat
+    chat = Chat.query.get(chat_id)
+    if not chat:
+        return jsonify({'error': 'Chat not found'}), 404
+    
+    try:
+        client = None
+        try:
+            # Создаём клиент и подключаемся
+            client = run_async(create_client(account.phone))
+            run_async(client.connect())
+            
+            # Проверяем авторизацию
+            is_authorized = run_async(client.is_user_authorized())
+            if not is_authorized:
+                return jsonify({
+                    'success': False,
+                    'error': 'Account not authorized. Please reconnect the account.',
+                    'check_type': 'validation_only' if not with_send else 'validation_with_send',
+                }), 400
+            
+            # Проверка validate_chat_peer
+            telegram_chat_id = int(chat.telegram_chat_id)
+            is_valid_peer = run_async(validate_chat_peer(client, telegram_chat_id))
+            
+            result = {
+                'success': True,
+                'account_id': account_id,
+                'account_phone': account.phone,
+                'chat_id': chat_id,
+                'chat_title': chat.title,
+                'telegram_chat_id': telegram_chat_id,
+                'check_type': 'validation_only' if not with_send else 'validation_with_send',
+                'validation_result': {
+                    'is_valid_peer': is_valid_peer,
+                    'message': 'Чат доступен для аккаунта' if is_valid_peer else 'Чат недоступен для аккаунта (validate_chat_peer вернул False)',
+                },
+            }
+            
+            # Если запрошена проверка с отправкой
+            if with_send:
+                try:
+                    send_success, send_error, message_id = run_async(
+                        send_test_message(account.phone, str(telegram_chat_id), "Тестовое сообщение для проверки доступа")
+                    )
+                    result['send_result'] = {
+                        'success': send_success,
+                        'message_id': message_id,
+                        'error': send_error,
+                        'message': 'Сообщение успешно отправлено' if send_success else f'Ошибка отправки: {send_error}',
+                    }
+                    # Обновляем общий результат
+                    result['success'] = send_success
+                    if not send_success:
+                        result['error'] = send_error
+                except Exception as send_exc:
+                    logger.error(f"Error sending test message in check_chat_access: {send_exc}", exc_info=True)
+                    result['send_result'] = {
+                        'success': False,
+                        'error': str(send_exc),
+                        'message': f'Исключение при отправке: {str(send_exc)}',
+                    }
+                    result['success'] = False
+                    result['error'] = str(send_exc)
+            else:
+                # Если только проверка без отправки - предупреждаем, что это диагностика
+                result['note'] = 'Это только диагностическая проверка. Для реальной проверки используйте вариант с отправкой.'
+            
+            # Логируем действие
+            log_action(
+                action='admin_check_chat_access',
+                user_id=current_user.user_id,
+                details={
+                    'account_id': account_id,
+                    'chat_id': chat_id,
+                    'with_send': with_send,
+                    'is_valid_peer': is_valid_peer,
+                    'send_success': result.get('send_result', {}).get('success') if with_send else None,
+                }
+            )
+            
+            return jsonify(result), 200
+            
+        finally:
+            if client:
+                try:
+                    run_async(client.disconnect())
+                except Exception as disc_err:
+                    logger.warning(f"Error disconnecting client in check_chat_access: {disc_err}")
+                    
+    except Exception as e:
+        logger.error(f"Error in admin check chat access: {e}", exc_info=True)
+        log_error(e, 'admin_check_chat_access_failed', current_user.user_id, {
+            'account_id': account_id,
+            'chat_id': chat_id,
+            'with_send': with_send,
+        })
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'check_type': 'validation_only' if not with_send else 'validation_with_send',
+        }), 500

@@ -65,6 +65,34 @@ interface MonitorResponse {
   stuck_queues: QueueRow[]
 }
 
+interface ChatCheckResult {
+  success: boolean
+  account_id: number
+  account_phone: string
+  chat_id: number
+  chat_title: string
+  telegram_chat_id: number
+  check_type: 'validation_only' | 'validation_with_send'
+  validation_result: {
+    is_valid_peer: boolean
+    message: string
+  }
+  send_result?: {
+    success: boolean
+    message_id?: number
+    error?: string
+    message: string
+  }
+  note?: string
+  error?: string
+}
+
+interface AccountOption {
+  account_id: number
+  phone: string
+  chats: Array<{ chat_id: number; title: string; telegram_chat_id: string }>
+}
+
 export default function AccountAutopublishMonitor(): JSX.Element {
   const [data, setData] = useState<MonitorResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -73,10 +101,74 @@ export default function AccountAutopublishMonitor(): JSX.Element {
   const [thresholdMinutes, setThresholdMinutes] = useState(5)
   const [resetting, setResetting] = useState(false)
   const [togglingRateLimit, setTogglingRateLimit] = useState(false)
+  
+  // Chat check state
+  const [checkAccountId, setCheckAccountId] = useState<number | ''>('')
+  const [checkChatId, setCheckChatId] = useState<number | ''>('')
+  const [checkingChat, setCheckingChat] = useState(false)
+  const [checkResult, setCheckResult] = useState<ChatCheckResult | null>(null)
+  const [accountOptions, setAccountOptions] = useState<AccountOption[]>([])
+  const [loadingAccounts, setLoadingAccounts] = useState(false)
 
   useEffect(() => {
     void loadData()
+    void loadAccountOptions()
   }, [])
+  
+  const loadAccountOptions = async (): Promise<void> => {
+    try {
+      setLoadingAccounts(true)
+      const res = await api.get<AccountOption[]>('/admin/dashboard/test-account-publication/accounts')
+      setAccountOptions(res.data)
+    } catch (err: unknown) {
+      console.error('Failed to load account options:', err)
+    } finally {
+      setLoadingAccounts(false)
+    }
+  }
+  
+  const checkChatAccess = async (withSend: boolean): Promise<void> => {
+    if (!checkAccountId || !checkChatId) {
+      setError('Выберите аккаунт и чат')
+      return
+    }
+    
+    try {
+      setCheckingChat(true)
+      setCheckResult(null)
+      setError('')
+      const res = await api.post<ChatCheckResult>('/admin/dashboard/check-chat-access', {
+        account_id: checkAccountId,
+        chat_id: checkChatId,
+        with_send: withSend,
+      })
+      setCheckResult(res.data)
+      if (res.data.success) {
+        setActionMessage(
+          withSend
+            ? 'Проверка с отправкой завершена успешно'
+            : 'Проверка без отправки завершена успешно'
+        )
+      } else {
+        setError(res.data.error || 'Ошибка проверки доступа к чату')
+      }
+    } catch (err: unknown) {
+      if (axios.isAxiosError<ApiErrorResponse>(err)) {
+        const errorMsg = err.response?.data?.error || 'Ошибка проверки доступа к чату'
+        setError(errorMsg)
+        if (err.response?.data) {
+          setCheckResult(err.response.data as ChatCheckResult)
+        }
+      } else {
+        setError('Ошибка проверки доступа к чату')
+      }
+    } finally {
+      setCheckingChat(false)
+    }
+  }
+  
+  const selectedAccount = accountOptions.find((acc) => acc.account_id === checkAccountId)
+  const availableChats = selectedAccount?.chats || []
 
   const loadData = async (): Promise<void> => {
     try {
@@ -263,6 +355,91 @@ export default function AccountAutopublishMonitor(): JSX.Element {
               </table>
             </div>
           )}
+        </GlassCard>
+
+        <GlassCard className="monitor-section-card">
+          <h2 className="card-title">Проверка доступа к чату</h2>
+          <div className="chat-check-form">
+            <div className="form-row">
+              <div className="form-group">
+                <label>Аккаунт:</label>
+                <select
+                  value={checkAccountId}
+                  onChange={(e) => {
+                    setCheckAccountId(e.target.value ? Number(e.target.value) : '')
+                    setCheckChatId('')
+                  }}
+                  className="form-control"
+                  disabled={loadingAccounts || checkingChat}
+                >
+                  <option value="">Выберите аккаунт</option>
+                  {accountOptions.map((acc) => (
+                    <option key={acc.account_id} value={acc.account_id}>
+                      {acc.account_id} ({acc.phone})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Чат:</label>
+                <select
+                  value={checkChatId}
+                  onChange={(e) => setCheckChatId(e.target.value ? Number(e.target.value) : '')}
+                  className="form-control"
+                  disabled={!checkAccountId || checkingChat}
+                >
+                  <option value="">Выберите чат</option>
+                  {availableChats.map((chat) => (
+                    <option key={chat.chat_id} value={chat.chat_id}>
+                      {chat.chat_id} - {chat.title} ({chat.telegram_chat_id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="form-row">
+              <button
+                className="btn btn-secondary"
+                onClick={() => void checkChatAccess(false)}
+                disabled={!checkAccountId || !checkChatId || checkingChat}
+              >
+                {checkingChat ? 'Проверка...' : 'Проверить без отправки'}
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => void checkChatAccess(true)}
+                disabled={!checkAccountId || !checkChatId || checkingChat}
+              >
+                {checkingChat ? 'Проверка...' : 'Проверить с отправкой'}
+              </button>
+            </div>
+            {checkResult && (
+              <div className={`chat-check-result ${checkResult.success ? 'success' : 'error'}`}>
+                <h3>Результат проверки:</h3>
+                <div className="result-details">
+                  <p><strong>Тип проверки:</strong> {checkResult.check_type === 'validation_only' ? 'Только проверка (без отправки)' : 'Проверка с отправкой'}</p>
+                  <p><strong>Аккаунт:</strong> {checkResult.account_id} ({checkResult.account_phone})</p>
+                  <p><strong>Чат:</strong> {checkResult.chat_id} - {checkResult.chat_title} ({checkResult.telegram_chat_id})</p>
+                  <p><strong>Результат validate_chat_peer:</strong> {checkResult.validation_result.is_valid_peer ? '✅ Доступен' : '❌ Недоступен'}</p>
+                  <p><strong>Сообщение:</strong> {checkResult.validation_result.message}</p>
+                  {checkResult.send_result && (
+                    <>
+                      <p><strong>Результат отправки:</strong> {checkResult.send_result.success ? '✅ Успешно' : '❌ Ошибка'}</p>
+                      {checkResult.send_result.message_id && (
+                        <p><strong>ID сообщения:</strong> {checkResult.send_result.message_id}</p>
+                      )}
+                      {checkResult.send_result.error && (
+                        <p><strong>Ошибка отправки:</strong> {checkResult.send_result.error}</p>
+                      )}
+                      <p><strong>Сообщение:</strong> {checkResult.send_result.message}</p>
+                    </>
+                  )}
+                  {checkResult.note && <p className="note">{checkResult.note}</p>}
+                  {checkResult.error && <p className="error-text"><strong>Ошибка:</strong> {checkResult.error}</p>}
+                </div>
+              </div>
+            )}
+          </div>
         </GlassCard>
 
         <GlassCard className="monitor-section-card">

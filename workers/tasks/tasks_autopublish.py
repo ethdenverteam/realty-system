@@ -5,6 +5,7 @@ Celery tasks for autopublish
 from workers.celery_app import celery_app
 from app.database import db
 from bot.models import PublicationQueue, Object, Chat, PublicationHistory, AutopublishConfig, TelegramAccount
+from workers.tasks.tasks_publication import publish_to_telegram  # Celery-задача отправки в Telegram
 from datetime import datetime, timedelta
 from sqlalchemy import or_, func
 import logging
@@ -80,8 +81,24 @@ def process_autopublish():
             
             for queue in queues:
                 scheduled_str = queue.scheduled_time.strftime('%Y-%m-%d %H:%M:%S') if queue.scheduled_time else 'not scheduled'
-                logger.info(f"Publishing queue {queue.queue_id} for object {queue.object_id} to chat {queue.chat_id} (scheduled: {scheduled_str}, created: {queue.created_at})")
+                logger.info(
+                    f"Publishing queue {queue.queue_id} for object {queue.object_id} "
+                    f"to chat {queue.chat_id} (scheduled: {scheduled_str}, created: {queue.created_at})"
+                )
+                try:
+                    # Ставим задачу publish_to_telegram в очередь Celery
                 publish_to_telegram.delay(queue.queue_id)
+                except Exception as enqueue_error:
+                    # ВАЖНО: если даже постановка задачи упала, помечаем очередь с ошибкой,
+                    # чтобы она не висела в pending бесконечно.
+                    logger.error(
+                        f"Failed to enqueue publish_to_telegram for queue {queue.queue_id}: {enqueue_error}",
+                        exc_info=True,
+                    )
+                    queue.status = 'failed'
+                    queue.error_message = str(enqueue_error)
+                    queue.attempts = (queue.attempts or 0) + 1
+                    db.session.commit()
             
             return len(queues)
     except SoftTimeLimitExceeded:

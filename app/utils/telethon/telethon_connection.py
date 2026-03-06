@@ -73,7 +73,12 @@ async def create_client(phone: str) -> TelegramClient:
 async def validate_chat_peer(client: TelegramClient, telegram_chat_id: int) -> bool:
     """
     Проверяет, что для данного клиента существует валидный peer с указанным telegram_chat_id.
-    Используется перед отправкой сообщения, чтобы избежать Invalid Peer.
+    
+    ВАЖНО: Эта функция используется ТОЛЬКО для диагностики в админке.
+    В боевой логике отправки сообщений мы убрали защитные проверки и всегда пробуем отправку,
+    а любые проблемы Telegram видим "как есть".
+    
+    Функция просматривает ВСЕ диалоги аккаунта (limit=None) для поиска чата по ID.
     """
     original_id = telegram_chat_id
     try:
@@ -140,7 +145,7 @@ async def validate_chat_peer(client: TelegramClient, telegram_chat_id: int) -> b
                             f"validate_chat_peer: matched dialog entity.id={ent_id} "
                             f"for telegram_chat_id={original_id}"
                         )
-                        return True
+                return True
             except Exception as cmp_err:
                 # Не даём сравнительной ошибке прервать проверку остальных диалогов
                 logger.debug(

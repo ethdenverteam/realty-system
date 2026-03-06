@@ -395,16 +395,9 @@ async def send_object_message(phone: str, chat_id: str, message_text: str, photo
             else:
                 return (False, "Account not authorized. Please connect first.", None)
         
-        # Перед отправкой проверяем, что peer валиден для данного клиента
-        try:
-            is_valid_peer = await validate_chat_peer(client, int(chat_id))
-        except Exception as peer_check_error:
-            logger.error(f"Error while validating peer for chat_id={chat_id}: {peer_check_error}", exc_info=True)
-            is_valid_peer = False
-
-        if not is_valid_peer:
-            await client.disconnect()
-            return (False, "Выбранный чат недоступен для этого аккаунта. Проверьте, что аккаунт состоит в чате и чат активен.", None)
+        # ВАЖНО: Убрали защитную проверку validate_chat_peer из боевой логики.
+        # Теперь всегда пробуем отправку, а любые проблемы Telegram видим "как есть".
+        # validate_chat_peer используется только для диагностики в админке.
 
         # Send message with photo if available - всегда отправляем фото если оно есть
         if photos and len(photos) > 0:

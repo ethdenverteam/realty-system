@@ -76,4 +76,91 @@
   color: #d1fae5;
 }
 
+/* Chat check form styles */
+.chat-check-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chat-check-form .form-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.chat-check-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 250px;
+  flex: 1;
+}
+
+.chat-check-form .form-group label {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.chat-check-form .form-control {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 14px;
+}
+
+.chat-check-form .form-control:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-check-result {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.chat-check-result.success {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.chat-check-result.error {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.chat-check-result h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 18px;
+}
+
+.chat-check-result .result-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-check-result .result-details p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.chat-check-result .result-details .note {
+  font-style: italic;
+  opacity: 0.8;
+  margin-top: 8px;
+}
+
+.chat-check-result .result-details .error-text {
+  color: #fca5a5;
+  margin-top: 8px;
+}
+
 
